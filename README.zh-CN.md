@@ -181,7 +181,7 @@ cardinal-mcp/
 
 ---
 
-## 工作流示例
+## 工作流示例(我都没试过)
 
 ### "把合成器变亮一点"
 
@@ -232,7 +232,7 @@ AI: → cardinal_patch_info 找 SnareDrumN
 
 ### 硬件
 
-- **CPU**：AMD64（x86-64）
+- **CPU**：Intel(R) Core(TM) Ultra 9 275HX
 - **屏幕**：
   - 逻辑分辨率 1600×1000
   - 物理分辨率 3200×2000（200% 缩放 = DPI 192）
