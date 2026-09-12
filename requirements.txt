@@ -1,0 +1,10 @@
+# cardinal-mcp 的全部第三方依赖（只有两个）
+#
+#   python-osc   OSC 消息的构造与解析，跟 Cardinal 通讯用
+#   zstandard    Cardinal 保存 .vcv 时用的是 tar+zstd 归档格式，读它需要这个
+#
+# 安装：
+#   pip install -r requirements.txt
+#
+python-osc>=1.8.0
+zstandard>=0.21.0

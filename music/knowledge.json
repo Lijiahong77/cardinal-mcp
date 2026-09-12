@@ -1,0 +1,691 @@
+{
+ "drum_patterns": {
+  "four_on_floor": {
+   "name": "四四拍 / House",
+   "bpm": [
+    118,
+    128
+   ],
+   "mood": "稳、能跳、万能",
+   "desc": "底鼓每拍一下（four on the floor），反拍开镲是 house 的灵魂。",
+   "kick": "x...x...x...x...",
+   "snare": "....x.......x...",
+   "hat": "..o...o...o...o."
+  },
+  "rock_basic": {
+   "name": "摇滚基本型",
+   "bpm": [
+    100,
+    140
+   ],
+   "mood": "直接、有推动力",
+   "desc": "底鼓 1、3 拍，军鼓 2、4 拍。最经典的鼓点。",
+   "kick": "x.......x.......",
+   "snare": "....x.......x...",
+   "hat": "x.o.x.o.x.o.x.o."
+  },
+  "lofi_hiphop": {
+   "name": "Lo-fi Hip Hop",
+   "bpm": [
+    70,
+    92
+   ],
+   "mood": "懒散、怀旧、适合学习背景",
+   "desc": "底鼓偏后（第 1 拍和第 2.5 拍），军鼓在第 3 拍，整体有摇摆感。",
+   "kick": "x.....o.x.......",
+   "snare": "........x.......",
+   "hat": "o.o.o.o.o.o.o.o."
+  },
+  "trap": {
+   "name": "Trap",
+   "bpm": [
+    130,
+    150
+   ],
+   "mood": "压迫、现代",
+   "desc": "808 底鼓 + 密集的滚奏 hi-hat。军鼓在第 3 拍。",
+   "kick": "x.....o...x.....",
+   "snare": "........x.......",
+   "hat": "xoxxooxxoxxoxoxx"
+  },
+  "breakbeat": {
+   "name": "Breakbeat",
+   "bpm": [
+    160,
+    175
+   ],
+   "mood": "碎、有劲、dnb 味",
+   "desc": "把底鼓和军鼓打散，制造「断拍」的紧张感。",
+   "kick": "x.....x...x.....",
+   "snare": "....x..x..x.x...",
+   "hat": "o.o.o.o.o.o.o.o."
+  },
+  "ballad": {
+   "name": "慢歌 / 叙事",
+   "bpm": [
+    60,
+    80
+   ],
+   "mood": "舒缓、留白",
+   "desc": "稀疏的底鼓和军鼓，给旋律和人声让位置。",
+   "kick": "x.......o.......",
+   "snare": "....x.......x...",
+   "hat": "..o...o...o...o."
+  },
+  "bossa": {
+   "name": "Bossa Nova",
+   "bpm": [
+    90,
+    110
+   ],
+   "mood": "轻松、有呼吸",
+   "desc": "两个小节的呼应型，底鼓和军鼓交错咬合。",
+   "kick": "x..o..x...x..o..",
+   "snare": "..o..x..o..x..o.",
+   "hat": "o.o.o.o.o.o.o.o."
+  },
+  "halftime": {
+   "name": "半速 / 后摇氛围",
+   "bpm": [
+    60,
+    75
+   ],
+   "mood": "沉重、辽阔",
+   "desc": "军鼓落在第 3 拍、感觉像慢了一半，适合铺长的段落。",
+   "kick": "x.......x.......",
+   "snare": "........x.......",
+   "hat": "o...o...o...o..."
+  },
+  "none": {
+   "name": "不要鼓",
+   "bpm": [
+    0,
+    0
+   ],
+   "mood": "纯氛围",
+   "desc": "留空，只保留和声与音色。",
+   "kick": "................",
+   "snare": "................",
+   "hat": "................"
+  }
+ },
+ "progressions": {
+  "pop_1564": {
+   "name": "流行万能 (I–V–vi–IV)",
+   "degrees": [
+    "I",
+    "V",
+    "vi",
+    "IV"
+   ],
+   "mood": "明亮、通用、几乎不会错",
+   "style": [
+    "pop",
+    "ballad"
+   ],
+   "desc": "被用烂但真的好用。适合做副歌。"
+  },
+  "pop_6415": {
+   "name": "小调感流行 (vi–IV–I–V)",
+   "degrees": [
+    "vi",
+    "IV",
+    "I",
+    "V"
+   ],
+   "mood": "uplifting 里带一点忧郁",
+   "style": [
+    "pop",
+    "edm"
+   ],
+   "desc": "从六级起手，情绪更「抓」。EDM 副歌常客。"
+  },
+  "canon": {
+   "name": "卡农进行 (I–V–vi–iii–IV–I–IV–V)",
+   "degrees": [
+    "I",
+    "V",
+    "vi",
+    "iii",
+    "IV",
+    "I",
+    "IV",
+    "V"
+   ],
+   "mood": "叙事、有推进感",
+   "style": [
+    "pop",
+    "ballad"
+   ],
+   "desc": "八小节完整版，低音线是级进下行，很好配旋律。"
+  },
+  "jazz_251": {
+   "name": "爵士 ii–V–I",
+   "degrees": [
+    "ii7",
+    "V7",
+    "Imaj7"
+   ],
+   "mood": "温暖、有解决感",
+   "style": [
+    "jazz",
+    "lofi"
+   ],
+   "desc": "功能和声的核心句式。加个 vi7 就成 loop。"
+  },
+  "lofi_2516": {
+   "name": "Lo-fi 循环 (ii7–V7–Imaj7–vi7)",
+   "degrees": [
+    "ii7",
+    "V7",
+    "Imaj7",
+    "vi7"
+   ],
+   "mood": "松弛、怀旧、能无限循环",
+   "style": [
+    "lofi",
+    "jazz"
+   ],
+   "desc": "七和弦让色彩变软，适合配 lo-fi 鼓。"
+  },
+  "minor_epic": {
+   "name": "史诗小调 (i–VI–III–VII)",
+   "degrees": [
+    "i",
+    "VI",
+    "III",
+    "VII"
+   ],
+   "mood": "壮阔、有电影感",
+   "style": [
+    "epic",
+    "edm"
+   ],
+   "desc": "小调里最「燃」的进行，配大混响很有效。"
+  },
+  "andalusian": {
+   "name": "安达卢西亚 (i–VII–VI–V)",
+   "degrees": [
+    "i",
+    "VII",
+    "VI",
+    "V"
+   ],
+   "mood": "异域、宿命感",
+   "style": [
+    "flamenco",
+    "epic"
+   ],
+   "desc": "西班牙弗拉门戈的经典下行。最后一个 V 是大三，很有张力。"
+  },
+  "blues_12": {
+   "name": "12 小节布鲁斯",
+   "degrees": [
+    "I7",
+    "I7",
+    "I7",
+    "I7",
+    "IV7",
+    "IV7",
+    "I7",
+    "I7",
+    "V7",
+    "IV7",
+    "I7",
+    "V7"
+   ],
+   "mood": "根源、会自己走起来",
+   "style": [
+    "blues",
+    "rock"
+   ],
+   "desc": "标准 12 小节，全是属七和弦。"
+  },
+  "ambient_drone": {
+   "name": "氛围长音 (i 挂留)",
+   "degrees": [
+    "i",
+    "i",
+    "VI",
+    "VI"
+   ],
+   "mood": "静止、冥想",
+   "style": [
+    "ambient",
+    "drone"
+   ],
+   "desc": "每个和弦停很久，靠音色变化而不是和声变化推动。"
+  },
+  "bedroom_4536": {
+   "name": "卧室流行 (IV–V–iii–vi)",
+   "degrees": [
+    "IV",
+    "V",
+    "iii",
+    "vi"
+   ],
+   "mood": "青春、日系",
+   "style": [
+    "pop"
+   ],
+   "desc": "日系/动漫歌曲高频进行。"
+  }
+ },
+ "recipes": {
+  "warm_pad": {
+   "name": "温暖铺底 Pad",
+   "target": [
+    "VCO",
+    "VCF",
+    "ADSR",
+    "Plateau"
+   ],
+   "mood": "柔和、有空间、不抢戏",
+   "desc": "起音慢、释放长、滤波略暗，混响给足。适合垫在旋律下面。",
+   "settings": [
+    {
+     "module": "ADSR",
+     "param": "Attack",
+     "value": 0.45,
+     "why": "起音慢，声音是「浮上来」而不是「砸下来」"
+    },
+    {
+     "module": "ADSR",
+     "param": "Decay",
+     "value": 0.6,
+     "why": "缓降"
+    },
+    {
+     "module": "ADSR",
+     "param": "Sustain",
+     "value": 0.8,
+     "why": "按住时保持饱满"
+    },
+    {
+     "module": "ADSR",
+     "param": "Release",
+     "value": 0.75,
+     "why": "松手后留一条尾巴"
+    },
+    {
+     "module": "VCF",
+     "param": "Cutoff frequency",
+     "value": 6.0,
+     "why": "比中心高一点，滤掉刺耳的高频但保留空气感"
+    },
+    {
+     "module": "VCF",
+     "param": "Resonance",
+     "value": 0.12,
+     "why": "一点点共振让声音有「肉」"
+    },
+    {
+     "module": "VCO",
+     "param": "Frequency modulation",
+     "value": 0.05,
+     "why": "轻微力度响应，保留动态"
+    },
+    {
+     "module": "Plateau",
+     "param": "Wet level",
+     "value": 0.45,
+     "why": "混响给足，制造空间"
+    },
+    {
+     "module": "Plateau",
+     "param": "Size",
+     "value": 0.75,
+     "why": "大空间"
+    },
+    {
+     "module": "Plateau",
+     "param": "Decay",
+     "value": 0.8,
+     "why": "混响尾巴长"
+    }
+   ]
+  },
+  "bright_pluck": {
+   "name": "明亮拨弦 Pluck",
+   "target": [
+    "VCO",
+    "VCF",
+    "ADSR",
+    "Plateau"
+   ],
+   "mood": "清脆、有颗粒感",
+   "desc": "短促的起音 + 快速衰减，滤波开亮。适合旋律和琶音。",
+   "settings": [
+    {
+     "module": "ADSR",
+     "param": "Attack",
+     "value": 0.02,
+     "why": "几乎瞬间起音，才有「拨」的感觉"
+    },
+    {
+     "module": "ADSR",
+     "param": "Decay",
+     "value": 0.22,
+     "why": "快速衰减是拨弦的关键"
+    },
+    {
+     "module": "ADSR",
+     "param": "Sustain",
+     "value": 0.0,
+     "why": "不保持，让它自然消失"
+    },
+    {
+     "module": "ADSR",
+     "param": "Release",
+     "value": 0.2,
+     "why": "短尾巴"
+    },
+    {
+     "module": "VCF",
+     "param": "Cutoff frequency",
+     "value": 18.0,
+     "why": "开亮，保留泛音"
+    },
+    {
+     "module": "VCF",
+     "param": "Resonance",
+     "value": 0.2,
+     "why": "轻微共振增加「叮」的质感"
+    },
+    {
+     "module": "Plateau",
+     "param": "Wet level",
+     "value": 0.28,
+     "why": "少量混响，不要太湿"
+    }
+   ]
+  },
+  "lofi_keys": {
+   "name": "Lo-fi 键盘",
+   "target": [
+    "VCO",
+    "VCF",
+    "ADSR",
+    "Plateau"
+   ],
+   "mood": "闷、旧、像卡带",
+   "desc": "滤波压暗 + 起音略慢，配合 lo-fi 鼓非常合适。",
+   "settings": [
+    {
+     "module": "ADSR",
+     "param": "Attack",
+     "value": 0.08,
+     "why": "轻微延迟的起音"
+    },
+    {
+     "module": "ADSR",
+     "param": "Decay",
+     "value": 0.5,
+     "why": "中等衰减"
+    },
+    {
+     "module": "ADSR",
+     "param": "Sustain",
+     "value": 0.45,
+     "why": "保持一点，让和弦连起来"
+    },
+    {
+     "module": "ADSR",
+     "param": "Release",
+     "value": 0.4,
+     "why": "自然收尾"
+    },
+    {
+     "module": "VCF",
+     "param": "Cutoff frequency",
+     "value": -6.0,
+     "why": "压低截止，去掉亮的高频"
+    },
+    {
+     "module": "VCF",
+     "param": "Resonance",
+     "value": 0.05,
+     "why": "几乎不共振，越平越旧"
+    },
+    {
+     "module": "VCF",
+     "param": "Drive",
+     "value": 0.2,
+     "why": "轻微过载模拟磁带饱和"
+    },
+    {
+     "module": "Plateau",
+     "param": "Wet level",
+     "value": 0.3,
+     "why": "一点混响"
+    },
+    {
+     "module": "Plateau",
+     "param": "Size",
+     "value": 0.4,
+     "why": "小房间，不是大厅"
+    }
+   ]
+  },
+  "dark_bass": {
+   "name": "暗色贝斯",
+   "target": [
+    "VCO",
+    "VCF",
+    "ADSR"
+   ],
+   "mood": "低、厚、托底",
+   "desc": "滤波压到很低 + 快速起音，低频结实不糊。",
+   "settings": [
+    {
+     "module": "ADSR",
+     "param": "Attack",
+     "value": 0.01,
+     "why": "贝斯要立刻出来"
+    },
+    {
+     "module": "ADSR",
+     "param": "Decay",
+     "value": 0.3,
+     "why": "短衰减"
+    },
+    {
+     "module": "ADSR",
+     "param": "Sustain",
+     "value": 0.85,
+     "why": "保持住低频"
+    },
+    {
+     "module": "ADSR",
+     "param": "Release",
+     "value": 0.12,
+     "why": "干脆收尾，不拖泥带水"
+    },
+    {
+     "module": "VCF",
+     "param": "Cutoff frequency",
+     "value": -30.0,
+     "why": "压到很低，只留基频"
+    },
+    {
+     "module": "VCF",
+     "param": "Resonance",
+     "value": 0.18,
+     "why": "一点共振让低频更「立」"
+    }
+   ]
+  },
+  "bell": {
+   "name": "铃铛 / 钟",
+   "target": [
+    "VCO",
+    "VCF",
+    "ADSR",
+    "Plateau"
+   ],
+   "mood": "清、远、有回响",
+   "desc": "极短起音 + 长衰减，配合大混响。适合点缀。",
+   "settings": [
+    {
+     "module": "ADSR",
+     "param": "Attack",
+     "value": 0.01,
+     "why": "瞬时起音"
+    },
+    {
+     "module": "ADSR",
+     "param": "Decay",
+     "value": 0.7,
+     "why": "长的衰减产生「余音」"
+    },
+    {
+     "module": "ADSR",
+     "param": "Sustain",
+     "value": 0.0,
+     "why": "完全不保持"
+    },
+    {
+     "module": "ADSR",
+     "param": "Release",
+     "value": 0.5,
+     "why": "长释放"
+    },
+    {
+     "module": "VCF",
+     "param": "Cutoff frequency",
+     "value": 24.0,
+     "why": "开亮"
+    },
+    {
+     "module": "Plateau",
+     "param": "Wet level",
+     "value": 0.5,
+     "why": "大混响"
+    },
+    {
+     "module": "Plateau",
+     "param": "Size",
+     "value": 0.9,
+     "why": "大厅"
+    },
+    {
+     "module": "Plateau",
+     "param": "Decay",
+     "value": 0.85,
+     "why": "很长的尾巴"
+    }
+   ]
+  },
+  "lead_saw": {
+   "name": "主奏锯齿",
+   "target": [
+    "VCO",
+    "VCF",
+    "ADSR",
+    "Plateau"
+   ],
+   "mood": "有力、穿透",
+   "desc": "中等起音 + 高保持，滤波开亮带共振。适合当主旋律。",
+   "settings": [
+    {
+     "module": "ADSR",
+     "param": "Attack",
+     "value": 0.06,
+     "why": "稍微留一点起音，不至于太生硬"
+    },
+    {
+     "module": "ADSR",
+     "param": "Decay",
+     "value": 0.4,
+     "why": "中等"
+    },
+    {
+     "module": "ADSR",
+     "param": "Sustain",
+     "value": 0.75,
+     "why": "保持住，长音不断"
+    },
+    {
+     "module": "ADSR",
+     "param": "Release",
+     "value": 0.3,
+     "why": "中等尾巴"
+    },
+    {
+     "module": "VCF",
+     "param": "Cutoff frequency",
+     "value": 14.0,
+     "why": "偏亮，能穿过混音"
+    },
+    {
+     "module": "VCF",
+     "param": "Resonance",
+     "value": 0.3,
+     "why": "共振让音色更有「性格」"
+    },
+    {
+     "module": "Plateau",
+     "param": "Wet level",
+     "value": 0.22,
+     "why": "少量混响，保持清晰"
+    }
+   ]
+  },
+  "lofi_kick": {
+   "name": "柔化底鼓",
+   "target": [
+    "BassDrum9"
+   ],
+   "mood": "闷、不刺耳",
+   "desc": "把底鼓速度放慢一点、选一个柔和的采样，音量别太大。",
+   "settings": [
+    {
+     "module": "BassDrum9",
+     "param": "Sample",
+     "value": 0.0,
+     "index": 0,
+     "why": "换一个采样（0–15 逐个试）"
+    },
+    {
+     "module": "BassDrum9",
+     "param": "Playback Speed",
+     "value": 0.85,
+     "index": 0,
+     "why": "放慢一点，听起来更「旧」"
+    }
+   ],
+   "note": "Sample 参数有多个槽位（0 和 1 各对应一个鼓声），index 指定改第几个。"
+  },
+  "halftime_kit": {
+   "name": "半速鼓组",
+   "target": [
+    "Clocked",
+    "BassDrum9",
+    "ClosedHiHat",
+    "CR78"
+   ],
+   "mood": "沉、慢、氛围",
+   "desc": "把时钟 BPM 降到 70 附近，底鼓和军鼓拉稀。",
+   "settings": [
+    {
+     "module": "Clocked",
+     "param": "Master clock",
+     "value": 72.0,
+     "why": "整体放慢"
+    },
+    {
+     "module": "Clocked",
+     "param": "Clk 1 ratio",
+     "value": -1.0,
+     "why": "镲放慢一档，变成四分音符"
+    },
+    {
+     "module": "Clocked",
+     "param": "Clk 2 ratio",
+     "value": -3.0,
+     "why": "复合鼓放慢，只在小节头出现"
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,668 @@
+{
+  "version": "2.4.1",
+  "path": "D:\\Cardinal\\patches\\helm_drums.vcv",
+  "zoom": 0.8408964276313782,
+  "gridOffset": [
+    9.955729484558105,
+    -0.6803248524665833
+  ],
+  "modules": [
+    {
+      "id": 1,
+      "plugin": "Cardinal",
+      "model": "TextEditor",
+      "version": "2.0.0",
+      "params": [],
+      "data": {
+        "filepath": "",
+        "lang": "None",
+        "etext": "HELM DRUMS - standalone beat box\n\nClocked  = master clock (BPM knob + RUN light)\n  OUT 0  -> Kick      every quarter note\n  OUT 1  -> HiHat     x2 = eighth notes\n  OUT 2  -> CR78 perc x1 = quarter notes\n\nTIPS\n- Clocked knobs 'Clk 1/2/3 ratio':\n  negative number = slower, positive = faster\n- If one drum stays silent, drag that\n  cable onto the module's TRIG jack\n- Drums are the WSTD/DrumKit set:\n  BassDrum9, ClosedHiHat, CR78\n\n",
+        "width": 30
+      },
+      "pos": [
+        23,
+        1
+      ]
+    },
+    {
+      "id": 10,
+      "plugin": "ImpromptuModular",
+      "model": "Clocked",
+      "version": "2.1.0",
+      "params": [
+        {
+          "value": 100.0,
+          "id": 0
+        },
+        {
+          "value": 1.0,
+          "id": 1
+        },
+        {
+          "value": -1.0,
+          "id": 2
+        },
+        {
+          "value": 0.0,
+          "id": 3
+        },
+        {
+          "value": 0.0,
+          "id": 4
+        },
+        {
+          "value": 0.0,
+          "id": 5
+        },
+        {
+          "value": 0.0,
+          "id": 6
+        },
+        {
+          "value": 0.0,
+          "id": 7
+        },
+        {
+          "value": 0.5,
+          "id": 8
+        },
+        {
+          "value": 0.5,
+          "id": 9
+        },
+        {
+          "value": 0.5,
+          "id": 10
+        },
+        {
+          "value": 0.5,
+          "id": 11
+        },
+        {
+          "value": 0.0,
+          "id": 12
+        },
+        {
+          "value": 0.0,
+          "id": 13
+        },
+        {
+          "value": 0.0,
+          "id": 14
+        },
+        {
+          "value": 0.0,
+          "id": 15
+        },
+        {
+          "value": 0.0,
+          "id": 16
+        },
+        {
+          "value": 0.0,
+          "id": 17
+        },
+        {
+          "value": 0.0,
+          "id": 18
+        },
+        {
+          "value": 0.0,
+          "id": 19
+        }
+      ],
+      "rightModuleId": 11,
+      "data": {
+        "panelTheme": 1,
+        "panelContrast": 220.0,
+        "running": true,
+        "displayDelayNoteMode": false,
+        "bpmDetectionMode": false,
+        "resetOnStartStop": 0,
+        "ppqn": 4,
+        "resetClockOutputsHigh": false,
+        "momentaryRunInput": true,
+        "forceCvOnBpmOut": false,
+        "clockMaster": false
+      },
+      "pos": [
+        20,
+        0
+      ]
+    },
+    {
+      "id": 13,
+      "plugin": "WSTD-Drums",
+      "model": "CR78",
+      "version": "2.0.0",
+      "params": [
+        {
+          "value": 3.0,
+          "id": 0
+        },
+        {
+          "value": 3.0,
+          "id": 1
+        },
+        {
+          "value": 0.0,
+          "id": 2
+        },
+        {
+          "value": 0.0,
+          "id": 3
+        },
+        {
+          "value": 0.0,
+          "id": 4
+        },
+        {
+          "value": 0.0,
+          "id": 5
+        },
+        {
+          "value": 0.0,
+          "id": 6
+        },
+        {
+          "value": 0.0,
+          "id": 7
+        },
+        {
+          "value": 0.0,
+          "id": 8
+        },
+        {
+          "value": 0.0,
+          "id": 9
+        },
+        {
+          "value": 0.0,
+          "id": 10
+        },
+        {
+          "value": 0.0,
+          "id": 11
+        },
+        {
+          "value": 0.0,
+          "id": 12
+        },
+        {
+          "value": 0.0,
+          "id": 13
+        },
+        {
+          "value": 0.0,
+          "id": 14
+        },
+        {
+          "value": 0.0,
+          "id": 15
+        },
+        {
+          "value": 1.0,
+          "id": 16
+        },
+        {
+          "value": 1.0,
+          "id": 17
+        },
+        {
+          "value": 0.0,
+          "id": 18
+        },
+        {
+          "value": 0.0,
+          "id": 19
+        },
+        {
+          "value": 0.0,
+          "id": 20
+        },
+        {
+          "value": 0.0,
+          "id": 21
+        },
+        {
+          "value": 0.0,
+          "id": 22
+        },
+        {
+          "value": 0.0,
+          "id": 23
+        },
+        {
+          "value": 0.0,
+          "id": 24
+        },
+        {
+          "value": 0.0,
+          "id": 25
+        },
+        {
+          "value": 0.0,
+          "id": 26
+        },
+        {
+          "value": 0.0,
+          "id": 27
+        },
+        {
+          "value": 0.0,
+          "id": 28
+        },
+        {
+          "value": 0.0,
+          "id": 29
+        },
+        {
+          "value": 0.0,
+          "id": 30
+        },
+        {
+          "value": 0.0,
+          "id": 31
+        }
+      ],
+      "leftModuleId": 12,
+      "rightModuleId": 14,
+      "pos": [
+        52,
+        0
+      ]
+    },
+    {
+      "id": 12,
+      "plugin": "WSTD-Drums",
+      "model": "ClosedHiHat",
+      "version": "2.0.0",
+      "params": [
+        {
+          "value": 7.0,
+          "id": 0
+        },
+        {
+          "value": 7.0,
+          "id": 1
+        },
+        {
+          "value": 0.0,
+          "id": 2
+        },
+        {
+          "value": 0.0,
+          "id": 3
+        },
+        {
+          "value": 0.0,
+          "id": 4
+        },
+        {
+          "value": 0.0,
+          "id": 5
+        },
+        {
+          "value": 0.0,
+          "id": 6
+        },
+        {
+          "value": 0.0,
+          "id": 7
+        },
+        {
+          "value": 0.0,
+          "id": 8
+        },
+        {
+          "value": 0.0,
+          "id": 9
+        },
+        {
+          "value": 0.0,
+          "id": 10
+        },
+        {
+          "value": 0.0,
+          "id": 11
+        },
+        {
+          "value": 0.0,
+          "id": 12
+        },
+        {
+          "value": 0.0,
+          "id": 13
+        },
+        {
+          "value": 0.0,
+          "id": 14
+        },
+        {
+          "value": 0.0,
+          "id": 15
+        },
+        {
+          "value": 1.0,
+          "id": 16
+        },
+        {
+          "value": 1.0,
+          "id": 17
+        },
+        {
+          "value": 0.0,
+          "id": 18
+        },
+        {
+          "value": 0.0,
+          "id": 19
+        },
+        {
+          "value": 0.0,
+          "id": 20
+        },
+        {
+          "value": 0.0,
+          "id": 21
+        },
+        {
+          "value": 0.0,
+          "id": 22
+        },
+        {
+          "value": 0.0,
+          "id": 23
+        },
+        {
+          "value": 0.0,
+          "id": 24
+        },
+        {
+          "value": 0.0,
+          "id": 25
+        },
+        {
+          "value": 0.0,
+          "id": 26
+        },
+        {
+          "value": 0.0,
+          "id": 27
+        },
+        {
+          "value": 0.0,
+          "id": 28
+        },
+        {
+          "value": 0.0,
+          "id": 29
+        },
+        {
+          "value": 0.0,
+          "id": 30
+        },
+        {
+          "value": 0.0,
+          "id": 31
+        }
+      ],
+      "leftModuleId": 11,
+      "rightModuleId": 13,
+      "pos": [
+        46,
+        0
+      ]
+    },
+    {
+      "id": 11,
+      "plugin": "WSTD-Drums",
+      "model": "BassDrum9",
+      "version": "2.0.0",
+      "params": [
+        {
+          "value": 7.0,
+          "id": 0
+        },
+        {
+          "value": 7.0,
+          "id": 1
+        },
+        {
+          "value": 0.0,
+          "id": 2
+        },
+        {
+          "value": 0.0,
+          "id": 3
+        },
+        {
+          "value": 0.0,
+          "id": 4
+        },
+        {
+          "value": 0.0,
+          "id": 5
+        },
+        {
+          "value": 0.0,
+          "id": 6
+        },
+        {
+          "value": 0.0,
+          "id": 7
+        },
+        {
+          "value": 0.0,
+          "id": 8
+        },
+        {
+          "value": 0.0,
+          "id": 9
+        },
+        {
+          "value": 0.0,
+          "id": 10
+        },
+        {
+          "value": 0.0,
+          "id": 11
+        },
+        {
+          "value": 0.0,
+          "id": 12
+        },
+        {
+          "value": 0.0,
+          "id": 13
+        },
+        {
+          "value": 0.0,
+          "id": 14
+        },
+        {
+          "value": 0.0,
+          "id": 15
+        },
+        {
+          "value": 1.0,
+          "id": 16
+        },
+        {
+          "value": 1.0,
+          "id": 17
+        },
+        {
+          "value": 0.0,
+          "id": 18
+        },
+        {
+          "value": 0.0,
+          "id": 19
+        },
+        {
+          "value": 0.0,
+          "id": 20
+        },
+        {
+          "value": 0.0,
+          "id": 21
+        },
+        {
+          "value": 0.0,
+          "id": 22
+        },
+        {
+          "value": 0.0,
+          "id": 23
+        },
+        {
+          "value": 0.0,
+          "id": 24
+        },
+        {
+          "value": 0.0,
+          "id": 25
+        },
+        {
+          "value": 0.0,
+          "id": 26
+        },
+        {
+          "value": 0.0,
+          "id": 27
+        },
+        {
+          "value": 0.0,
+          "id": 28
+        },
+        {
+          "value": 0.0,
+          "id": 29
+        },
+        {
+          "value": 0.0,
+          "id": 30
+        },
+        {
+          "value": 0.0,
+          "id": 31
+        }
+      ],
+      "leftModuleId": 10,
+      "rightModuleId": 12,
+      "pos": [
+        40,
+        0
+      ]
+    },
+    {
+      "id": 14,
+      "plugin": "Fundamental",
+      "model": "Mixer",
+      "version": "2.1.0",
+      "params": [
+        {
+          "value": 0.3,
+          "id": 0
+        }
+      ],
+      "leftModuleId": 13,
+      "rightModuleId": 15,
+      "data": {
+        "average": false,
+        "invert": false
+      },
+      "pos": [
+        58,
+        0
+      ]
+    },
+    {
+      "id": 15,
+      "plugin": "Cardinal",
+      "model": "HostAudio2",
+      "version": "2.0.0",
+      "params": [
+        {
+          "value": 0.7943282127380371,
+          "id": 0
+        }
+      ],
+      "leftModuleId": 14,
+      "data": {
+        "dcFilter": true
+      },
+      "pos": [
+        61,
+        0
+      ]
+    }
+  ],
+  "cables": [
+    {
+      "id": 1001,
+      "outputModuleId": 10,
+      "outputId": 0,
+      "inputModuleId": 11,
+      "inputId": 17,
+      "color": "#ff5252"
+    },
+    {
+      "id": 1002,
+      "outputModuleId": 10,
+      "outputId": 1,
+      "inputModuleId": 12,
+      "inputId": 16,
+      "color": "#ffd452"
+    },
+    {
+      "id": 1003,
+      "outputModuleId": 10,
+      "outputId": 2,
+      "inputModuleId": 13,
+      "inputId": 17,
+      "color": "#52ff7d"
+    },
+    {
+      "id": 1004,
+      "outputModuleId": 11,
+      "outputId": 1,
+      "inputModuleId": 14,
+      "inputId": 0,
+      "color": "#527dff"
+    },
+    {
+      "id": 1005,
+      "outputModuleId": 12,
+      "outputId": 0,
+      "inputModuleId": 14,
+      "inputId": 1,
+      "color": "#ff9352"
+    },
+    {
+      "id": 1006,
+      "outputModuleId": 13,
+      "outputId": 1,
+      "inputModuleId": 14,
+      "inputId": 2,
+      "color": "#a852ff"
+    },
+    {
+      "id": 1773751621909530,
+      "outputModuleId": 14,
+      "outputId": 0,
+      "inputModuleId": 15,
+      "inputId": 0,
+      "color": "#ff5252"
+    },
+    {
+      "id": 1359153897385888,
+      "outputModuleId": 14,
+      "outputId": 0,
+      "inputModuleId": 15,
+      "inputId": 1,
+      "color": "#ff9352"
+    }
+  ]
+}

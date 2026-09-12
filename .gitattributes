@@ -1,0 +1,13 @@
+# 统一换行符，避免 Windows 上 Git 反复把文件标记成「已修改」
+* text=auto eol=lf
+
+# 机架文件可能是明文 JSON，也可能是 tar+zstd 归档
+# 当成二进制处理，避免换行符转换把压缩数据弄坏
+*.vcv binary
+
+# 二进制资源
+*.png binary
+*.jpg binary
+*.gif binary
+*.zst binary
+*.zip binary

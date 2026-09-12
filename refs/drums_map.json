@@ -1,0 +1,128 @@
+[
+  {
+    "file": "BD9.cpp",
+    "class": "BD9Module",
+    "voices": 2,
+    "family": "?",
+    "labels": [
+      "Sample",
+      "Sample",
+      "Playback Speed"
+    ]
+  },
+  {
+    "file": "Baronial.cpp",
+    "class": "BaronialModule",
+    "voices": null,
+    "family": "?",
+    "labels": [
+      "Time",
+      "Time",
+      "Time"
+    ]
+  },
+  {
+    "file": "CR78.cpp",
+    "class": "CR78Module",
+    "voices": 2,
+    "family": "?",
+    "labels": [
+      "Sample",
+      "Sample",
+      "Playback Speed"
+    ]
+  },
+  {
+    "file": "ClosedHH.cpp",
+    "class": "ClosedHHModule",
+    "voices": 2,
+    "family": "?",
+    "labels": [
+      "Sample",
+      "Sample",
+      "Playback Speed"
+    ]
+  },
+  {
+    "file": "DMX.cpp",
+    "class": "DMXModule",
+    "voices": 2,
+    "family": "?",
+    "labels": [
+      "Sample",
+      "Sample",
+      "Playback Speed"
+    ]
+  },
+  {
+    "file": "Gnome.cpp",
+    "class": "GnomeModule",
+    "voices": null,
+    "family": "?",
+    "labels": [
+      "Speed"
+    ]
+  },
+  {
+    "file": "Marionette.cpp",
+    "class": "MarionetteModule",
+    "voices": null,
+    "family": "kick01",
+    "labels": [
+      "Decay",
+      "Sustain",
+      "Release"
+    ]
+  },
+  {
+    "file": "OpenHH.cpp",
+    "class": "OpenHHModule",
+    "voices": 2,
+    "family": "?",
+    "labels": [
+      "Sample",
+      "Sample",
+      "Playback Speed"
+    ]
+  },
+  {
+    "file": "SBD.cpp",
+    "class": "SBDModule",
+    "voices": null,
+    "family": "?",
+    "labels": [
+      "Pitch",
+      "Pitch Decay",
+      "Amp Decay"
+    ]
+  },
+  {
+    "file": "Sequencer.cpp",
+    "class": "SequencerModule",
+    "voices": null,
+    "family": "?",
+    "labels": []
+  },
+  {
+    "file": "Snare.cpp",
+    "class": "SnareModule",
+    "voices": 2,
+    "family": "?",
+    "labels": [
+      "Sample",
+      "Sample",
+      "Playback Speed"
+    ]
+  },
+  {
+    "file": "Tomi.cpp",
+    "class": "TomiModule",
+    "voices": 2,
+    "family": "?",
+    "labels": [
+      "Sample",
+      "Sample",
+      "Playback Speed"
+    ]
+  }
+]

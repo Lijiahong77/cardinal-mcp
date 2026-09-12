@@ -1,0 +1,54 @@
+# ============================================================
+#  cardinal-mcp · 不上传清单
+#  原则：别人的东西不随附文件、只标注来源（见 docs/ATTRIBUTION.md）
+#        我们自己的实践全部上传
+# ============================================================
+
+# ---------- 第三方作品：不随附 ----------
+# Cardinal / VCV Rack 官方示例机架与模板（他人作品，官方仓库可下载）
+refs/examples/
+refs/*.tpl.vcv
+
+# 从上游抓的 C++ 源码缓存（GPL-3.0；paramlib.py 会自动重新下载）
+tools/_srccache/
+
+# MidiSuite（键盘厂商软件）界面截图
+refs/smk25_config/
+
+# ---------- 含个人 / 会话信息的截图，绝不外传 ----------
+refs/_*.png
+refs/_screen*.png
+
+# ---------- 运行产物 ----------
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# ---------- 本机专属：自动备份与临时存档快照 ----------
+# 这些是每次重排 / 修复前自动生成的，属于个人工作留痕
+patches/*_before_*.vcv
+patches/*_before_*.json
+patches/*_3row_live_*.json
+patches/*_live_*.json
+patches/helm_full_3row_*.vcv
+patches/helm_full_before_2row_*.vcv
+patches/helm_before_full.vcv
+patches/helm_keys_live_backup.vcv
+
+# ---------- 一次性临时探针 / 列表脚本（不在工作流里重用） ----------
+.tmp_*.py
+# _publish_prep.py 是把"本机专属"信息脱敏进 docs/ 用的一次性脚本
+# 自己内部就带着待替换的本机标识，留着等于把「要藏的东西」写在仓库里
+tools/_publish_prep.py
+
+# ---------- 本地配置 ----------
+mcp.local.json
+.env
+*.local
+
+# ---------- 编辑器 / 系统 ----------
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

@@ -1,0 +1,2253 @@
+{
+ "Cardinal/HostAudio2": {
+  "model": "HostAudio2",
+  "params": {
+   "0": {
+    "default": null,
+    "enum": "0",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Level",
+    "unit": " dB"
+   }
+  },
+  "plugin": "Cardinal",
+  "source": "plugins/Cardinal/src/HostAudio.cpp"
+ },
+ "Cardinal/HostMIDI": {
+  "model": "HostMIDI",
+  "params": {},
+  "plugin": "Cardinal",
+  "source": "plugins/Cardinal/src/HostMIDI.cpp"
+ },
+ "Cardinal/TextEditor": {
+  "model": "TextEditor",
+  "params": {},
+  "plugin": "Cardinal",
+  "source": "plugins/Cardinal/src/TextEditor.cpp"
+ },
+ "Fundamental/ADSR": {
+  "model": "ADSR",
+  "params": {
+   "0": {
+    "default": 0.5,
+    "enum": "ATTACK_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Attack",
+    "unit": " ms"
+   },
+   "1": {
+    "default": 0.5,
+    "enum": "DECAY_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Decay",
+    "unit": " ms"
+   },
+   "2": {
+    "default": 0.5,
+    "enum": "SUSTAIN_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Sustain",
+    "unit": "%"
+   },
+   "3": {
+    "default": 0.5,
+    "enum": "RELEASE_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Release",
+    "unit": " ms"
+   },
+   "4": {
+    "default": null,
+    "enum": "ATTACK_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Attack CV",
+    "unit": "%"
+   },
+   "5": {
+    "default": null,
+    "enum": "DECAY_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Decay CV",
+    "unit": "%"
+   },
+   "6": {
+    "default": null,
+    "enum": "SUSTAIN_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Sustain CV",
+    "unit": "%"
+   },
+   "7": {
+    "default": null,
+    "enum": "RELEASE_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Release CV",
+    "unit": "%"
+   },
+   "8": {
+    "default": null,
+    "enum": "PUSH_PARAM",
+    "kind": "button",
+    "max": null,
+    "min": null,
+    "name": "Push"
+   }
+  },
+  "plugin": "Fundamental",
+  "source": "src/ADSR.cpp"
+ },
+ "Fundamental/Mixer": {
+  "model": "Mixer",
+  "params": {
+   "0": {
+    "default": null,
+    "enum": "LEVEL_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Level",
+    "unit": "%"
+   }
+  },
+  "plugin": "Fundamental",
+  "source": "src/Mixer.cpp"
+ },
+ "Fundamental/Sum": {
+  "model": "Sum",
+  "params": {
+   "0": {
+    "default": null,
+    "enum": "LEVEL_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Level",
+    "unit": "%"
+   }
+  },
+  "plugin": "Fundamental",
+  "source": "src/Sum.cpp"
+ },
+ "Fundamental/VCA-1": {
+  "model": "VCA-1",
+  "params": {
+   "0": {
+    "default": 1.0,
+    "enum": "LEVEL1_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Channel 1 level",
+    "unit": "%"
+   },
+   "1": {
+    "default": 1.0,
+    "enum": "LEVEL2_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Channel 2 level",
+    "unit": "%"
+   }
+  },
+  "plugin": "Fundamental",
+  "source": "src/VCA.cpp"
+ },
+ "Fundamental/VCF": {
+  "model": "VCF",
+  "params": {
+   "0": {
+    "default": null,
+    "enum": "FREQ_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Cutoff frequency",
+    "unit": " Hz"
+   },
+   "1": {
+    "enum": "FINE_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "枚举占位，无 configParam（废弃或未使用）"
+   },
+   "2": {
+    "default": null,
+    "enum": "RES_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Resonance",
+    "unit": "%"
+   },
+   "3": {
+    "default": null,
+    "enum": "FREQ_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Cutoff frequency CV",
+    "unit": "%"
+   },
+   "4": {
+    "default": null,
+    "enum": "DRIVE_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Drive",
+    "unit": "%"
+   },
+   "5": {
+    "default": null,
+    "enum": "RES_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Resonance CV",
+    "unit": "%"
+   },
+   "6": {
+    "default": null,
+    "enum": "DRIVE_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Drive CV",
+    "unit": "%"
+   }
+  },
+  "plugin": "Fundamental",
+  "source": "src/VCF.cpp"
+ },
+ "Fundamental/VCO": {
+  "model": "VCO",
+  "params": {
+   "0": {
+    "enum": "MODE_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "枚举占位，无 configParam（废弃或未使用）"
+   },
+   "1": {
+    "default": null,
+    "enum": "SYNC_PARAM",
+    "kind": "switch",
+    "max": null,
+    "min": null,
+    "name": "Sync mode",
+    "options": [
+     "Soft"
+    ],
+    "unit": "Soft"
+   },
+   "2": {
+    "default": null,
+    "enum": "FREQ_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Frequency",
+    "unit": " Hz"
+   },
+   "3": {
+    "enum": "FINE_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "枚举占位，无 configParam（废弃或未使用）"
+   },
+   "4": {
+    "default": null,
+    "enum": "FM_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Frequency modulation",
+    "unit": "%"
+   },
+   "5": {
+    "default": 0.5,
+    "enum": "PW_PARAM",
+    "kind": "knob",
+    "max": 0.99,
+    "min": 0.01,
+    "name": "Pulse width",
+    "unit": "%"
+   },
+   "6": {
+    "default": null,
+    "enum": "PW_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Pulse width modulation",
+    "unit": "%"
+   },
+   "7": {
+    "default": null,
+    "enum": "LINEAR_PARAM",
+    "kind": "switch",
+    "max": null,
+    "min": null,
+    "name": "FM mode",
+    "options": [
+     "1V/octave"
+    ],
+    "unit": "1V/octave"
+   }
+  },
+  "plugin": "Fundamental",
+  "source": "src/VCO.cpp"
+ },
+ "ImpromptuModular/Clocked": {
+  "model": "Clocked",
+  "params": {
+   "0": {
+    "default": 120.0,
+    "enum": "RATIO_PARAMS + 0",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Master clock",
+    "unit": " BPM"
+   },
+   "1": {
+    "default": 0.0,
+    "enum": "RATIO_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Clk 1 ratio"
+   },
+   "10": {
+    "default": 0.5,
+    "enum": "PW_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Pulse width clk 2"
+   },
+   "11": {
+    "default": 0.5,
+    "enum": "PW_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Pulse width clk 3"
+   },
+   "12": {
+    "default": 0.0,
+    "enum": "RESET_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Reset"
+   },
+   "13": {
+    "default": 0.0,
+    "enum": "RUN_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Run"
+   },
+   "14": {
+    "enum": "DELAY_PARAMS",
+    "kind": "reserved",
+    "name": null,
+    "note": "枚举占位，无 configParam（废弃或未使用）"
+   },
+   "15": {
+    "default": 0.0,
+    "enum": "DELAY_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": 7.0,
+    "min": 0.0,
+    "name": "Delay clk 1"
+   },
+   "16": {
+    "default": 0.0,
+    "enum": "DELAY_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": 7.0,
+    "min": 0.0,
+    "name": "Delay clk 2"
+   },
+   "17": {
+    "default": 0.0,
+    "enum": "DELAY_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": 7.0,
+    "min": 0.0,
+    "name": "Delay clk 3"
+   },
+   "18": {
+    "default": 0.0,
+    "enum": "BPMMODE_DOWN_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Bpm mode prev"
+   },
+   "19": {
+    "default": 0.0,
+    "enum": "BPMMODE_UP_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Bpm mode next"
+   },
+   "2": {
+    "default": 0.0,
+    "enum": "RATIO_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Clk 2 ratio"
+   },
+   "3": {
+    "default": 0.0,
+    "enum": "RATIO_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Clk 3 ratio"
+   },
+   "4": {
+    "default": 0.0,
+    "enum": "SWING_PARAMS + 0",
+    "kind": "knob",
+    "max": 1.0,
+    "min": -1.0,
+    "name": "Swing clk"
+   },
+   "5": {
+    "default": 0.0,
+    "enum": "SWING_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": 1.0,
+    "min": -1.0,
+    "name": "Swing clk 1"
+   },
+   "6": {
+    "default": 0.0,
+    "enum": "SWING_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": 1.0,
+    "min": -1.0,
+    "name": "Swing clk 2"
+   },
+   "7": {
+    "default": 0.0,
+    "enum": "SWING_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": 1.0,
+    "min": -1.0,
+    "name": "Swing clk 3"
+   },
+   "8": {
+    "default": 0.5,
+    "enum": "PW_PARAMS + 0",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Pulse width clk"
+   },
+   "9": {
+    "default": 0.5,
+    "enum": "PW_PARAMS + 1 + i",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Pulse width clk 1"
+   }
+  },
+  "plugin": "ImpromptuModular",
+  "source": "src/Clocked.cpp"
+ },
+ "MindMeldModular/MixMasterJr": {
+  "model": "MixMasterJr",
+  "params": {
+   "0": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-01-: pan",
+    "unit": "%"
+   },
+   "1": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-02-: pan",
+    "unit": "%"
+   },
+   "10": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-03-: level",
+    "unit": "dB"
+   },
+   "11": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-04-: level",
+    "unit": "dB"
+   },
+   "12": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-05-: level",
+    "unit": "dB"
+   },
+   "13": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-06-: level",
+    "unit": "dB"
+   },
+   "14": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-07-: level",
+    "unit": "dB"
+   },
+   "15": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-08-: level",
+    "unit": "dB"
+   },
+   "16": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-01-: mute"
+   },
+   "17": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-02-: mute"
+   },
+   "18": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-03-: mute"
+   },
+   "19": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-04-: mute"
+   },
+   "2": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-03-: pan",
+    "unit": "%"
+   },
+   "20": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-05-: mute"
+   },
+   "21": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-06-: mute"
+   },
+   "22": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-07-: mute"
+   },
+   "23": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-08-: mute"
+   },
+   "24": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-01-: solo"
+   },
+   "25": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-02-: solo"
+   },
+   "26": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-03-: solo"
+   },
+   "27": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-04-: solo"
+   },
+   "28": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-05-: solo"
+   },
+   "29": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-06-: solo"
+   },
+   "3": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-04-: pan",
+    "unit": "%"
+   },
+   "30": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-07-: solo"
+   },
+   "31": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-08-: solo"
+   },
+   "32": {
+    "default": 0.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-01-: group"
+   },
+   "33": {
+    "default": 0.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-02-: group"
+   },
+   "34": {
+    "default": 0.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-03-: group"
+   },
+   "35": {
+    "default": 0.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-04-: group"
+   },
+   "36": {
+    "default": 0.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-05-: group"
+   },
+   "37": {
+    "default": 0.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-06-: group"
+   },
+   "38": {
+    "default": 0.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-07-: group"
+   },
+   "39": {
+    "default": 0.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-08-: group"
+   },
+   "4": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-05-: pan",
+    "unit": "%"
+   },
+   "40": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "-01-: HPF cutoff",
+    "unit": "Hz"
+   },
+   "41": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "-02-: HPF cutoff",
+    "unit": "Hz"
+   },
+   "42": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "-03-: HPF cutoff",
+    "unit": "Hz"
+   },
+   "43": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "-04-: HPF cutoff",
+    "unit": "Hz"
+   },
+   "44": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "-05-: HPF cutoff",
+    "unit": "Hz"
+   },
+   "45": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "-06-: HPF cutoff",
+    "unit": "Hz"
+   },
+   "46": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "-07-: HPF cutoff",
+    "unit": "Hz"
+   },
+   "47": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "-08-: HPF cutoff",
+    "unit": "Hz"
+   },
+   "48": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "-01-: LPF cutoff",
+    "unit": "Hz"
+   },
+   "49": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "-02-: LPF cutoff",
+    "unit": "Hz"
+   },
+   "5": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-06-: pan",
+    "unit": "%"
+   },
+   "50": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "-03-: LPF cutoff",
+    "unit": "Hz"
+   },
+   "51": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "-04-: LPF cutoff",
+    "unit": "Hz"
+   },
+   "52": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "-05-: LPF cutoff",
+    "unit": "Hz"
+   },
+   "53": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "-06-: LPF cutoff",
+    "unit": "Hz"
+   },
+   "54": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "-07-: LPF cutoff",
+    "unit": "Hz"
+   },
+   "55": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "-08-: LPF cutoff",
+    "unit": "Hz"
+   },
+   "56": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "GRP1: pan",
+    "unit": "%"
+   },
+   "57": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "GRP2: pan",
+    "unit": "%"
+   },
+   "58": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "GRP1: level",
+    "unit": "dB"
+   },
+   "59": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "GRP2: level",
+    "unit": "dB"
+   },
+   "6": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-07-: pan",
+    "unit": "%"
+   },
+   "60": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "GRP1: mute"
+   },
+   "61": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "GRP2: mute"
+   },
+   "62": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "GRP1: solo"
+   },
+   "63": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "GRP2: solo"
+   },
+   "64": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "GRP1: HPF cutoff",
+    "unit": "Hz"
+   },
+   "65": {
+    "default": 20.0,
+    "kind": "knob",
+    "max": 1000.0,
+    "min": 13.0,
+    "name": "GRP2: HPF cutoff",
+    "unit": "Hz"
+   },
+   "66": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "GRP1: LPF cutoff",
+    "unit": "Hz"
+   },
+   "67": {
+    "default": 20000.0,
+    "kind": "knob",
+    "max": 21000.0,
+    "min": 1000.0,
+    "name": "GRP2: LPF cutoff",
+    "unit": "Hz"
+   },
+   "68": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "MASTER: level",
+    "unit": "dB"
+   },
+   "69": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "MASTER: mute"
+   },
+   "7": {
+    "default": 0.5,
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "-08-: pan",
+    "unit": "%"
+   },
+   "70": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "MASTER: dim"
+   },
+   "71": {
+    "default": 0.0,
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "MASTER: mono"
+   },
+   "8": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-01-: level",
+    "unit": "dB"
+   },
+   "9": {
+    "default": 1.0,
+    "kind": "knob",
+    "max": 2.0,
+    "min": 0.0,
+    "name": "-02-: level",
+    "unit": "dB"
+   }
+  },
+  "plugin": "MindMeldModular",
+  "source": "手工整理（MixMaster.cpp 构造函数循环 + MixMaster.hpp 枚举）"
+ },
+ "Valley/Plateau": {
+  "model": "Plateau",
+  "params": {
+   "0": {
+    "default": null,
+    "enum": "Plateau::DRY_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": 0.0,
+    "name": "Dry level",
+    "unit": "%"
+   },
+   "1": {
+    "default": 0.5,
+    "enum": "Plateau::WET_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": 0.0,
+    "name": "Wet level",
+    "unit": "%"
+   },
+   "10": {
+    "default": null,
+    "enum": "Plateau::MOD_SPEED_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Modulation rate",
+    "unit": "%"
+   },
+   "11": {
+    "default": 0.5,
+    "enum": "Plateau::MOD_SHAPE_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Modulation shape",
+    "unit": "%"
+   },
+   "12": {
+    "default": 0.5,
+    "enum": "Plateau::MOD_DEPTH_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Modulation depth",
+    "unit": "%"
+   },
+   "13": {
+    "default": null,
+    "enum": "Plateau::FREEZE_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Hold"
+   },
+   "14": {
+    "default": null,
+    "enum": "Plateau::CLEAR_PARAM",
+    "kind": "switch",
+    "max": null,
+    "min": null,
+    "name": "Clear",
+    "options": [
+     "Off"
+    ],
+    "unit": "Off"
+   },
+   "15": {
+    "default": null,
+    "enum": "Plateau::FREEZE_TOGGLE_PARAM",
+    "kind": "switch",
+    "max": null,
+    "min": null,
+    "name": "Hold toggle",
+    "options": [
+     "Off"
+    ],
+    "unit": "Off"
+   },
+   "16": {
+    "enum": "CLEAR_TOGGLE_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "枚举占位，无 configParam（废弃或未使用）"
+   },
+   "17": {
+    "default": null,
+    "enum": "Plateau::DRY_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Dry CV depth",
+    "unit": "x"
+   },
+   "18": {
+    "default": null,
+    "enum": "Plateau::WET_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Wet CV depth",
+    "unit": "x"
+   },
+   "19": {
+    "default": null,
+    "enum": "Plateau::INPUT_LOW_DAMP_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Input low cut CV",
+    "unit": "x"
+   },
+   "2": {
+    "default": null,
+    "enum": "Plateau::PRE_DELAY_PARAM",
+    "kind": "knob",
+    "max": 0.5,
+    "min": null,
+    "name": "Pre-delay",
+    "unit": "ms"
+   },
+   "20": {
+    "default": null,
+    "enum": "Plateau::INPUT_HIGH_DAMP_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Input high cut CV",
+    "unit": "x"
+   },
+   "21": {
+    "default": null,
+    "enum": "Plateau::SIZE_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Size CV",
+    "unit": "x"
+   },
+   "22": {
+    "default": null,
+    "enum": "Plateau::DIFFUSION_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Diffusion CV",
+    "unit": "x"
+   },
+   "23": {
+    "default": null,
+    "enum": "Plateau::DECAY_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Decay CV",
+    "unit": "x"
+   },
+   "24": {
+    "default": null,
+    "enum": "Plateau::REVERB_HIGH_DAMP_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Reverb high cut CV",
+    "unit": "x"
+   },
+   "25": {
+    "default": null,
+    "enum": "Plateau::REVERB_LOW_DAMP_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Reverb low cut CV",
+    "unit": "x"
+   },
+   "26": {
+    "default": null,
+    "enum": "Plateau::MOD_SPEED_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Mod speed CV",
+    "unit": "x"
+   },
+   "27": {
+    "default": null,
+    "enum": "Plateau::MOD_SHAPE_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Mod shape CV",
+    "unit": "x"
+   },
+   "28": {
+    "default": null,
+    "enum": "Plateau::MOD_DEPTH_CV_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Mod depth CV",
+    "unit": "x"
+   },
+   "29": {
+    "default": null,
+    "enum": "Plateau::TUNED_MODE_PARAM",
+    "kind": "switch",
+    "max": null,
+    "min": null,
+    "name": "Tuned mode",
+    "options": [
+     "Off"
+    ],
+    "unit": "Off"
+   },
+   "3": {
+    "default": null,
+    "enum": "Plateau::INPUT_LOW_DAMP_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Input low cut",
+    "unit": "Hz"
+   },
+   "30": {
+    "default": null,
+    "enum": "Plateau::DIFFUSE_INPUT_PARAM",
+    "kind": "switch",
+    "max": null,
+    "min": null,
+    "name": "Diffuse input",
+    "options": [
+     "Off"
+    ],
+    "unit": "Off"
+   },
+   "4": {
+    "default": null,
+    "enum": "Plateau::INPUT_HIGH_DAMP_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Input high cut",
+    "unit": "Hz"
+   },
+   "5": {
+    "default": 0.5,
+    "enum": "Plateau::SIZE_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Size",
+    "unit": "%"
+   },
+   "6": {
+    "default": null,
+    "enum": "Plateau::DIFFUSION_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Diffusion",
+    "unit": "%"
+   },
+   "7": {
+    "default": 0.54995,
+    "enum": "Plateau::DECAY_PARAM",
+    "kind": "knob",
+    "max": 0.9999,
+    "min": 0.1,
+    "name": "Decay",
+    "unit": "%"
+   },
+   "8": {
+    "default": null,
+    "enum": "Plateau::REVERB_HIGH_DAMP_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Reverb high cut",
+    "unit": "Hz"
+   },
+   "9": {
+    "default": null,
+    "enum": "Plateau::REVERB_LOW_DAMP_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": null,
+    "name": "Reverb low cut",
+    "unit": "Hz"
+   }
+  },
+  "plugin": "Valley",
+  "source": "src/Plateau/Plateau.cpp, src/Plateau/Plateau.hpp"
+ },
+ "WSTD-Drums/BassDrum9": {
+  "model": "BassDrum9",
+  "params": {
+   "0": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample"
+   },
+   "1": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 1",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample"
+   },
+   "10": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 10",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "11": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 11",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "12": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 12",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "13": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 13",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "14": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 14",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "15": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 15",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "16": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "unit": "x"
+   },
+   "17": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 1",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "unit": "x"
+   },
+   "18": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 2",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "19": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 3",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "2": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 2",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "20": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 4",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "21": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 5",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "22": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 6",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "23": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 7",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "24": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 8",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "25": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 9",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "26": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 10",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "27": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 11",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "28": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 12",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "29": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 13",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "3": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 3",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "30": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 14",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "31": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 15",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "4": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 4",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "5": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 5",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "6": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 6",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "7": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 7",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "8": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 8",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "9": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 9",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   }
+  },
+  "plugin": "WSTD-Drums",
+  "source": "src/controller/BD9.cpp, src/controller/BD9.hpp, src/controller/SampleController.hpp"
+ },
+ "WSTD-Drums/CR78": {
+  "model": "CR78",
+  "params": {
+   "0": {
+    "default": 3.0,
+    "enum": "DRUM_PARAM",
+    "kind": "knob",
+    "max": 6.0,
+    "min": 0.0,
+    "name": "Sample"
+   },
+   "1": {
+    "default": 3.0,
+    "enum": "DRUM_PARAM + 1",
+    "kind": "knob",
+    "max": 6.0,
+    "min": 0.0,
+    "name": "Sample"
+   },
+   "10": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 10",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "11": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 11",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "12": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 12",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "13": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 13",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "14": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 14",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "15": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 15",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "16": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "unit": "x"
+   },
+   "17": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 1",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "unit": "x"
+   },
+   "18": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 2",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "19": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 3",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "2": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 2",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "20": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 4",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "21": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 5",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "22": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 6",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "23": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 7",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "24": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 8",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "25": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 9",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "26": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 10",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "27": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 11",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "28": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 12",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "29": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 13",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "3": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 3",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "30": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 14",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "31": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 15",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "4": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 4",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "5": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 5",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "6": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 6",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "7": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 7",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "8": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 8",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "9": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 9",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   }
+  },
+  "plugin": "WSTD-Drums",
+  "source": "src/controller/CR78.cpp, src/controller/CR78.hpp, src/controller/SampleController.hpp"
+ },
+ "WSTD-Drums/ClosedHiHat": {
+  "model": "ClosedHiHat",
+  "params": {
+   "0": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM",
+    "kind": "knob",
+    "max": 14.0,
+    "min": 0.0,
+    "name": "Sample"
+   },
+   "1": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 1",
+    "kind": "knob",
+    "max": 14.0,
+    "min": 0.0,
+    "name": "Sample"
+   },
+   "10": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 10",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "11": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 11",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "12": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 12",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "13": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 13",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "14": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 14",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "15": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 15",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "16": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "unit": "x"
+   },
+   "17": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 1",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "unit": "x"
+   },
+   "18": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 2",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "19": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 3",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "2": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 2",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "20": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 4",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "21": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 5",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "22": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 6",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "23": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 7",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "24": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 8",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "25": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 9",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "26": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 10",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "27": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 11",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "28": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 12",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "29": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 13",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "3": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 3",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "30": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 14",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "31": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 15",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "unit": "x"
+   },
+   "4": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 4",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "5": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 5",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "6": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 6",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "7": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 7",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "8": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 8",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   },
+   "9": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 9",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+   }
+  },
+  "plugin": "WSTD-Drums",
+  "source": "src/controller/ClosedHH.cpp, src/controller/ClosedHH.hpp, src/controller/SampleController.hpp"
+ }
+}
