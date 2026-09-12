@@ -192,7 +192,7 @@ cardinal-mcp/
 
 ---
 
-## Workflow examples
+## Workflow examples（I haven't try yet😂）
 
 ### "Make the synth brighter"
 
@@ -246,7 +246,7 @@ AI:   → cardinal_patch_info to find SnareDrumN
 
 ### Hardware
 
-- **CPU**: AMD64 (x86-64)
+- **CPU**: Intel(R) Core(TM) Ultra 9 275HX
 - **Screen**:
   - logical resolution 1600×1000
   - physical resolution 3200×2000 (200% scaling = DPI 192)
