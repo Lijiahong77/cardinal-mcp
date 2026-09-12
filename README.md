@@ -1,79 +1,104 @@
 # cardinal-mcp
 
-> 一个让 AI 能直接操作 [Cardinal](https://github.com/DISTRHO/Cardinal) 模块化合成器的轻量外壳。
-> 12 个 MCP 工具 + 24 个零依赖 Python 小工具 = 一个能版本管理、自动化、远程控制的合成器工作流。
+> A lightweight shell that lets an AI agent drive [Cardinal](https://github.com/DISTRHO/Cardinal)
+> (a modular synth) directly.
+> 12 MCP tools + 24 zero-dependency Python utilities = a version-controllable,
+> automatable, remotely-controllable synth workflow.
 
 ---
 
-## 这是什么 / 不是什么
-
-**是什么**
-
-Cardinal 是 VCV Rack 的硬分叉（DISTRHO 出品），本身是为了拿来做插件和独立合成器的。但如果你像作者一样想
-「弹键盘 + 打鼓 + 调音」还想要一份「代码级」的副本让 AI 能帮你改，那它是黑盒——没有 MCP 接口、没有结构化输出，
-模块位置参数全是 GUI 拖拽出来的。
-
-`cardinal-mcp` 在它外面套了一层：
-- 用 **Cardinal 的 OSC（4 条消息）** + **Windows 屏幕截图** + **实时自动存档读回** 拼出一套
-  **12 个语义化 MCP 工具**（`cardinal_load_patch` / `cardinal_set_param` / `cardinal_read_live` 等等）。
-- 配套一组**零依赖的探测工具**：DPI 探测、MIDI 抓包、GDI 截屏、实时存档读回、布局门禁。
-- 一本 `params/modules.json`：**15 模块 / 248 命名参数**，从 Cardinal 自带模块的 C++ 源码里抽取。
-- 一本 `music/knowledge.json`：9 套节奏型 / 10 套和弦进行 / 8 套音色配方。
-- 一套**排班门禁**：每次加新模块、重新接线，必须过一次 `layout_patch.py guard` 才准推送。
-
-**不是什么**
-
-- **不是 Cardinal 插件**——不修改 Cardinal 本身，仅在外部通过 OSC + 文件层操控。
-- **不是音乐教学项目**——只解决"工程化与可遥控"，音乐知识库是顺带的脚手架。
-- **不带第三方作品**——把 Cardinal 官方示例机架、MidiSuite 配置截图、源码缓存都从仓库里排除掉了，
-  这些是别人的资产，使用 `docs/ATTRIBUTION.md` 标注来源，需要的自己去下。
+> [!CAUTION]
+> **AI-Generated Project — Verify Before You Trust It.**
+> This repository was produced almost entirely by an **AI Agent (WorkBuddy)**, not by a
+> human typing every line. The code, docs, and param dictionaries were generated and
+> self-reviewed by the agent. They are shared in the hope they help — but **treat them
+> as unverified**: review, test, and audit anything you intend to run, especially the
+> OSC / file-editing tools that touch your running Cardinal. The agent can be wrong,
+> and it cannot hear your audio.
+>
+> 中文读者见 **[`README.zh-CN.md`](README.zh-CN.md)**；完整声明见 **[`AI-DISCLOSURE.md`](AI-DISCLOSURE.md)**。
 
 ---
 
-## 适合谁
+## What it is / isn't
 
-- 已经装了 Cardinal standalone + MIDI 键盘，想用 Cursor / WorkBuddy 这类 MCP-aware AI 直接调参数、换音色、改连线的人。
-- 想把"手点鼠标搭的合成器机架"变成可以 `git diff` 的纯文本的人。
-- 想要在没有 GUI 的环境（远程、CI）里预生成、预校验机架的人。
+**What it is**
+
+Cardinal is a hard fork of VCV Rack (by DISTRHO), built to run as a plugin and a
+standalone synth. But if you, like the author, want to "play keyboard + drums + tweak
+tone" *and* keep a code-level copy an AI can edit, it's a black box — no MCP interface,
+no structured output, module positions are all drag-and-drop in the GUI.
+
+`cardinal-mcp` wraps a layer around it:
+- Uses Cardinal's **OSC (4 messages)** + **Windows screenshots** + **live autosave
+  read-back** to assemble **12 semantic MCP tools** (`cardinal_load_patch` /
+  `cardinal_set_param` / `cardinal_read_live`, etc.).
+- Ships a set of **zero-dependency probe tools**: DPI probe, MIDI sniffer, GDI
+  screenshot, live-autosave read-back, layout gate.
+- A `params/modules.json`: **15 modules / 248 named params**, scraped from Cardinal's
+  bundled modules' C++ source.
+- A `music/knowledge.json`: 9 drum patterns / 10 chord progressions / 8 tone recipes.
+- A **layout gate**: every time you add a module or rewire, you must pass
+  `layout_patch.py guard` before pushing.
+
+**What it is NOT**
+
+- **Not a Cardinal plugin** — it does not modify Cardinal itself; it only drives it
+  externally via OSC + the file layer.
+- **Not a music-teaching project** — it only solves "engineering + remote control";
+  the music knowledge base is incidental scaffolding.
+- **Ships no third-party works** — Cardinal's official example patches, MidiSuite
+  config screenshots, and source caches are excluded from the repo. They belong to
+  others; see `docs/ATTRIBUTION.md` for how to obtain them.
 
 ---
 
-## 30 秒上手
+## Who it's for
 
-### 1. 安装依赖
+- Anyone with Cardinal standalone + a MIDI keyboard who wants an MCP-aware AI
+  (Cursor / WorkBuddy) to tweak params, swap tones, and rewire directly.
+- Anyone who wants to turn a "mouse-built synth rack" into plain text they can `git diff`.
+- Anyone who wants to pre-generate and pre-validate racks in a headless / CI environment.
 
-只需要两个 Python 包：
+---
+
+## 30-second start
+
+### 1. Install dependencies
+
+Only two Python packages:
 
 ```bash
 pip install -r requirements.txt
-# 或者手动：python-osc + zstandard
+# or manually: python-osc + zstandard
 ```
 
-依赖少是因为绝大多数工具都用标准库（`win32gui` / `ctypes` / `socket` / `tarfile` / `json`）。
+Few dependencies because most tools use the standard library only
+(`win32gui` / `ctypes` / `socket` / `tarfile` / `json`).
 
-### 2. 启动 Cardinal 并打开 OSC 通道
+### 2. Launch Cardinal and enable OSC
 
 ```text
-打开 CardinalNative.exe
-菜单：Engine → Enable OSC remote control   （顶部菜单，⚠️ 每次启动都要重新点）
+Open CardinalNative.exe
+Menu: Engine → Enable OSC remote control   (top menu; ⚠️ click it again every launch)
 ```
 
-验证 OSC 通了：
+Verify OSC is up:
 
 ```bash
 python tools/cardinal_mcp.py --selftest
-# 期望最后一行：OK: All 12 tools reachable
+# last line should read: OK: All 12 tools reachable
 ```
 
-如果不通，先用 PowerShell 跑：
+If it doesn't connect, first check in PowerShell:
 ```powershell
 Get-NetUDPEndpoint -LocalPort 2228 -ErrorAction SilentlyContinue
 ```
-应该看到 `CardinalNative.exe` 绑着这个端口。
+You should see `CardinalNative.exe` bound to that port.
 
-### 3. 在 AI 工具里注册 MCP server
+### 3. Register the MCP server in your AI client
 
-把 MCP 配置加到你的 MCP-aware 客户端（WorkBuddy / Claude Desktop / Cursor 都行）：
+Add this to your MCP-aware client (WorkBuddy / Claude Desktop / Cursor all work):
 
 ```json
 {
@@ -91,182 +116,205 @@ Get-NetUDPEndpoint -LocalPort 2228 -ErrorAction SilentlyContinue
 }
 ```
 
-完整的字段示例见 `mcp.example.json`。所有环境变量都有合理默认值，不设也能跑。
+See `mcp.example.json` for the full field list. Every env var has a sane default, so
+it runs even with no config.
 
-### 4. 测试一下
+### 4. Try it
 
-在 AI 里输：`列出当前所有 patch 并告诉我 helm_full.vcv 里有几个模块。`
+In your AI client, type: `List all current patches and tell me how many modules helm_full.vcv has.`
 
-背后会自动调用 `cardinal_list_patches` + `cardinal_patch_info`。
+Behind the scenes it calls `cardinal_list_patches` + `cardinal_patch_info`.
 
 ---
 
-## 它能做什么 —— 12 个 MCP 工具一览
+## What it can do — the 12 MCP tools
 
-| 工具 | 做什么 | 常用场景 |
+| Tool | Does | Common use |
 |---|---|---|
-| `cardinal_ping` | 发 `/hello` 检查 Cardinal 是否响应 OSC | 排查连通性 |
-| `cardinal_list_patches` | 列 `patches/` 目录下所有 .vcv 机架 | 选要加载的机架 |
-| `cardinal_patch_info` | 看某个机架的模块清单（拿到 moduleId 才好调参） | 改参数前的必备查询 |
-| `cardinal_load_patch` | 把某个 .vcv 推给 Cardinal（含 zoom + gridOffset） | 让 AI 切音色 |
-| `cardinal_set_param` | 拧任意模块的旋钮：`moduleId + paramId + value` | 改 cutoff / release / 等 |
-| `cardinal_set_host_param` | 改 Cardinal 内置的 24 个宿主参数 | 调音频接口/采样率等 |
-| `cardinal_read_live` | 读 Cardinal 正在运行的机架（走实时自动存档读回） | 想看用户在 GUI 里改了啥 |
-| `cardinal_save_live` | 把当前 GUI 状态落盘成 .vcv | 用户手动改完不存档就丢 |
-| `cardinal_module_params` | 列某模块的参数清单（名 → 编号） | 找参数编号 |
-| `cardinal_find_param` | 把口语翻成参数编号（"亮一点"→Cutoff） | 让 AI 用自然语说话 |
-| `cardinal_music` | 节奏型 / 和弦进行 / 音色配方查询 | 让 AI 用知识库回答 |
-| `cardinal_apply_recipe` | 把音色配方写进当前机架 | 让 AI 一键换音色 |
+| `cardinal_ping` | send `/hello` to check Cardinal's OSC response | connectivity troubleshooting |
+| `cardinal_list_patches` | list all .vcv patches in `patches/` | pick a rack to load |
+| `cardinal_patch_info` | inspect a patch's module list (need moduleId to set params) | required lookup before tweaking |
+| `cardinal_load_patch` | push a .vcv into running Cardinal (incl. zoom + gridOffset) | let the AI switch tones |
+| `cardinal_set_param` | turn any module's knob: `moduleId + paramId + value` | change cutoff / release / etc. |
+| `cardinal_set_host_param` | change one of Cardinal's 24 host params | audio device / sample rate / etc. |
+| `cardinal_read_live` | read the rack Cardinal is currently running (via live autosave) | see what the user changed in the GUI |
+| `cardinal_save_live` | persist current GUI state to a .vcv | user's manual changes vanish on close otherwise |
+| `cardinal_module_params` | list a module's params (name → number) | find a param number |
+| `cardinal_find_param` | translate plain language to a param number ("brighter" → Cutoff) | let the AI speak naturally |
+| `cardinal_music` | query drum patterns / chord progressions / tone recipes | let the AI answer from the knowledge base |
+| `cardinal_apply_recipe` | write a tone recipe into the current rack | one-click tone swap |
 
 ---
 
-## 项目结构
+## Project structure
 
 ```
 cardinal-mcp/
-├── README.md                       ← 本文件
+├── README.md                       ← this file (English)
+├── README.zh-CN.md                 ← Chinese version
 ├── LICENSE                         ← MIT
 ├── requirements.txt                ← python-osc + zstandard
-├── mcp.example.json                ← MCP 配置示例
+├── mcp.example.json                ← MCP config example
+├── AI-DISCLOSURE.md                ← AI-generation notice (READ BEFORE USE)
 │
-├── tools/                          ← 24 个 Python 工具
-│   ├── cardinal_mcp.py             ← MCP 主入口（1200 行）
-│   ├── patchio.py                  ← 双格式读写 .vcv（JSON / tar+zstd）
-│   ├── layout_patch.py             ← 排班门禁 + 自动重排
-│   ├── paramlib.py                 ← 从源码抓参数字典
-│   ├── musiclib.py                 ← 音色配方 / 和弦进行 / 节奏型
-│   ├── make_full.py                ← 生成"键盘全控件"机架
-│   ├── make_knobs.py               ← 写 HostMIDIMap 映射
-│   ├── fix_drum_bus.py             ← 鼓总线修复 + 输入口自查
-│   ├── winprobe.py                 ← DPI / 窗口探测
-│   ├── winmidi.py + midiprobe.py   ← Windows 原生 MIDI 工具
-│   ├── shot.py                     ← GDI 截屏（零依赖）
-│   └── ... 更多辅助脚本
+├── tools/                          ← 24 Python utilities
+│   ├── cardinal_mcp.py             ← MCP entry point (the 12 tools)
+│   ├── patchio.py                  ← read/write .vcv in both formats (JSON / tar+zstd)
+│   ├── layout_patch.py             ← layout gate + auto re-layout
+│   ├── paramlib.py                 ← scrape the param dictionary from source
+│   ├── musiclib.py                 ← tone recipes / chord progressions / drum patterns
+│   ├── make_full.py                ← generate the "full keyboard controls" rack
+│   ├── make_knobs.py               ← write HostMIDIMap mappings
+│   ├── fix_drum_bus.py             ← drum-bus fix + input-port self-check
+│   ├── winprobe.py                 ← DPI / window probe
+│   ├── winmidi.py + midiprobe.py   ← native Windows MIDI tools
+│   ├── shot.py                     ← GDI screenshot (zero-dependency)
+│   └── ... more helper scripts
 │
 ├── params/
-│   └── modules.json                ← 15 模块 / 248 命名参数
+│   └── modules.json                ← 15 modules / 248 named params
 │
 ├── music/
-│   └── knowledge.json              ← 节奏型 / 进行 / 配方
+│   └── knowledge.json              ← patterns / progressions / recipes
 │
 ├── patches/
-│   ├── helm_full.vcv               ← 主机架：琴键+旋钮+触控+鼓垫全套
-│   ├── helm_keys.vcv               ← 纯合成器机架
-│   ├── helm_drums.vcv              ← 鼓机架
-│   └── ... （.gitignore 排除了个人备份）
+│   ├── helm_full.vcv               ← main rack: keys + knobs + touch + pads, all wired
+│   ├── helm_keys.vcv               ← synth-only rack
+│   ├── helm_drums.vcv              ← drum rack
+│   └── ... (personal backups excluded by .gitignore)
 │
 └── docs/
-    ├── DESIGN-NOTES.md             ← 技术档案：完整解释整套东西怎么搭起来的
-    ├── CARDINAL-REPO-NOTES.md      ← 上游 Cardinal 仓库的关键发现
-    ├── SMK25-midi-map.md           ← M-VAVE SMK25 键盘 MIDI 实测档案
-    └── ATTRIBUTION.md              ← 第三方资源来源标注
+    ├── DESIGN-NOTES.md             ← tech archive: how the whole thing was built
+    ├── CARDINAL-REPO-NOTES.md      ← key findings from the upstream Cardinal repo
+    ├── SMK25-midi-map.md           ← M-VAVE SMK25 keyboard MIDI measurement notes
+    └── ATTRIBUTION.md              ← third-party resource attribution
 ```
 
 ---
 
-## 工作流示例
+## Workflow examples
 
-### "把合成器变亮一点"
-
-```
-你: 帮我把 Current Patch 的滤波器亮度调高一点
-AI: → cardinal_patch_info  (拿到 VCF moduleId)
-   → cardinal_find_param (口语 → "Cutoff")
-   → cardinal_set_param (Cutoff value = 0.75)
-   → 告诉你人话：把 cutoff 从默认 0.5 提到 0.75，听感会更亮
-```
-
-### "换一首和弦进行"
+### "Make the synth brighter"
 
 ```
-你: 给我做个 ii-V-I 的爵士伴奏
-AI: → cardinal_music (progressions) 拿 ii-V-I 的 voicings
-   → cardinal_patch_info 看现在的 ADSR / VCO 配置
-   → cardinal_apply_recipe 写新参数
-   → 你按一个键就能听到 ii-V-I 了
+You:  Raise the filter brightness of the current patch a bit
+AI:   → cardinal_patch_info  (get the VCF moduleId)
+     → cardinal_find_param (plain language → "Cutoff")
+     → cardinal_set_param (Cutoff value = 0.75)
+     → tells you in plain words: cutoff 0.5 → 0.75, sounds brighter
 ```
 
-### "把鼓垫 3 的音色换成 Snare-B"
+### "Swap in a chord progression"
 
 ```
-你: 第三号鼓垫想换成短一点的军鼓
-AI: → cardinal_patch_info 找 SnareDrumN
-   → 看到第 i 个声部的采样由 param(i) 控制
-   → cardinal_set_param 把 SnareDrumN 的 param(2) 改成更"短"的采样编号
-   → 让你敲一下键盘验证
+You:  Give me a ii–V–I jazz accompaniment
+AI:   → cardinal_music (progressions) to get ii–V–I voicings
+     → cardinal_patch_info to see current ADSR / VCO config
+     → cardinal_apply_recipe to write the new params
+     → you press one key and hear ii–V–I
+```
+
+### "Change pad 3's sound to a short snare"
+
+```
+You:  I want pad #3 to be a shorter snare
+AI:   → cardinal_patch_info to find SnareDrumN
+     → see that voice i's sample is controlled by param(i)
+     → cardinal_set_param to set SnareDrumN param(2) to a "shorter" sample number
+     → ask you to hit the pad to verify
 ```
 
 ---
 
-## 硬件 / 软件环境（本项目在哪台机器上验证过）
+## Hardware / software environment (where this was verified)
 
-> 这部分是给想自己复刻的人看的，告诉你要什么环境才能跑得起来。
+> For anyone who wants to reproduce it — what environment it needs to run.
 
-### 软件
+### Software
 
-- **OS**：Windows 11（10.0.26200，64-bit）
-- **Cardinal**：26.02（[DISTRHO/Cardinal](https://github.com/DISTRHO/Cardinal) 26.02 发行版 standalone，安装在 `C:\Program Files\Cardinal-win64-26.02\`）
-  - 共 4 个变体：DISTRHO 本体 / FX / Mini / Synth
-  - 启动用 `CardinalNative.exe`（≈100 MB，主 standalone）
-  - 自带模块库（VCV Rack Fundamental + AudibleInstruments + 一众社区插件）
-- **Python**：3.13.12（managed 解释器，装在用户目录的隔离 venv 里）
-- **AI 客户端**：WorkBuddy（用其 MCP 配置）——同理 Cursor / Claude Desktop 也可以用同一份 `mcp.example.json`
-- **MIDI 配套软件**（用户私有，不随附）：M-VAVE MidiSuite，配 M-VAVE SMK25 时有用
+- **OS**: Windows 11 (10.0.26200, 64-bit)
+- **Cardinal**: 26.02 ([DISTRHO/Cardinal](https://github.com/DISTRHO/Cardinal) 26.02
+  standalone release, installed at `C:\Program Files\Cardinal-win64-26.02\`)
+  - 4 variants: DISTRHO core / FX / Mini / Synth
+  - launch with `CardinalNative.exe` (~100 MB, main standalone)
+  - bundled module library (VCV Rack Fundamental + AudibleInstruments + community plugins)
+- **Python**: 3.13.12 (managed interpreter, in an isolated venv under the user dir)
+- **AI client**: WorkBuddy (via its MCP config) — Cursor / Claude Desktop work with the
+  same `mcp.example.json`
+- **MIDI companion software** (user-private, not shipped): M-VAVE MidiSuite, useful with
+  the M-VAVE SMK25
 
-### 硬件
+### Hardware
 
-- **CPU**：AMD64（x86-64）
-- **屏幕**：
-  - 逻辑分辨率 1600×1000
-  - 物理分辨率 3200×2000（200% 缩放 = DPI 192）
-  - 1 HP（Cardinal 模块宽单位）≈ 21 物理像素 @ zoom=0.75
-- **MIDI 键盘**：[M-VAVE SMK25](https://www.m-vave.com/) —— 25 键 + 16 旋钮 + 16 鼓垫 + 触控条 + 踏板 + Transport
-  - USB + BLE 双模
-  - **完整 MIDI 映射实测档见 `docs/SMK25-midi-map.md`**
+- **CPU**: AMD64 (x86-64)
+- **Screen**:
+  - logical resolution 1600×1000
+  - physical resolution 3200×2000 (200% scaling = DPI 192)
+  - 1 HP (Cardinal module width unit) ≈ 21 physical px @ zoom=0.75
+- **MIDI keyboard**: [M-VAVE SMK25](https://www.m-vave.com/) — 25 keys + 16 knobs +
+  16 pads + touch strip + pedal + transport
+  - USB + BLE
+  - **full MIDI mapping measurements in `docs/SMK25-midi-map.md`**
 
-### 网络
+### Network
 
-- 不联网可用——所有工具都能脱机工作。
-- 联网只用在一个地方：`tools/paramlib.py` 第一次启动会从 Cardinal 自带模块对应的 GitHub 仓库抓 C++ 源码做参数提取（产物缓存在 `tools/_srccache/`，**不进仓库**）。
+- Works fully offline — every tool runs without a network.
+- Network is used in exactly one place: `tools/paramlib.py` fetches C++ source from the
+  GitHub repos of Cardinal's bundled modules on first run to extract params (cached in
+  `tools/_srccache/`, **not in the repo**).
 
 ---
 
-## 已知限制 / 不支持的场景
+## Known limitations / unsupported scenarios
 
-| 不支持 | 原因 |
+| Not supported | Why |
 |---|---|
-| 实时 MIDI/CV 注入 | Cardinal OSC 只有 `/load /param /host-param /hello` 四条消息，没有 MIDI 注入 |
-| 参数变化自动回读 | 实时自动存档只在结构性事件后写盘（详见 DESIGN-NOTES 约束 16）。参数改变了看不见，只能人眼看 GUI |
-| 无人值守（headless）运行 | Cardinal standalone 没有 headless 版本（VCV Rack Pro 才有，Cardinal 不带）|
-| Linux/macOS 测试 | 本仓库只在 Windows 上跑通过；Python 工具都是跨平台的，但 `winmidi.py` / `winprobe.py` 用 Win32 API |
-| LMMS / DAW 录音闭环 | 那是另一个项目（Cardinal.vst 装到 DAW 里），本仓库只到 standalone + OSC |
+| Live MIDI/CV injection | Cardinal OSC only has 4 messages: `/load /param /host-param /hello`; no MIDI injection |
+| Auto read-back of param changes | The live autosave is only written after structural events (see DESIGN-NOTES constraint 16); param changes are invisible until you look at the GUI |
+| Unattended (headless) runs | Cardinal standalone has no headless build (VCV Rack Pro does; Cardinal doesn't) |
+| Linux/macOS testing | Only verified on Windows; the Python tools are cross-platform, but `winmidi.py` / `winprobe.py` use the Win32 API |
+| LMMS / DAW recording loop | That's a separate project (Cardinal.vst into a DAW); this repo stops at standalone + OSC |
 
 ---
 
-## 文档索引
+## Documentation index
 
-| 文档 | 解决什么问题 |
+| Doc | Answers |
 |---|---|
-| `README.md` | 我该不该装这个？装完怎么跑？ |
-| `docs/DESIGN-NOTES.md` | 它是怎么搭起来的？24 个工具逐个解释、12 个踩坑、五条可复用原则 |
-| `docs/CARDINAL-REPO-NOTES.md` | Cardinal 上游有什么值得抄的？OSC 边界 / 模块清单 / 不存在的功能 |
-| `docs/SMK25-midi-map.md` | M-VAVE SMK25 的 MIDI 实测数据：什么控件发什么消息、什么通道、什么坑 |
-| `docs/ATTRIBUTION.md` | 用到了哪些第三方资源、怎么拿 |
-| `HANDOFF.md` | 给续接的 AI 看的状态快照 |
+| `README.md` | Should I install this? How do I run it? |
+| `README.zh-CN.md` | Chinese version of this README |
+| `docs/DESIGN-NOTES.md` | How was it built? All 24 tools explained, 12 pitfalls, 5 reusable principles |
+| `docs/CARDINAL-REPO-NOTES.md` | What's worth borrowing from upstream Cardinal? OSC boundaries / module list / non-existent features |
+| `docs/SMK25-midi-map.md` | M-VAVE SMK25 MIDI measurements: what control sends what message, what channel, what gotcha |
+| `docs/ATTRIBUTION.md` | Which third-party resources are used, and how to get them |
+| `AI-DISCLOSURE.md` | **This project was generated by an AI Agent — verify before use** (bilingual notice) |
+| `HANDOFF.md` | Status snapshot for a follow-up AI |
 
 ---
 
-## 致谢
+## Acknowledgements
 
-- [DISTRHO/Cardinal](https://github.com/DISTRHO/Cardinal) —— 本项目操控的目标
-- [VCV Rack](https://vcvrack.com/) —— Cardinal 是它的硬分叉，模块生态基于 Rack 社区
-- [WorkBuddy](https://www.workbuddy.cn/) —— MCP host，本人在用的 AI 客户端
-- python-osc / zstandard —— 两个唯一的 Python 第三方依赖
+- [DISTRHO/Cardinal](https://github.com/DISTRHO/Cardinal) — the target this project drives
+- [VCV Rack](https://vcvrack.com/) — Cardinal is its hard fork; the module ecosystem is built on the Rack community
+- [WorkBuddy](https://www.workbuddy.cn/) — the MCP host, the AI client the author uses
+- python-osc / zstandard — the only two third-party Python dependencies
 
-第三方资源的使用与版权见 `docs/ATTRIBUTION.md`。
+Use and copyright of third-party resources: see `docs/ATTRIBUTION.md`.
+
+---
+
+## AI generation notice (required reading)
+
+**This project was produced almost entirely by an AI Agent (WorkBuddy), not written
+line-by-line by a human.** The code, docs, and param dictionaries are AI self-reviewed
+output and may contain errors. Before running any tool that edits your rack or your
+running Cardinal, back up and test first.
+
+- Full notice + a "suggested verification checklist" in **[`AI-DISCLOSURE.md`](AI-DISCLOSURE.md)** (bilingual).
+- The top banner carries the same warning.
 
 ---
 
 ## License
 
-MIT——见 `LICENSE`。
+MIT — see `LICENSE`.

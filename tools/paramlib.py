@@ -1,37 +1,40 @@
-"""params 字典：把 Cardinal 模块的「参数编号 -> 人类可读名字」抓下来。
+"""Parameter dictionary: recover each Cardinal module's "param number -> human name".
 
-为什么要这个文件
-----------------
-.vcv / patch.json 里参数只有编号和数值（{"id": 7, "value": 0.62}），没有名字。
-所以「包络慢一点」「鼓闷一点」这种话落不到具体旋钮上。
-这个模块从模块源码里解析 configParam / configSwitch / configButton，
-产出参数字典 D:\\Cardinal\\params\\modules.json。
+WHY THIS FILE EXISTS
+--------------------
+A .vcv / patch.json stores parameters only as numbers and values
+({"id": 7, "value": 0.62}) — no names. So a request like "make the envelope slower"
+or "mute the drum" cannot be mapped to a concrete knob. This module parses the
+module's C++ source (configParam / configSwitch / configButton) and produces the
+parameter dictionary at D:\\Cardinal\\params\\modules.json.
 
-解析过程中踩到的坑（都已处理）
-------------------------------
-1. 枚举名有两种：`enum ParamIds`（Fundamental）和 `enum ParamId`（MixMaster）。
-2. 一个源文件里可能有多个 enum 块（ParamIds / InputIds / OutputIds / LightIds），
-   **只有 ParamId* 才是参数**，其余是端口/灯，混进来会造出大量假槽位。
-3. 参数编号由 C++ 常量决定，且大量用循环生成：
+Pitfalls hit while parsing (all handled)
+---------------------------------------
+1. Two enum-name styles: `enum ParamIds` (Fundamental) and `enum ParamId` (MixMaster).
+2. One source file can contain several enum blocks (ParamIds / InputIds / OutputIds /
+   LightIds). ONLY ParamId* entries are parameters; the others are ports/lights and
+   would manufacture huge numbers of fake slots if mixed in.
+3. Param numbers come from C++ constants and are heavily loop-generated:
    `for (int i = 0; i < N_TRK; i++) configParam(TRACK_PAN_PARAMS + i, ...)`
-   —— 必须做块结构扫描 + 循环展开，否则只会得到 4 个参数而不是 72 个。
-4. Rack 的 `ENUMS(NAME, n)` 宏把一个名字展开成 n 个连续编号：
-   `ENUMS(RATIO_PARAMS, 4)` → RATIO_PARAMS+0..3。
-   注意 `ENUMS(A, 4)` 自身含逗号，按逗号切分枚举体时必须跳过括号内逗号。
-5. **废弃但占号**的参数：VCO/VCF 里写着 `FINE_PARAM, // removed in 2.0`，
-   它仍然占一个编号，但没有 configParam。必须如实记录成 reserved，
-   否则「第 3 号参数」会指错位置。
-6. 枚举可能在头文件里（Plateau.hpp），且用 `Plateau::DRY_PARAM` 限定名。
-7. 枚举可能在父类里（鼓模块的 SampleController.hpp），子类 .cpp 只做 configParam
-   —— 所以要跨文件共享符号表。
+   — we MUST do block-structure scanning + loop unrolling, or we get 4 params
+   instead of 72.
+4. Rack's `ENUMS(NAME, n)` macro expands one name into n consecutive numbers:
+   `ENUMS(RATIO_PARAMS, 4)` -> RATIO_PARAMS+0..3. Note `ENUMS(A, 4)` itself contains a
+   comma, so splitting an enum body on commas must skip commas inside parentheses.
+5. REMOVED-BUT-RESERVED params: VCO/VCF have `FINE_PARAM, // removed in 2.0` which
+   still occupies a number but has no configParam. We must record it as "reserved"
+   or "param #3" would point at the wrong slot.
+6. The enum may live in a header (Plateau.hpp), qualified as `Plateau::DRY_PARAM`.
+7. The enum may live in a PARENT class (drum modules' SampleController.hpp); the
+   child .cpp only does configParam — so we must share one symbol table across files.
 
-用法
+USAGE
 ----
-    python paramlib.py build                 # 抓取并写入字典
+    python paramlib.py build                 # scrape sources and write the dictionary
     python paramlib.py build --only Fundamental,Valley
-    python paramlib.py show Fundamental VCF   # 看某个模块的参数表
-    python paramlib.py search cutoff          # 按名字搜
-    python paramlib.py verify                 # 用实际 patch 交叉验证
+    python paramlib.py show Fundamental VCF   # dump one module's param table
+    python paramlib.py search cutoff          # search by name
+    python paramlib.py verify                 # cross-check against real patches
 """
 
 import json
@@ -47,9 +50,14 @@ CACHE_DIR = os.path.join(HERE, "_srccache")
 RAW = "https://raw.githubusercontent.com"
 
 
-# ================================================================ 源码抓取
+# ================================================================ Source fetching
 
 def fetch(url, use_cache=True):
+    """Download a source file (with a local cache so we don't re-hit GitHub).
+
+    Returns the text, or None on failure. The cache key is a URL-slugged name;
+    cached files let `build` run fully offline after the first successful scrape.
+    """
     os.makedirs(CACHE_DIR, exist_ok=True)
     key = re.sub(r"[^A-Za-z0-9]+", "_", url)[-140:]
     path = os.path.join(CACHE_DIR, key)
@@ -68,6 +76,7 @@ def fetch(url, use_cache=True):
 
 
 def fetch_many(urls):
+    """Try several candidate URLs; return (text, url) of the first that has real content."""
     for u in urls:
         t = fetch(u)
         if t and len(t) > 200 and "404: Not Found" not in t[:120]:
@@ -76,7 +85,7 @@ def fetch_many(urls):
 
 
 def match_brace(src, start):
-    """从 start（指向 '{'）找到配对 '}' 的下标。"""
+    """Given `start` pointing at a '{', return the index of its matching '}'."""
     depth, i = 0, start
     while i < len(src):
         if src[i] == "{":
@@ -89,16 +98,17 @@ def match_brace(src, start):
     return len(src) - 1
 
 
-# ================================================================ C++ 轻量解析
+# ================================================================ Lightweight C++ parsing
 
 def strip_comments(src):
+    """Remove /* */ and // comments so they can't fool the tokenisers."""
     src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
     src = re.sub(r"//[^\n]*", "", src)
     return src
 
 
 def split_args(inner):
-    """按顶层逗号切分（跳过括号/花括号/方括号/字符串里的逗号）。"""
+    """Split a paren body on TOP-LEVEL commas (skip commas inside (), [], {}, strings)."""
     parts, cur = [], ""
     depth, in_str, quote, i = 0, False, "", 0
     while i < len(inner):
@@ -138,12 +148,18 @@ _CONST_OK = re.compile(r"[\d\s+\-*/()<>&|^%~.]*")
 
 
 def eval_const(expr, env):
-    """求 C++ 常量表达式，求不出来返回 None。"""
+    """Best-effort evaluation of a C++ constant expression; None if it can't be done.
+
+    We strip type keywords and casts, resolve identifiers from `env`, drop float
+    suffixes, then only accept a pure arithmetic expression before calling eval().
+    This is intentionally conservative — anything that still contains a letter is
+    refused rather than guessed wrong.
+    """
     e = (expr or "").strip()
     if not e:
         return None
     e = re.sub(r"\b(?:float|double|int|uint8_t|uint16_t|uint32_t|uint64_t|size_t|unsigned)\b", "", e)
-    e = re.sub(r"\([^()]*\)\s*(?=[\d+\-*/])", "", e)     # 去掉 (float) 之类 cast
+    e = re.sub(r"\([^()]*\)\s*(?=[\d+\-*/])", "", e)     # drop (float)-style casts
     e = re.sub(r"\b\w+::", "", e)                          # Plateau::DRY_PARAM -> DRY_PARAM
     e = re.sub(r"\b([A-Za-z_]\w*)\b",
                lambda m: str(env[m.group(1)]) if m.group(1) in env else m.group(1), e)
@@ -160,6 +176,7 @@ def eval_const(expr, env):
 
 
 def parse_defines(src):
+    """Collect #define macros whose value is a pure constant, into an env dict."""
     env = {}
     for m in re.finditer(r"^\s*#define\s+(\w+)\s+([^\n\\]+)", src, re.M):
         v = eval_const(m.group(2).strip(), {})
@@ -169,7 +186,7 @@ def parse_defines(src):
 
 
 def find_calls(src, name):
-    """找出所有 name(...) 调用，返回 [(位置, 实参文本)]。"""
+    """Find every `name(...)` call; return [(start_index, arg_text)]."""
     out = []
     for m in re.finditer(r"\b" + name + r"\s*(<[^;(){}]*?>)?\s*\(", src):
         start = m.end() - 1
@@ -200,10 +217,11 @@ def find_calls(src, name):
 
 
 def parse_enums(src, defines):
-    """解析所有 enum 块。
+    """Parse all enum blocks.
 
-    返回 (符号表 env, 参数字典 param_syms)
-    param_syms 只包含 ParamId / ParamIds 块里的符号 —— 端口/灯枚举不算参数。
+    Returns (symbol_env, param_syms). `param_syms` holds ONLY the symbols inside a
+    ParamId / ParamIds block — port/light enums are excluded from the parameter set.
+    Runs several passes so later blocks can reference earlier values.
     """
     env = dict(defines)
     blocks = []
@@ -214,7 +232,7 @@ def parse_enums(src, defines):
         blocks.append((name, body))
 
     param_syms = {}
-    for _ in range(4):        # 多轮，让后面的块能引用前面的值
+    for _ in range(4):        # multiple passes let later blocks use earlier values
         param_syms = {}
         for name, body in blocks:
             is_param = name.startswith("ParamId")
@@ -257,6 +275,7 @@ FOR_HEAD = re.compile(
 
 
 def scan_loops(src):
+    """Find `for` loops; record their span and the loop variable + bounds."""
     loops = []
     for m in FOR_HEAD.finditer(src):
         loops.append({"start": m.end() - 1, "end": match_brace(src, m.end() - 1),
@@ -266,16 +285,19 @@ def scan_loops(src):
 
 
 def innermost_loop(loops, pos):
+    """Return the innermost loop (smallest span) containing `pos`, or None."""
     hits = [l for l in loops if l["start"] <= pos <= l["end"]]
     return min(hits, key=lambda l: l["end"] - l["start"]) if hits else None
 
 
 def num(expr, env):
+    """Evaluate a numeric constant expression to float, or None."""
     v = eval_const(expr, env) if expr else None
     return None if v is None else float(v)
 
 
 def label_of(expr):
+    """Extract the first quoted string from an argument, or None."""
     if not expr:
         return None
     m = re.search(r'"([^"]*)"', expr)
@@ -283,7 +305,12 @@ def label_of(expr):
 
 
 def parse_module(src, env):
-    """解析一个源文件里的 configParam 调用。env 为跨文件共享符号表。"""
+    """Parse configParam / configSwitch / configButton calls in one source file.
+
+    `env` is the cross-file shared symbol table (so a child .cpp sees its parent
+    class's enums). Loop-generated params are unrolled by instantiating the loop
+    variable over its [lo, hi) range.
+    """
     src = strip_comments(src)
     env = dict(env)
     env.update(parse_defines(src))
@@ -291,6 +318,7 @@ def parse_module(src, env):
     loops = scan_loops(src)
     params = {}
 
+    # The four Rack factory functions that register a param, with their "kind".
     specs = [("configParam", "knob"), ("configParamNoRand", "knob"),
              ("configSwitch", "switch"), ("configButton", "button")]
     for fname, kind in specs:
@@ -319,6 +347,7 @@ def parse_module(src, env):
                 if kind == "button":
                     entry["name"] = label_of(args[1])
                 elif len(args) > 4:
+                    # configParam(name, min, max, default, label, unit?, ...)
                     entry["name"] = label_of(args[4])
                     entry["min"] = num(args[1], e)
                     entry["max"] = num(args[2], e)
@@ -334,7 +363,7 @@ def parse_module(src, env):
     return params, local_syms
 
 
-# ================================================================ 模块 -> 源码
+# ================================================================ module -> source map
 
 REPOS = {
     "Fundamental": ("CardinalModules/Fundamental", "master", "src"),
@@ -345,6 +374,8 @@ REPOS = {
     "WSTD-Drums": ("Wasted-Audio/WSTD-Drums", "master", "src"),
 }
 
+# Exact (plugin, model) -> list of source-relative paths. Headers (.hpp) are added
+# automatically later (the enum often lives there).
 SOURCES = {
     ("Fundamental", "VCA-1"): ["src/VCA.cpp"],
     ("Fundamental", "VCF"): ["src/VCF.cpp"],
@@ -370,11 +401,13 @@ SOURCES = {
 
 
 def raw_url(plugin, rel):
+    """Build a raw.githubusercontent.com URL for a source file."""
     owner, branch, _ = REPOS[plugin]
     return "{}/{}/{}/{}".format(RAW, owner, branch, rel)
 
 
 def guess_rels(plugin, model):
+    """When SOURCES has no exact entry, guess candidate paths from the model name."""
     _owner, _branch, sub = REPOS[plugin]
     rels = []
     for n in (model, model.replace("-", ""), model.replace("-", "_")):
@@ -382,14 +415,15 @@ def guess_rels(plugin, model):
     return rels
 
 
-# ---------------------------------------------- 手工规则（循环生成 + 动态名字）
+# ---------------------------------------------- Manual rules (loop-gen + dynamic names)
 
 def gen_mixmasterjr():
-    """MixMasterJr：8 轨 + 2 编组 + master，共 72 个参数。
+    """MixMasterJr: 8 tracks + 2 groups + master = 72 params.
 
-    编号来源：MixMaster.cpp 构造函数里的循环结构 + MixMaster.hpp 的枚举常量。
-    交叉验证：8*7 + 2*6 + 4 = 72，与 patch 里实测参数个数完全一致。
-    名字来源：构造函数里 snprintf 的格式串（如 "-%02i-: pan"）。
+    Numbers come from MixMaster.cpp's constructor loop structure + MixMaster.hpp's
+    enum constants. Cross-check: 8*7 + 2*6 + 4 = 72, matching the param count
+    measured in the real patch. Names come from the snprintf format strings in the
+    constructor (e.g. "-%02i-: pan").
     """
     p = {}
 
@@ -432,18 +466,19 @@ def gen_mixmasterjr():
 
 MANUAL = {
     "MindMeldModular/MixMasterJr": {
-        "source": "手工整理（MixMaster.cpp 构造函数循环 + MixMaster.hpp 枚举）",
+        "source": "hand-built (MixMaster.cpp constructor loops + MixMaster.hpp enum)",
         "params": gen_mixmasterjr(),
     },
 }
 
 
 def fill_drums(params, sample_max=15.0):
-    """鼓模块的槽位补全。
+    """Backfill the drum module's slot map.
 
-    源码里 `configParam(DRUM_PARAM, ...)` 和 `DRUM_PARAM + 1` 只配置了 2 个鼓声，
-    但父类声明了 `NUM_PARAMS = TUNE_PARAM + MAX_MODULES = 32`——patch 里 32 个槽位
-    全都在。按 MAX_MODULES=16 的规律补全，让任何编号都能查到含义。
+    The source configParam(DRUM_PARAM, ...) and DRUM_PARAM + 1 only enable 2 drum
+    voices, but the parent class declares NUM_PARAMS = TUNE_PARAM + MAX_MODULES = 32 —
+    all 32 slots exist in the patch. We fill by the MAX_MODULES=16 pattern so any
+    number can be looked up.
     """
     out = {str(k): v for k, v in params.items()}
     for i in range(16):
@@ -451,23 +486,24 @@ def fill_drums(params, sample_max=15.0):
         if k not in out:
             out[k] = {"kind": "knob", "enum": "DRUM_PARAM + {}".format(i), "name": "Sample",
                       "min": 0.0, "max": sample_max, "default": 7.0,
-                      "note": "未使用槽位（本模块只启用前 2 个鼓声）"}
+                      "note": "unused slot (only first 2 drum voices enabled)"}
     for i in range(16):
         k = str(16 + i)
         if k not in out:
             out[k] = {"kind": "knob", "enum": "TUNE_PARAM + {}".format(i),
                       "name": "Playback Speed", "min": 0.2, "max": 1.8,
                       "default": 1.0, "unit": "x",
-                      "note": "未使用槽位（本模块只启用前 2 个鼓声）"}
+                      "note": "unused slot (only first 2 drum voices enabled)"}
     return out
 
 
 def fix_templated_names(params):
-    """修掉名字里的 printf 占位符。
+    """Repair printf-style placeholders left in names.
 
-    源码里名字常是运行时拼的：`string::f("Clk %i ratio", i + 1)`、
-    `snprintf(strBuf, 32, "-%02i-: pan", i + 1)`。静态解析只能拿到模板串，
-    这里按「同一个枚举基名」分组，用组内序号把 %i / %02i 填成真实数字。
+    Source names are often built at runtime: `string::f("Clk %i ratio", i + 1)`,
+    `snprintf(strBuf, 32, "-%02i-: pan", i + 1)`. Static parsing only recovers the
+    template string, so we group by the same enum base name and substitute the
+    group index for %i / %02i.
     """
     groups = {}
     for pid, p in params.items():
@@ -483,9 +519,14 @@ def fix_templated_names(params):
     return params
 
 
-# ================================================================ 建档
+# ================================================================ Build the dictionary
 
 def plan_from_patches(patch_dir):
+    """Decide which (plugin, model) pairs we need, from the patches on disk.
+
+    Returns (sorted_needed, max_param_count_per_module). The max count tells us how
+    many slots a module actually has, so we can drop phantom slots beyond it.
+    """
     sys.path.insert(0, HERE)
     import patchio
     need, size = set(), {}
@@ -508,6 +549,7 @@ def plan_from_patches(patch_dir):
 
 
 def build(patch_dir=None, only=None, quiet=False):
+    """Scrape sources for every module used in the patches and write modules.json."""
     patch_dir = patch_dir or os.path.join(os.path.dirname(HERE), "patches")
     targets, sizes = plan_from_patches(patch_dir)
     lib = {}
@@ -527,16 +569,16 @@ def build(patch_dir=None, only=None, quiet=False):
             lib[key] = {"plugin": plugin, "model": model, "source": manual["source"],
                         "params": manual["params"]}
             if not quiet:
-                print("  [manual] {:<34} {:>3} 个参数".format(key, len(manual["params"])))
+                print("  [manual] {:<34} {:>3} params".format(key, len(manual["params"])))
             continue
 
         if plugin not in REPOS:
             if not quiet:
-                print("  [skip]   {:<34} 无源码地址".format(key))
+                print("  [skip]   {:<34} no source URL".format(key))
             continue
 
         rels = SOURCES.get((plugin, model)) or guess_rels(plugin, model)
-        # 自动补同目录同名头文件（枚举常在 .hpp 里）
+        # Auto-add the same-name header next to each .cpp (enums often live in .hpp).
         expanded = []
         for rel in rels:
             expanded.append(rel)
@@ -549,10 +591,11 @@ def build(patch_dir=None, only=None, quiet=False):
                 files.append((rel, t))
         if not files:
             if not quiet:
-                print("  [miss]   {:<34} 找不到源文件".format(key))
+                print("  [miss]   {:<34} source not found".format(key))
             continue
 
-        # 1) 先建立跨文件共享符号表（父类头文件里的枚举要能被子类 cpp 用上）
+        # 1) Build a cross-file shared symbol table first (a parent class's enums in
+        #    a .hpp must be visible to the child .cpp's configParam calls).
         shared = {}
         for _rel, t in files:
             body = strip_comments(t)
@@ -560,7 +603,7 @@ def build(patch_dir=None, only=None, quiet=False):
             env, _ = parse_enums(body, shared)
             shared.update(env)
 
-        # 2) 再逐文件解析 configParam，并收集参数枚举符号
+        # 2) Parse configParam per file, collecting param + enum symbols.
         params = {}
         syms = {}
         for _rel, t in files:
@@ -571,7 +614,8 @@ def build(patch_dir=None, only=None, quiet=False):
             for k, v in s.items():
                 syms.setdefault(k, v)
 
-        # 3) 枚举里有、但没 configParam 的编号 -> reserved（只取参数枚举）
+        # 3) Enum entries with no configParam -> "reserved" (only ParamId* enums;
+        #    skip _LEN / _LAST / NUM_ sentinels and anything beyond the module's real size).
         limit = sizes.get((plugin, model))
         for nm, (enum_name, idx) in syms.items():
             if re.search(r"_LEN$|_LAST$|^NUM_", nm):
@@ -581,14 +625,14 @@ def build(patch_dir=None, only=None, quiet=False):
                 continue
             if idx not in params:
                 params[idx] = {"kind": "reserved", "enum": nm, "name": None,
-                               "note": "枚举占位，无 configParam（废弃或未使用）"}
+                               "note": "enum placeholder, no configParam (removed/unused)"}
 
-        # 4) 超出该模块实际参数个数的空槽位一律丢掉
+        # 4) Drop empty slots beyond the module's actual param count.
         if limit is not None:
             params = {k: v for k, v in params.items()
                       if k < limit or (v.get("name") and v["kind"] != "reserved")}
 
-        # 5) 后处理：补全鼓模块的空槽 / 修掉名字里的 printf 占位符
+        # 5) Post-process: backfill drum empty slots / fix printf placeholders in names.
         if plugin == "WSTD-Drums":
             params = fill_drums(params)
         params = fix_templated_names(params)
@@ -601,7 +645,7 @@ def build(patch_dir=None, only=None, quiet=False):
         if not quiet:
             head = [v["name"] for k, v in sorted(params.items(), key=lambda x: int(x[0]))
                     if v.get("name")][:4]
-            print("  [ok]     {:<34} {:>3} 槽 / {:>3} 有名  {}".format(
+            print("  [ok]     {:<34} {:>3} slots / {:>3} named  {}".format(
                 key, len(params), named, "、".join(head)))
 
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -610,12 +654,13 @@ def build(patch_dir=None, only=None, quiet=False):
     return lib
 
 
-# ================================================================ 查询接口
+# ================================================================ Query interface
 
 _CACHE = {"lib": None, "mtime": None}
 
 
 def load():
+    """Load modules.json, cached and invalidated by file mtime."""
     if not os.path.exists(OUT_FILE):
         return {}
     mtime = os.path.getmtime(OUT_FILE)
@@ -629,8 +674,9 @@ ALIAS = {"DrumKit": "WSTD-Drums"}
 MODEL_ALIAS = {"BD9": "BassDrum9", "ClosedHH": "ClosedHiHat", "Snare": "SnareDrumN",
                "OpenHH": "OpenHiHat"}
 
-# 中文口语 -> 参数名里可能出现的英文关键词。
-# 参数名全是英文，但用户说中文；没有这张表，「滤波亮一点」就翻译不出来。
+# Chinese colloquial term -> English keywords that may appear in a param name.
+# Param names are all English but the user speaks Chinese; without this table a
+# request like "brighter filter" could not be translated.
 TERMS = {
     "亮": ["cutoff", "freq", "bright", "tone", "high"],
     "暗": ["cutoff", "freq", "low", "damp"],
@@ -682,6 +728,8 @@ TERMS = {
 
 
 def lookup(plugin, model):
+    """Find a module's dictionary entry, trying plugin/model aliases and a
+    model-only fallback."""
     lib = load()
     for p in (plugin, ALIAS.get(plugin, plugin)):
         for m in (model, MODEL_ALIAS.get(model, model)):
@@ -695,6 +743,7 @@ def lookup(plugin, model):
 
 
 def name_of(plugin, model, param_id):
+    """Return the human name of one param, or None."""
     e = lookup(plugin, model)
     if not e:
         return None
@@ -705,11 +754,13 @@ def name_of(plugin, model, param_id):
 
 
 def describe(plugin, model, param_id):
+    """Return the full param dict for one param id, or None."""
     e = lookup(plugin, model)
     return e["params"].get(str(param_id)) if e else None
 
 
 def search(keyword, limit=40):
+    """Fuzzy search the dictionary by param name or enum name."""
     kw = keyword.lower()
     hits = []
     for key, mod in load().items():
@@ -725,10 +776,11 @@ def search(keyword, limit=40):
 
 
 def resolve_name(plugin, model, human):
-    """把「人话」映射到参数编号，返回 [(匹配分, 编号, 名字)]。
+    """Map plain language to a param number. Returns [(score, number, name)].
 
-    参数名都是英文（Cutoff frequency / Release / Wet level…），但用户说中文。
-    所以先把口语词展开成可能对应的英文关键词，再去匹配参数名。
+    Param names are English (Cutoff frequency / Release / Wet level…) but the user
+    speaks Chinese, so we first expand colloquial words into the English keywords
+    they might map to, then match against param names.
     """
     e = lookup(plugin, model)
     if not e:
@@ -754,6 +806,8 @@ def resolve_name(plugin, model, human):
 
 
 def verify(patch_dir=None, verbose=True):
+    """Cross-check the dictionary against real patches: do every param id used in a
+    patch exist in the dictionary? Returns a list of problems."""
     sys.path.insert(0, HERE)
     import patchio
     patch_dir = patch_dir or os.path.join(os.path.dirname(HERE), "patches")
@@ -773,15 +827,15 @@ def verify(patch_dir=None, verbose=True):
                 continue
             e = lookup(m["plugin"], m["model"])
             if not e:
-                problems.append((fn, m["plugin"], m["model"], "字典里没有这个模块"))
+                problems.append((fn, m["plugin"], m["model"], "module not in dictionary"))
                 continue
             known = sorted(int(k) for k in e["params"])
             missing = [g for g in given if g not in known]
             if missing:
                 problems.append((fn, m["plugin"], m["model"],
-                                 "patch 有字典缺: {}".format(missing)))
+                                 "patch has but dict lacks: {}".format(missing)))
             if verbose:
-                print("  {:<36} {:<20} patch {:>3} / 字典 {:>3}".format(
+                print("  {:<36} {:<20} patch {:>3} / dict {:>3}".format(
                     m["plugin"] + "/" + m["model"], fn[:18], len(given), len(known)))
     return problems
 
@@ -793,15 +847,15 @@ def main(argv):
         only = set(argv[argv.index("--only") + 1].split(",")) if "--only" in argv else None
         lib = build(only=only)
         named = sum(1 for v in lib.values() for p in v["params"].values() if p.get("name"))
-        print("\n{} 个模块建档 / {} 个命名参数 -> {}".format(len(lib), named, OUT_FILE))
+        print("\n{} modules / {} named params -> {}".format(len(lib), named, OUT_FILE))
         return 0
 
     if argv[1] == "show":
         e = lookup(argv[2], argv[3])
         if not e:
-            print("没有建档:", argv[2], argv[3])
+            print("not built:", argv[2], argv[3])
             return 1
-        print("{}  来源: {}".format(e["model"], e["source"]))
+        print("{}   source: {}".format(e["model"], e["source"]))
         for k, v in sorted(e["params"].items(), key=lambda x: int(x[0])):
             bits = []
             if v.get("min") is not None and v.get("max") is not None:
@@ -811,7 +865,7 @@ def main(argv):
             if v.get("unit"):
                 bits.append(v["unit"])
             print("  {:>3}  {:<24} {:<9} {}".format(
-                k, v.get("name") or "(未使用)", v["kind"], " ".join(bits)))
+                k, v.get("name") or "(unused)", v["kind"], " ".join(bits)))
         return 0
 
     if argv[1] == "search":
@@ -823,11 +877,11 @@ def main(argv):
         probs = verify()
         print()
         if probs:
-            print("发现 {} 处不一致:".format(len(probs)))
+            print("found {} mismatches:".format(len(probs)))
             for p in probs:
                 print("  {} {} {} -> {}".format(*p))
             return 1
-        print("全部一致")
+        print("all consistent")
         return 0
 
     print(__doc__)

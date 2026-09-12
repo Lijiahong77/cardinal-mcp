@@ -1,38 +1,49 @@
 # -*- coding: utf-8 -*-
 """
-layout_patch.py —— Cardinal 机架「排班」工具（模块布局的唯一权威）
+layout_patch.py — the single source of truth for laying out modules in a
+Cardinal patch (the "排班" / stage-blocking tool).
 
-排班规则见 ~/.workbuddy/MEMORY.md「Cardinal 机架排班铁律」
+The layout rules are also mirrored in ~/.workbuddy/MEMORY.md ("Cardinal 机架排班铁律").
 --------------------------------------------------------------------
-1. `pos[0]`（x）单位是「**格**」，不是像素。1 格 ≈ 1 HP ≈ 15px。
-   `pos[1]`（y）单位是「**行号**」（写 `0 / 1 / 2 …`），**不是格**（2026-09-12 15:45 修正）。
-2. 行有语义，按信号流自上而下：
-      行0 合成器链 ｜ 行1 控制映射+鼓机 ｜ 行2 混音输出+说明牌 ｜ 行3+ 新增区
-3. 同行内 x 从 0 起单调递增，列间距 = 模块宽度 + `GAP` 格。
-4. 宽度不确定就估大（估小会压住右邻居）。
-5. ⚠️ **改 `.vcv` 前必须确认 Cardinal 已关闭** —— 它一按 Ctrl+S 就会把内存状态写回文件，
-   覆盖你的改动（2026-09-12 实录：排好的布局被一次保存整个盖掉）。
+1. `pos[0]` (x) is in "cells" (格), NOT pixels. 1 cell ≈ 1 HP ≈ 15 internal px.
+   `pos[1]` (y) is a "row number" (0 / 1 / 2 …), NOT cells
+   (corrected 2026-09-12 15:45).
+2. Rows have meaning, top-to-bottom by signal flow:
+      row 0  synth chain        | row 1  control map + drums
+      row 2  mix output + label | row 3+ new / unregistered zone
+3. Within a row, x starts at 0 and increases monotonically; column gap = module
+   width + GAP cells.
+4. When unsure of a module's width, overestimate (underestimating overlaps the
+   right-hand neighbour).
+5. ⚠️ Before editing a .vcv, make sure Cardinal is CLOSED — pressing Ctrl+S in
+   Cardinal writes its in-memory state back to the file and overwrites your edits
+   (observed 2026-09-12: a tidy layout was wiped by a later save).
 
-踩过的坑（2026-09-12）：把新模块 pos 写成 x=300~720（当成像素），
-等于放到 4500px 外 —— 界面上「只看到线、看不到模块」。
+The bug we hit (2026-09-12): writing a new module's pos as x=300~720 (treating
+cells as pixels) placed it ~4500px off-screen — the GUI showed "wires but no
+modules".
 
-严重度分级（避免门禁误报，误报比不查更糟）
+Severity tiers (to avoid false alarms — a false alarm is worse than no check)
 --------------------------------------------------------------------
-  硬错误（退出码 1）：输入口双接、明显重叠（>2 格）、坐标超出视野（|坐标|>200 格）
-  提示（不影响退出码）：y 不在行网格上、轻微重叠、轻微负坐标、有模块未登记
-  `--strict` 时提示升级为错误
+  HARD error (exit code 1): input port double-connected, obvious overlap (>2 cells),
+                            coordinate outside the default view (|coord|>200 cells)
+  SOFT warning (non-blocking): y not on an integer row grid, slight overlap,
+                               slightly negative x, unregistered module
+  `--strict` upgrades SOFT warnings to HARD errors
 
-子命令
+Subcommands
 --------------------------------------------------------------------
-  check  <patch>                     只列坐标（诊断，不改文件）
-  guard  <patch> [--strict]          【门禁】排班 + 接线双重体检，有硬错误则退出码 1
-  widths [--fix]                     复测本机面板宽度，核对 WIDTH_BY_MODEL 是否失真
+  check  <patch>                      just print coordinates (diagnose, no edit)
+  guard  <patch> [--strict]           GATE: layout + wiring double check; exit 1 on hard error
+  widths [--fix]                      re-measure panel widths, verify WIDTH_BY_MODEL
   apply  <patch> [--push] [--strict] [--no-etext]
-                                     重排并写回（自动备份）；未登记模块自动落行
-       --push      顺带推进 Cardinal 并复验实时存档
-       --strict    出现「自动落行」的模块就拒绝写入（逼自己登记进 LAYOUT）
-       --no-etext  不更新说明牌 TextEditor
+                                      re-layout and write back (auto-backup);
+                                      unregistered modules auto-place
+       --push      also push into Cardinal and verify the live autosave
+       --strict    refuse to write if any module had to be auto-placed
+       --no-etext  do not update the TextEditor label panel
 """
+
 import json
 import os
 import re
@@ -43,63 +54,72 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import patchio  # noqa: E402
 
-# ---------------------------------------------------------------- 排班常量
-# 【2026-09-12 15:45 修正：y 的单位是「行号」，不是「格」】
-#   证据：本机 20 个官方模板/示例，**即便 39 模块的多行机架，y 也全落在 -1 ~ 2**；
-#         Cardinal 保存 helm_full.vcv 后 y 正是 0/1/2。
-#   → 写 y 就写 0 / 1 / 2 / 3…；早期写成 y=34/68（当格用）是**错的**。
-#   ⚠️ 未解疑点：早期写 y=0/34/68 时李却看到正常三行 -> 推测 Cardinal 加载时会做
-#      「格 -> 行」吸附（读格、写行号，读写不对称）。待实测确认（见 HANDOFF 约束 31）。
+
+# ================================================================ Layout constants
+# [2026-09-12 15:45 correction: y's unit is "row number", NOT "cells".]
+#   Evidence: all 20 official templates/examples on this machine — even a 39-module
+#   multi-row rack — have y only in the range -1 ~ 2; after Cardinal saved
+#   helm_full.vcv, its y is exactly 0/1/2.
+#   => write y as 0 / 1 / 2 / 3… ; writing y=34/68 (treating it as cells) was WRONG.
+#   ⚠️ Open question: earlier y=0/34/68 still rendered as normal 3 rows for the user
+#      -> hypothesis: Cardinal does a "cells -> rows" snap on load (reads cells, writes
+#      row numbers; read/write asymmetric). To be confirmed by experiment.
 #
-# 【屏幕容量，3200x2000 @200% DPI】
-#   zoom=1 时 1 格 = 20 物理px，窗口可用约 160 格宽 x 88 格高（扣掉工具栏）。
-#   1 行占高 ≈ 25.3 格（模块高）-> 3 行 ≈ 98 格 = 1960 物理px 会顶满屏幕，
-#   于是鼓落到中下部、「全在很下面」。=> 铁律：纵向排 2 行以内。
-GAP = 2            # 列间隙（格）。两行要装下 20 个模块，间隙必须收紧
-ROW_H = 34         # 【只用于估屏幕占用】1 行 ≈ 34 格；**布局输出用行号，别乘它**
-GRID_PER_ROW = 34  # 行 -> 格的换算系数（仅估算屏幕高度用）
-MAX_ROWS_FOR_SCREEN = 2   # 一屏能舒服放下的行数上限（超过就要缩放视图）
+# [Screen capacity, 3200x2000 @ 200% DPI]
+#   at zoom=1, 1 cell = 20 physical px; usable window ≈ 160 cells wide × 88 cells tall
+#   (minus the toolbar). One row is ≈ 25.3 cells tall -> 3 rows ≈ 98 cells = 1960 px
+#   fills the screen, pushing drums to the lower-middle ("all at the bottom").
+#   => iron rule: keep it to 2 rows vertically. Spread out horizontally instead.
+GAP = 2            # column gap (cells). 20 modules must fit in 2 rows, so keep it tight
+ROW_H = 34         # [estimating screen occupancy ONLY] 1 row ≈ 34 cells;
+                   #  **layout output uses the row number — do NOT multiply by this**
+GRID_PER_ROW = 34  # row -> cells conversion factor (screen-height estimate only)
+MAX_ROWS_FOR_SCREEN = 2   # max rows that fit comfortably on screen (more => zoom out)
 
-# 门禁阈值
-OVERLAP_TOL = 2    # 格。≤ 这个值的重叠视为宽度估值误差，只提示
-VIEW_LIMIT = 200   # 格。|x| 或 |y| 超过它 = 模块在默认视野外（200 格 ≈ 3000px）
-NEG_X_TOL = 8      # 格。x 轻微为负（如 TextEditor 挂 -3）可接受
+# Gate thresholds
+OVERLAP_TOL = 2    # cells. overlap ≤ this is treated as width-estimate error -> soft only
+VIEW_LIMIT = 200   # cells. |x| or |y| beyond this = module off the default view
+                   #  (200 cells ≈ 3000px)
+NEG_X_TOL = 8      # cells. slightly negative x (e.g. TextEditor at -3) is acceptable
 
-ROW_NAMES = {0: "合成器链+控制+输出", 1: "说明牌+鼓机+混音台"}
+ROW_NAMES = {0: "synth chain + control + output", 1: "label + drums + mixer"}
 
 
 def row_y(row):
-    """行号 -> y 坐标（**单位就是行号本身**）。
+    """Row number -> y coordinate (the unit IS the row number itself).
 
-    ⚠️ 2026-09-12 15:45 修正：`.vcv` 里 `pos[1]` 的单位是「行号」不是「格」。
-    证据：本机 20 个官方模板/示例，**即便 39 模块的多行机架，y 也全落在 -1 ~ 2**；
-         Cardinal 保存 helm_full.vcv 后 y 正是 **0/1/2**。
-    → 直接返回 `row`，**不要乘 ROW_H**（乘了会把模块扔到第 34 行的荒野，
-      比写成像素更隐蔽：文件里看着"有值"，界面上却什么都没有）。
+    ⚠️ 2026-09-12 15:45 correction: `pos[1]` in a .vcv is a ROW NUMBER, not cells.
+    Evidence: all 20 official templates/examples have y only in -1 ~ 2, and after
+    Cardinal saved helm_full.vcv its y is exactly 0/1/2.
+    => just return `row`; DO NOT multiply by ROW_H (multiplying would drop the module
+       into row 34's wilderness — more insidious than pixels, because the file "has a
+       value" yet the GUI shows nothing).
     """
     return row
 
 
 def row_name(row):
-    return ROW_NAMES.get(row, "新增区")
+    return ROW_NAMES.get(row, "new zone")
 
-# ---------------------------------------------------------------- 宽度表
-# 【实测值，不是猜的】来源：Cardinal 安装目录里的**面板 SVG**。
-# Rack 用面板 SVG 的物理尺寸决定模块宽度：1 HP = 5.08mm，而 1 格 = 1 HP = 15px。
-# 复测命令：`python layout_patch.py widths`
+
+# ================================================================ Width table
+# [Measured, not guessed.] Source: the panel SVGs shipped inside Cardinal's install
+# directory. Rack sizes a module from its panel SVG's physical dimensions:
+# 1 HP = 5.08 mm, and 1 cell = 1 HP = 15 px.
+# Re-measure with: `python layout_patch.py widths`
 #
-# 键必须是「插件/模块」—— 不同插件会重名（别的插件也有 VCO.svg，宽 27 HP），
-# 只按文件名查会串味，这个坑 2026-09-12 自检时踩到过。
+# The key MUST be "plugin/module" — different plugins reuse names (another plugin
+# also has VCO.svg at 27 HP), so looking up by file name alone cross-contaminates.
 #
-# 实测纠正的早期误估（记档，避免再错）：
-#   HostMIDIGate  10 → 14     HostMIDI        10 → 9      MixMasterJr  60 → 36
-#   Plateau       16 → 12     OpenHiHat        7 → 9      Fundamental/Mixer 6 → 3
-#   鼓模块通用     7 → 6
+# Measured corrections to earlier guesses (kept on record to avoid repeating):
+#   HostMIDIGate  10 -> 14     HostMIDI        10 -> 9      MixMasterJr  60 -> 36
+#   Plateau       16 -> 12     OpenHiHat        7 -> 9      Fundamental/Mixer 6 -> 3
+#   drum modules  7 -> 6
 RESOURCES = r"C:\Program Files\Cardinal-win64-26.02\Cardinal.lv2\resources"
-HP_MM = 5.08        # 1 HP 的毫米数
-PX_PER_HP = 15.0    # 1 HP = 1 格 = 15px
+HP_MM = 5.08        # millimetres per HP
+PX_PER_HP = 15.0    # 1 HP = 1 cell = 15 px
 
-# patch 里的 plugin slug ≠ 安装目录名，查到目录要过这一层
+# A patch's plugin slug ≠ its install directory name; this maps slug -> dir.
 PLUGIN_DIR = {
     "Valley": "ValleyAudio",
     "rcm": "rcm-modules",
@@ -108,8 +128,9 @@ PLUGIN_DIR = {
     "Wasted_Audio": "WSTD-Drums",
 }
 
+# plugin/module -> width in HP (cells). Measured from panel SVGs.
 WIDTH_BY_PLUGIN_MODEL = {
-    # ---- Cardinal 自家 ----
+    # ---- Cardinal's own ----
     "Cardinal/HostMIDI": 9,
     "Cardinal/HostMIDIMap": 11,
     "Cardinal/HostMIDIGate": 14,
@@ -117,7 +138,7 @@ WIDTH_BY_PLUGIN_MODEL = {
     "Cardinal/HostParameters": 9,
     "Cardinal/HostParametersMap": 11,
     "Cardinal/HostAudio": 8,
-    "Cardinal/HostAudio2": 8,          # 与 HostAudio 共用面板
+    "Cardinal/HostAudio2": 8,          # shares panel with HostAudio
     "Cardinal/HostTime": 8,
     "Cardinal/HostCV": 8,
     "Cardinal/ExpanderMIDI": 3,
@@ -158,7 +179,7 @@ WIDTH_BY_PLUGIN_MODEL = {
     "WSTD-Drums/Sequencer": 32,
 }
 
-# 面板文件名与 model 不同名时的对照（自检 `widths` 用）
+# When a panel file name differs from the model name (used by `widths` check).
 SVG_ALIAS = {
     ("WSTD-Drums", "BassDrum9"): "bd9",
     ("WSTD-Drums", "SnareDrumN"): "snare",
@@ -172,57 +193,60 @@ SVG_ALIAS = {
     ("MindMeldModular", "MixMasterJr"): "mixmaster-jr",
 }
 
-DRUM_WIDTH = 6      # 未列出的 WSTD 鼓模块兜底（实测多数 6 HP）
-DEFAULT_WIDTH = 10  # 完全未知时的兜底（宁大不小）
+DRUM_WIDTH = 6      # fallback for unlisted WSTD drums (most are 6 HP)
+DEFAULT_WIDTH = 10  # fallback when completely unknown (better too wide than too narrow)
 
 
 def norm_plugin(p):
-    """patch 里的 plugin slug -> 安装目录名。"""
+    """Map a patch's plugin slug to its install directory name."""
     return PLUGIN_DIR.get(p, p)
 
-# WSTD-Drums 全部 model（用于判断「鼓」）
+
+# Every WSTD-Drums model (used to recognise "this is a drum").
 DRUM_MODELS = {
     "BassDrum9", "SyntheticBassDrum", "MarionetteBass", "SnareDrumN",
     "ClosedHiHat", "OpenHiHat", "Tomi", "Toms", "CR78", "DMX",
     "Baronial", "Gnome", "Sequencer",
 }
 
-# ---------------------------------------------------------------- 登记表
-# 已登记的模块：id -> (行号, 宽度)。登记过的按表中顺序落位。
-# 没登记的不会丢，apply 会自动分类落行（并把它们报出来）。
+# ================================================================ Registration table
+# Registered modules: id -> (row, width). Registered ones are placed in listed order.
+# Unregistered modules are not lost — `apply` auto-classifies them into a row and
+# reports them.
 #
-# 【2 行布局，2026-09-12 依据屏幕实测重排】
-#   原来 3 行（0/1/2）总高 98 格 = 1960 物理px，把 2000px 高的屏幕顶满，
-#   鼓落在中下部，用户反馈「鼓什么的还是全在很下面」。
-#   压成 2 行后总高 64 格 = 1280 物理px，留出余量。
-#   行0 = 合成器 + 控制映射 + 输出（x 到 110 格）
-#   行1 = 说明牌 + 鼓机 + 混音台    （x 到 122 格）
+# [2-row layout, recomputed 2026-09-12 from real screen measurements]
+#   The old 3 rows (0/1/2) totalled 98 cells = 1960 px, filling the 2000px screen and
+#   dropping drums to the lower-middle ("drums all at the bottom"). Flattened to 2 rows
+#   = 64 cells = 1280 px, leaving headroom.
+#   row 0 = synth + control map + output (x up to ~110 cells)
+#   row 1 = label + drums + mixer     (x up to ~122 cells)
 LAYOUT = [
-    # ---------------- 第 0 行：合成器链 + 控制 + 输出 ----------------
-    ("2",                  0, 9),    # HostMIDI      9 HP —— 只收 ch1 琴键
+    # ---------------- row 0: synth chain + control + output ----------------
+    ("2",                  0, 9),    # HostMIDI      9 HP — keys on ch1 only
     ("3",                  0, 9),    # VCO           9
     ("4",                  0, 7),    # VCF           7
     ("5",                  0, 9),    # ADSR          9
     ("6",                  0, 3),    # VCA-1         3
     ("7",                  0, 3),    # Sum           3
     ("8",                  0, 12),   # Plateau      12
-    ("799138358763949",    0, 11),   # HostMIDIMap  11 —— CC20-27 -> 8 个参数
-    ("100",                0, 14),   # HostMIDIGate 14 —— 鼓垫 Note -> 门
-    ("9",                  0, 8),    # HostAudio2    8 —— 主输出
-    # ---------------- 第 1 行：说明牌 + 鼓机 + 混音台 ----------------
-    ("1",                  1, 26),   # TextEditor   26（机架地图）
+    ("799138358763949",    0, 11),   # HostMIDIMap  11 — CC20-27 -> 8 params
+    ("100",                0, 14),   # HostMIDIGate 14 — pad Note -> gate
+    ("9",                  0, 8),    # HostAudio2    8 — main output
+    # ---------------- row 1: label + drums + mixer ----------------
+    ("1",                  1, 26),   # TextEditor   26 (rack map)
     ("101",                1, 6),    # BassDrum9     6
     ("102",                1, 6),    # SnareDrumN    6
     ("103",                1, 6),    # ClosedHiHat   6
-    ("104",                1, 9),    # OpenHiHat     9（比其它鼓宽）
+    ("104",                1, 9),    # OpenHiHat     9 (wider than other drums)
     ("105",                1, 6),    # Tomi          6
     ("106",                1, 6),    # DMX           6
-    ("107",                1, 3),    # Mixer         3（鼓总线 A）
-    ("108",                1, 3),    # Mixer         3（鼓总线 B）
-    ("3130453735965577",   1, 36),   # MixMasterJr  36（8 轨混音台，实测 36 HP）
+    ("107",                1, 3),    # Mixer         3 (drum bus A)
+    ("108",                1, 3),    # Mixer         3 (drum bus B)
+    ("3130453735965577",   1, 36),   # MixMasterJr  36 (8-track mixer, measured 36 HP)
 ]
 
-# 说明牌文本（写进 TextEditor 的 data.etext）。宽度 26 格 ~ 65 字符，别超。
+# The label-panel text (written into TextEditor's data.etext). Width 26 cells ≈ 65
+# chars — keep it under that.
 ETEXT = """HELM FULL - keyboard fully wired
 ================================
 
@@ -253,14 +277,19 @@ PADS   1 BD-A  2 BD-B  3 SD-A  4 SD-B
 """
 
 
-# ================================================================ 基础工具
+# ================================================================ Basic helpers
+
 def sid(x):
-    """模块 id 在 patch 里可能是 int 也可能是 str，统一成 str 比较。"""
+    """Normalise a module id to str (ids may be int or str in a patch)."""
     return str(x)
 
 
 def estimate_width(m):
-    """查「插件/模块」宽度表（实测值）。TextEditor 读它自己的 data.width。"""
+    """Look up a module's width (cells) from the measured table.
+
+    TextEditor reads its own data.width (so its label box can be wider than a
+    default module).
+    """
     model = m.get("model", "")
     plugin = norm_plugin(m.get("plugin", ""))
     if model == "TextEditor":
@@ -277,7 +306,7 @@ def estimate_width(m):
 
 
 def classify_row(m):
-    """未登记模块该放哪一行（按模块角色猜）。只有 2 行。"""
+    """Decide which row an unregistered module belongs to (by its role)."""
     model = m.get("model", "")
     if model in ("HostMIDIMap", "HostParametersMap", "HostMIDIGate"):
         return 1
@@ -291,14 +320,16 @@ def classify_row(m):
 
 
 def on_grid(y):
-    """y 是否落在整数行号上（0/1/2…）。
+    """Is y on an integer row number (0/1/2…)?
 
-    ⚠️ 2026-09-12 修正：y 的单位是「行号」不是「格」，旧版按 34 的倍数判断是错的。
+    ⚠️ 2026-09-12 correction: y's unit is "row", not "cells"; the old test (multiple
+    of 34) was wrong.
     """
     return abs(y - round(y)) < 1e-3
 
 
 def resolved_pos(m):
+    """Return a module's (x, y) as floats, tolerating missing/bad pos fields."""
     p = m.get("pos") or [0, 0]
     try:
         return float(p[0]), float(p[1])
@@ -306,17 +337,18 @@ def resolved_pos(m):
         return 0.0, 0.0
 
 
-# ================================================================ 排班核心
-def do_layout(d):
-    """算出新坐标。
+# ================================================================ Layout core
 
-    返回 (新坐标表 {id: [x, y]}, 已登记 id 集合, 未登记模块列表, 日志行)
+def do_layout(d):
+    """Compute the new coordinates.
+
+    Returns (new_pos {id: [x, y]}, registered_id_set, unregistered_modules, log_lines).
     """
     mods = d.get("modules", [])
     by = {sid(m["id"]): m for m in mods}
     widths = {mid: estimate_width(m) for mid, m in by.items()}
 
-    declared = {}          # id -> (行, 宽度)
+    declared = {}          # id -> (row, width)
     missing = []
     for mid, row, w in LAYOUT:
         if mid not in by:
@@ -324,12 +356,13 @@ def do_layout(d):
             continue
         declared[mid] = (row, w)
 
-    # 未登记模块：按角色分行，行内保持原来的相对次序（y 再 x 再 id）
+    # Unregistered modules: place by role, preserving their original relative order
+    # (sorted by y, then x, then id) so the result is stable.
     unregistered = [m for m in mods if sid(m["id"]) not in declared]
     unregistered.sort(key=lambda m: (resolved_pos(m)[1], resolved_pos(m)[0],
                                      sid(m["id"])))
 
-    rows = {}              # 行号 -> [(id, 宽度, 是否登记)]
+    rows = {}              # row -> [(id, width, is_registered)]
     for mid, (row, w) in declared.items():
         rows.setdefault(row, []).append((mid, w, True))
     for m in unregistered:
@@ -339,7 +372,7 @@ def do_layout(d):
     out = {}
     log = []
     if missing:
-        log.append("  [警告] 登记表里有 %d 个模块不在机架中: %s" % (len(missing), missing))
+        log.append("  [warn] %d modules in LAYOUT not in patch: %s" % (len(missing), missing))
 
     for row in sorted(rows):
         x = 0.0
@@ -350,16 +383,17 @@ def do_layout(d):
                 auto_here.append(mid)
             x += w + GAP
         span = x - GAP if rows[row] else 0
-        note = "  ← 自动落行: %s" % auto_here if auto_here else ""
-        log.append("  行 %d（%s）: %d 个模块, 跨度 0 ~ %.0f 格%s"
+        note = "  <- auto-placed: %s" % auto_here if auto_here else ""
+        log.append("  row %d (%s): %d modules, span 0 ~ %.0f cells%s"
                    % (row, row_name(row), len(rows[row]), span, note))
 
     return out, set(declared), unregistered, log
 
 
-# ================================================================ 对比检查
+# ================================================================ Overlap / view checks
+
 def check_overlap(pos, widths, tol=0):
-    """同行重叠检查。tol = 容差（格），返回 (严重, 轻微)。"""
+    """Same-row overlap check. tol = tolerance (cells). Returns (hard, soft)."""
     hard, soft = [], []
     rows = {}
     for mid, (x, y) in pos.items():
@@ -371,40 +405,42 @@ def check_overlap(pos, widths, tol=0):
             cx, cw, cm = items[i]
             over = px + pw - cx
             if over > tol:
-                hard.append("y=%.0f 行 %s(x=%.0f,w≈%.0f) 压住 %s(x=%.0f)，重叠 %.0f 格 ≈ %.0f px"
+                hard.append("y=%.0f row %s(x=%.0f,w≈%.0f) overlaps %s(x=%.0f) by %.0f cells ≈ %.0f px"
                             % (y, pm, px, pw, cm, cx, over, over * 15))
             elif over > 0:
-                soft.append("y=%.0f 行 %s 与 %s 仅隔 %.0f 格（可能是宽度估值误差）"
+                soft.append("y=%.0f row %s and %s only %.0f cells apart (likely width estimate error)"
                             % (y, pm, cm, over))
     return hard, soft
 
 
 def check_view(pos):
-    """检查是否跑出默认视野。返回 (严重, 轻微)。"""
+    """Check whether any module is off the default view. Returns (hard, soft)."""
     hard, soft = [], []
     for mid, (x, y) in pos.items():
         if abs(x) > VIEW_LIMIT or abs(y) > VIEW_LIMIT:
-            hard.append("%s 的 pos=(%.0f, %.0f) 超出默认视野（|坐标|>%d 格 ≈ %dpx）"
-                        "—— 界面上看不到这个模块"
+            hard.append("%s pos=(%.0f, %.0f) outside default view (|coord|>%d cells ≈ %dpx) "
+                        "— module not visible"
                         % (mid, x, y, VIEW_LIMIT, VIEW_LIMIT * 15))
         elif x < -NEG_X_TOL:
-            hard.append("%s 的 x=%.0f 偏出视野左侧 %.0f px" % (mid, x, -x * 15))
+            hard.append("%s x=%.0f is %.0f px left of the view's left edge" % (mid, x, -x * 15))
         elif x < 0 or y < 0:
-            soft.append("%s 的 pos=(%.0f, %.0f) 有负分量（幅度小，一般无碍）"
+            soft.append("%s pos=(%.0f, %.0f) has a small negative component (usually harmless)"
                         % (mid, x, y))
     return hard, soft
 
 
 def check_grid(pos):
-    """检查 y 是否都在整数行号上（0/1/2…）。"""
-    return ["%s 的 y=%.2f 不是整数行号（y 单位是「行」不是「格」，写 0/1/2…）"
+    """Check that every y is on an integer row number (0/1/2…)."""
+    return ["%s y=%.2f is not an integer row (y unit is 'row' not 'cells'; write 0/1/2…)"
             % (mid, y)
             for mid, (x, y) in sorted(pos.items()) if not on_grid(y)]
 
 
-# ================================================================ 接线自查
+# ================================================================ Wiring self-check
+
 def check_input_dupes(d):
-    """列出被多根线占用的输入口（Cardinal 只保留第一根，其余静默丢弃）。"""
+    """List input ports occupied by more than one cable (Cardinal keeps only the
+    first; the rest are silently dropped)."""
     from collections import defaultdict
     ins = defaultdict(list)
     for c in d.get("cables", []):
@@ -418,16 +454,17 @@ def report_input_dupes(d, by):
     lines = []
     for (mid, port), srcs in sorted(dup.items(), key=lambda x: str(x[0])):
         name = by.get(mid, {}).get("model", mid)
-        lines.append("  %s(id=%s) IN%s ← %d 根: %s"
+        lines.append("  %s(id=%s) IN%s <- %d cables: %s"
                      % (name, mid, port, len(srcs), srcs))
     return lines
 
 
 def analyze(d, strict=False):
-    """排班 + 接线统一体检。返回 (硬错误列表, 提示列表)。
+    """Unified layout + wiring health check. Returns (hard_errors, soft_warnings).
 
-    分级依据：硬错误 = 一定会坏（看不到 / 压住 / 丢线）；
-    提示 = 不合规范但暂时能用（行不对齐、轻微重叠、未登记）。strict 把提示升级为错误。
+    Rationale for tiers: HARD = will definitely break (invisible / overlapping /
+    dropped cable); SOFT = non-conforming but currently usable (row misalignment,
+    slight overlap, unregistered). `--strict` upgrades SOFT to HARD.
     """
     mods = d.get("modules", [])
     by = {sid(m["id"]): m for m in mods}
@@ -446,17 +483,17 @@ def analyze(d, strict=False):
     hard += oh
     soft += os_
 
-    # 输入口双接 = 真 bug（静默丢线），无论如何都是硬错误
+    # Input-port double-connect is a real bug (silently drops cables) — always HARD.
     for line in report_input_dupes(d, by):
-        hard.append("输入口双接: " + line.strip())
+        hard.append("input port double-connect: " + line.strip())
 
-    # 未登记模块
+    # Unregistered modules.
     declared = {mid for mid, _r, _w in LAYOUT}
     unreg = [m for m in mods if sid(m["id"]) not in declared]
     if unreg:
         names = ["%s(%s)" % (m.get("model"), m["id"]) for m in unreg]
-        soft.append("有 %d 个模块未登记进 LAYOUT（apply 会自动落行，但顺序不稳定）: %s"
-                    % (len(unreg), names))
+        soft.append("have %d module(s) not in LAYOUT (apply auto-places them, but order is "
+                    "unstable): %s" % (len(unreg), names))
 
     if strict:
         hard += soft
@@ -464,12 +501,13 @@ def analyze(d, strict=False):
     return hard, soft
 
 
-# ================================================================ 面板实测
-def scan_panel_svgs(resources=RESOURCES):
-    """扫本机面板 SVG，返回 {插件目录名: {小写面板名: 宽度HP}}。
+# ================================================================ Panel measurement
 
-    原理：Rack 用面板 SVG 的物理尺寸决定模块宽度（1 HP = 5.08mm）。
-    **必须按插件分组** —— 不同插件会重名（多个插件都有 VCO.svg）。
+def scan_panel_svgs(resources=RESOURCES):
+    """Scan this machine's panel SVGs; return {plugin_dir: {lower_panel_name: width_HP}}.
+
+    Principle: Rack sizes a module from its panel SVG's physical size (1 HP = 5.08 mm).
+    MUST group by plugin — different plugins reuse names (several have VCO.svg).
     """
     out = {}
     if not os.path.isdir(resources):
@@ -505,16 +543,16 @@ def scan_panel_svgs(resources=RESOURCES):
 
 
 def cmd_widths():
-    """复测面板宽度，核对表里的值是否还准。"""
+    """Re-measure panel widths and verify the table values are still accurate."""
     tree = scan_panel_svgs()
     print("=" * 66)
-    print("面板实测宽度（1 HP = %.2fmm = 1 格 = %.0fpx）" % (HP_MM, PX_PER_HP))
-    print("来源:", RESOURCES)
+    print("measured panel widths (1 HP = %.2fmm = 1 cell = %.0fpx)" % (HP_MM, PX_PER_HP))
+    print("source:", RESOURCES)
     if not tree:
-        print("  [错误] 没扫到面板 SVG（路径变了？）")
+        print("  [error] no panel SVGs scanned (path changed?)")
         return 1
     total = sum(len(v) for v in tree.values())
-    print("  扫到 %d 个插件 / %d 个面板" % (len(tree), total))
+    print("  scanned %d plugins / %d panels" % (len(tree), total))
     print("-" * 66)
     bad, missing = 0, 0
     for key, want in sorted(WIDTH_BY_PLUGIN_MODEL.items()):
@@ -522,29 +560,30 @@ def cmd_widths():
         stem = SVG_ALIAS.get((plugin, model), model.lower())
         got = tree.get(plugin, {}).get(stem)
         if got is None:
-            print("   %-34s 表内 %5.1f   面板未找到（面板名可能是 %s.svg，加进 SVG_ALIAS）"
+            print("   %-34s table %5.1f   panel not found (panel name may be %s.svg; add to SVG_ALIAS)"
                   % (key, want, stem))
             missing += 1
         elif abs(got - want) > 0.05:
-            print("   %-34s 表内 %5.1f   !! 面板实测 %.1f —— 表已失真，请更新"
+            print("   %-34s table %5.1f   !! panel measured %.1f — table stale, update it"
                   % (key, want, got))
             bad += 1
     print("-" * 66)
     if not bad and not missing:
-        print("结论: 全部一致（%d 项）" % len(WIDTH_BY_PLUGIN_MODEL))
+        print("verdict: all consistent (%d entries)" % len(WIDTH_BY_PLUGIN_MODEL))
         return 0
-    print("结论: 失真 %d 项，未找到 %d 项" % (bad, missing))
+    print("verdict: %d stale, %d not found" % (bad, missing))
     return 1 if bad else 0
 
 
-# ================================================================ 子命令
+# ================================================================ Subcommands
+
 def check_file(path):
-    """只列坐标，不改文件。"""
+    """Just print coordinates, do not edit the file."""
     d = patchio.read_patch(path)
     mods = d.get("modules", [])
     widths = {sid(m["id"]): estimate_width(m) for m in mods}
     print("=" * 66)
-    print("%s | 模块 %d | zoom %s" % (os.path.basename(path), len(mods), d.get("zoom")))
+    print("%s | %d modules | zoom %s" % (os.path.basename(path), len(mods), d.get("zoom")))
     for m in sorted(mods, key=lambda x: (resolved_pos(x)[1], resolved_pos(x)[0])):
         print("   pos=%-14s %-34s w≈%-3.0f %s"
               % (json.dumps(m.get("pos")), m["plugin"] + "/" + m["model"],
@@ -552,14 +591,14 @@ def check_file(path):
     xs = [resolved_pos(m)[0] for m in mods]
     ys = [resolved_pos(m)[1] for m in mods]
     if xs:
-        print("   x 范围 %.0f ~ %.0f (跨 %.0f 格 ≈ %.0f px)"
+        print("   x range %.0f ~ %.0f (span %.0f cells ≈ %.0f px)"
               % (min(xs), max(xs), max(xs) - min(xs), (max(xs) - min(xs)) * 15))
-        print("   y 范围 %.0f ~ %.0f" % (min(ys), max(ys)))
+        print("   y range %.0f ~ %.0f" % (min(ys), max(ys)))
     return 0
 
 
 def guard_file(path, strict=False):
-    """门禁：排班 + 接线双重体检。有硬错误 -> 返回 1。"""
+    """GATE: layout + wiring double check. Returns 1 if any HARD error."""
     d = patchio.read_patch(path)
     mods = d.get("modules", [])
     hard, soft = analyze(d, strict=strict)
@@ -572,109 +611,110 @@ def guard_file(path, strict=False):
              or abs(target[mid][1] - actual[mid][1]) > 0.5]
 
     print("=" * 66)
-    print("排班门禁 | %s | 模块 %d | 线缆 %d"
+    print("layout gate | %s | %d modules | %d cables"
           % (os.path.basename(path), len(mods), len(d.get("cables", []))))
-    print("重排目标（跑 apply 会得到这个）:")
+    print("re-layout target (what `apply` would produce):")
     for line in log:
         print(line)
     if drift:
-        print("当前文件与重排目标相差 %d 个模块的位置（不算错，跑 apply 可对齐）:"
+        print("current file differs from target at %d module(s) (not an error; run apply to align):"
               % len(drift))
         for mid in drift:
             name = next((m.get("model") for m in mods if sid(m["id"]) == mid), mid)
-            print("   %s(%s): 现在 %s → 目标 [%.0f, %.0f]"
+            print("   %s(%s): now %s -> target [%.0f, %.0f]"
                   % (name, mid, list(actual.get(mid, [])), target[mid][0], target[mid][1]))
     else:
-        print("当前文件与重排目标：完全一致")
+        print("current file vs target: identical")
     print("-" * 66)
     for w in soft:
-        print("[提示] " + w)
+        print("[warn] " + w)
     if hard:
         for e in hard:
-            print("[不过] " + e)
+            print("[FAIL] " + e)
         print("-" * 66)
-        print("结论: 不通过（硬错误 %d 项，提示 %d 项）" % (len(hard), len(soft)))
+        print("verdict: FAIL (%d hard errors, %d warnings)" % (len(hard), len(soft)))
         return 1
-    print("结论: 通过" + ("（有 %d 项提示）" % len(soft) if soft else ""))
+    print("verdict: PASS" + (" (%d warnings)" % len(soft) if soft else ""))
     return 0
 
 
 def apply_file(path, push=False, strict=False, write_etext=True):
     if not os.path.exists(path):
-        print("[错误] 文件不存在:", path)
+        print("[error] file not found:", path)
         return 1
     d = patchio.read_patch(path)
     mods = d.get("modules", [])
     widths = {sid(m["id"]): estimate_width(m) for m in mods}
 
-    # 备份
+    # Backup before mutating.
     bak = path[:-4] + "_before_layout_%s.vcv" % time.strftime("%H%M%S")
     shutil.copy2(path, bak)
-    print("[备份]", os.path.basename(bak))
+    print("[backup]", os.path.basename(bak))
 
     pos, _declared, unreg, log = do_layout(d)
-    print("布局计算:")
+    print("layout computed:")
     for line in log:
         print(line)
 
-    # 排班自己产的坐标一定是网格对齐的，这里查的是「还有没有残留问题」
+    # Coordinates we just produced are always grid-aligned; this checks for any
+    # residual problem.
     hard, soft = check_overlap(pos, widths, tol=OVERLAP_TOL)
     soft += check_grid(pos)
     if hard:
-        print("[重叠错误]")
+        print("[overlap error]")
         for b in hard:
             print("   ", b)
     else:
-        print("[重叠检查] 通过，无重叠")
+        print("[overlap check] pass, no overlaps")
 
     if unreg and strict:
-        print("[不过 --strict] 有 %d 个模块未登记进 LAYOUT，拒绝写入:" % len(unreg))
+        print("[FAIL --strict] %d module(s) not in LAYOUT, refusing to write:" % len(unreg))
         for m in unreg:
             print("   %s/%s id=%s" % (m.get("plugin"), m.get("model"), m["id"]))
-        print("   请把它们加进 layout_patch.py 的 LAYOUT 表（id, 行, 宽度）")
+        print("   add them to LAYOUT in layout_patch.py (id, row, width)")
         return 1
 
     by = {sid(m["id"]): m for m in mods}
     for mid, p in pos.items():
         by[mid]["pos"] = p
 
-    # 更新说明牌（只动我们自己的牌子，不覆盖别人写的笔记）
+    # Update the label panel (only our own panel; never overwrite a user's notes).
     te = next((m for m in mods if m.get("model") == "TextEditor"), None)
     if te is not None:
         if not write_etext:
-            print("[说明牌] 按 --no-etext 跳过")
+            print("[label] skipped per --no-etext")
         else:
             old = (te.get("data") or {}).get("etext") or ""
             if old and "HELM FULL" not in old:
-                print("[说明牌] 检测到非本机架的自定义文本，保持不动（%d 字符）" % len(old))
+                print("[label] detected non-rack custom text, left untouched (%d chars)" % len(old))
             else:
                 te.setdefault("data", {})
                 te["data"]["etext"] = ETEXT
                 te["data"]["width"] = 26
-                print("[说明牌] TextEditor(id=%s) 文本已更新，%d 字符"
+                print("[label] TextEditor(id=%s) text updated, %d chars"
                       % (te["id"], len(ETEXT)))
 
     patchio.write_patch(path, d)
-    print("[写入]", path, "(%d 模块)" % len(mods))
+    print("[write]", path, "(%d modules)" % len(mods))
 
     dup = report_input_dupes(d, by)
     if dup:
-        print("[!!] 输入口双接未解决（Cardinal 会丢掉多余的线）:")
+        print("[!!] input-port double-connect unresolved (Cardinal drops the extra cables):")
         for line in dup:
             print("   ", line)
-        print("     → 接线不归排班工具管，用 fix_drum_bus.py report 定位后手工改线")
+        print("     -> wiring is not this tool's job; use fix_drum_bus.py report then edit cables")
     else:
-        print("[接线检查] 通过，没有输入口双接")
+        print("[wiring check] pass, no input-port double-connect")
 
     if push:
         import cardinal_mcp as cm
         name = os.path.basename(path)
-        print("[推送] load_patch", name)
+        print("[push] load_patch", name)
         print("   ", cm.load_patch(name))
         time.sleep(4)
         live, _ = cm.live_patch_path()
         d2 = patchio.read_patch(live)
-        print("[验证] 实时存档模块数 =", len(d2["modules"]))
+        print("[verify] live autosave module count =", len(d2["modules"]))
         for m in sorted(d2["modules"], key=lambda x: (resolved_pos(x)[1], resolved_pos(x)[0])):
             print("   pos=%-14s %-34s %s"
                   % (json.dumps(m["pos"]), m["plugin"] + "/" + m["model"], m["id"]))
