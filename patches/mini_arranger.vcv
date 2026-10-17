@@ -1,0 +1,387 @@
+{
+  "version": "2.1.2",
+  "zoom": 1.0,
+  "gridOffset": [
+    2,
+    2
+  ],
+  "modules": [
+    {
+      "id": 6820180775829815,
+      "plugin": "ImpromptuModular",
+      "model": "Clocked",
+      "version": "2.1.0",
+      "pos": [
+        0,
+        0
+      ],
+      "params": [
+        {
+          "id": 0,
+          "value": 120.0
+        },
+        {
+          "id": 1,
+          "value": 5.0
+        }
+      ],
+      "data": {
+        "running": true
+      }
+    },
+    {
+      "id": 4115996377720411,
+      "plugin": "LittleUtils",
+      "model": "Button",
+      "version": "2.1.0",
+      "pos": [
+        22,
+        0
+      ],
+      "params": [],
+      "data": {}
+    },
+    {
+      "id": 4115996377720412,
+      "plugin": "LittleUtils",
+      "model": "Button",
+      "version": "2.1.0",
+      "pos": [
+        27,
+        0
+      ],
+      "params": [],
+      "data": {}
+    },
+    {
+      "id": 2,
+      "plugin": "Cardinal",
+      "model": "HostMIDI",
+      "version": "2.0.0",
+      "pos": [
+        32,
+        0
+      ],
+      "params": [],
+      "data": {
+        "pwRange": 0.0,
+        "smooth": false,
+        "channels": 1,
+        "polyMode": 0,
+        "lastPitch": 8192,
+        "lastMod": 0,
+        "inputChannel": 0,
+        "outputChannel": 0
+      }
+    },
+    {
+      "id": 3781955267578473,
+      "plugin": "rcm",
+      "model": "rcm-pianoroll",
+      "version": "2.0.0",
+      "pos": [
+        43,
+        0
+      ],
+      "params": [
+        {
+          "id": 0,
+          "value": 0.0
+        },
+        {
+          "id": 1,
+          "value": 0.0
+        }
+      ],
+      "data": {
+        "sequenceRunning": false,
+        "driverMode": false,
+        "currentPattern": 0,
+        "currentStep": 0,
+        "clockDelay": 0,
+        "lowestDisplayNote": 48,
+        "notesToShow": 36,
+        "currentMeasure": 0
+      }
+    },
+    {
+      "id": 8601159184541723,
+      "plugin": "Fundamental",
+      "model": "VCO",
+      "version": "2.1.0",
+      "pos": [
+        85,
+        0
+      ],
+      "params": [
+        {
+          "id": 0,
+          "value": 0.0
+        },
+        {
+          "id": 1,
+          "value": 1.0
+        },
+        {
+          "id": 2,
+          "value": 0.0
+        },
+        {
+          "id": 3,
+          "value": 0.0
+        },
+        {
+          "id": 4,
+          "value": 0.0
+        },
+        {
+          "id": 5,
+          "value": 0.5
+        },
+        {
+          "id": 6,
+          "value": 0.0
+        },
+        {
+          "id": 7,
+          "value": 0.0
+        }
+      ],
+      "data": {}
+    },
+    {
+      "id": 5726895899473528,
+      "plugin": "Fundamental",
+      "model": "ADSR",
+      "version": "2.1.0",
+      "pos": [
+        96,
+        0
+      ],
+      "params": [
+        {
+          "id": 0,
+          "value": 0.5
+        },
+        {
+          "id": 1,
+          "value": 0.5
+        },
+        {
+          "id": 2,
+          "value": 0.5
+        },
+        {
+          "id": 3,
+          "value": 0.5
+        },
+        {
+          "id": 4,
+          "value": 0.0
+        },
+        {
+          "id": 5,
+          "value": 0.0
+        },
+        {
+          "id": 6,
+          "value": 0.0
+        },
+        {
+          "id": 7,
+          "value": 0.0
+        },
+        {
+          "id": 8,
+          "value": 0.0
+        }
+      ],
+      "data": {}
+    },
+    {
+      "id": 4828178296911509,
+      "plugin": "Fundamental",
+      "model": "VCA-1",
+      "version": "2.1.0",
+      "pos": [
+        107,
+        0
+      ],
+      "params": [
+        {
+          "id": 0,
+          "value": 1.0
+        },
+        {
+          "id": 1,
+          "value": 1.0
+        }
+      ],
+      "data": {}
+    },
+    {
+      "id": 1,
+      "plugin": "Cardinal",
+      "model": "HostAudio2",
+      "version": "2.0.0",
+      "pos": [
+        112,
+        0
+      ],
+      "params": [
+        {
+          "id": 0,
+          "value": 0.7943282127380371
+        }
+      ],
+      "data": {
+        "dcFilter": true
+      }
+    },
+    {
+      "id": 8712245256622475,
+      "plugin": "Cardinal",
+      "model": "TextEditor",
+      "version": "2.0.0",
+      "pos": [
+        0,
+        1
+      ],
+      "params": [],
+      "data": {
+        "filepath": "",
+        "lang": "None",
+        "etext": "MINI ARRANGER  (mini bianquji)\n================================\n\nROW 1: CLOCK BUTTONS KEYS | PIANO ROLL | VCO ADSR VCA OUT\nROW 2: this note + MIDI CC map\n\nHOW TO USE\n1. Press RUN (small button left of the keys),\n   the roll starts rolling.\n2. Press REC once -> recording is armed\n   (press again to stop recording).\n3. Play the SMK-25 keys. Notes land on the grid\n   AND you hear them while you play.\n4. Press RUN again to stop. Notes stay in the patch.\n5. Right-click the roll: Clear / Copy / Paste,\n   Notes to Show, Driver Mode, Clock Delay.\n\nSIGNAL PATH\nkeys -> PianoRoll -> VCO -> VCA -> HostAudio2\nClocked OUT1 (16th notes) -> PianoRoll CLOCK\nbuttons -> PianoRoll RUN / RECORD\n\nKNOBS\nClocked  Master clock  = tempo (BPM)\nClocked  Clk 1 ratio   = 5  -> x4 (16th notes)\nVCO      Frequency / Pulse width\nADSR     A D S R\nVCA-1    Channel 1 level\nHostAudio2  Level\n\nNOTES\n* The roll records ONE note at a time (mono).\n* Gate stays high across steps, so RETRIGGER\n  drives the envelope (that is why OUT7 is wired\n  to ADSR RETRIG).\n* END_OF_PATTERN output = chain a 2nd roll:\n  OUT9 -> next roll RUN, OUT0 -> next roll CLOCK.\n",
+        "width": 26
+      }
+    },
+    {
+      "id": 799138358763949,
+      "plugin": "Cardinal",
+      "model": "HostMIDIMap",
+      "version": "2.0.0",
+      "pos": [
+        28,
+        1
+      ],
+      "params": [],
+      "data": {
+        "maps": [
+          {
+            "cc": -1,
+            "moduleId": -1,
+            "paramId": 0
+          }
+        ],
+        "smooth": true,
+        "channel": 0
+      }
+    }
+  ],
+  "cables": [
+    {
+      "id": 2100,
+      "outputModuleId": 6820180775829815,
+      "outputId": 1,
+      "inputModuleId": 3781955267578473,
+      "inputId": 0,
+      "color": "#52ff7d"
+    },
+    {
+      "id": 2101,
+      "outputModuleId": 4115996377720411,
+      "outputId": 0,
+      "inputModuleId": 3781955267578473,
+      "inputId": 1,
+      "color": "#527dff"
+    },
+    {
+      "id": 2102,
+      "outputModuleId": 4115996377720412,
+      "outputId": 0,
+      "inputModuleId": 3781955267578473,
+      "inputId": 4,
+      "color": "#ff5252"
+    },
+    {
+      "id": 2103,
+      "outputModuleId": 2,
+      "outputId": 0,
+      "inputModuleId": 3781955267578473,
+      "inputId": 5,
+      "color": "#7d52ff"
+    },
+    {
+      "id": 2104,
+      "outputModuleId": 2,
+      "outputId": 1,
+      "inputModuleId": 3781955267578473,
+      "inputId": 6,
+      "color": "#ffb252"
+    },
+    {
+      "id": 2105,
+      "outputModuleId": 2,
+      "outputId": 6,
+      "inputModuleId": 3781955267578473,
+      "inputId": 7,
+      "color": "#52ffff"
+    },
+    {
+      "id": 2106,
+      "outputModuleId": 2,
+      "outputId": 2,
+      "inputModuleId": 3781955267578473,
+      "inputId": 8,
+      "color": "#52ff7d"
+    },
+    {
+      "id": 2107,
+      "outputModuleId": 3781955267578473,
+      "outputId": 5,
+      "inputModuleId": 8601159184541723,
+      "inputId": 0,
+      "color": "#527dff"
+    },
+    {
+      "id": 2108,
+      "outputModuleId": 3781955267578473,
+      "outputId": 6,
+      "inputModuleId": 5726895899473528,
+      "inputId": 4,
+      "color": "#ff5252"
+    },
+    {
+      "id": 2109,
+      "outputModuleId": 3781955267578473,
+      "outputId": 7,
+      "inputModuleId": 5726895899473528,
+      "inputId": 5,
+      "color": "#7d52ff"
+    },
+    {
+      "id": 2110,
+      "outputModuleId": 8601159184541723,
+      "outputId": 0,
+      "inputModuleId": 4828178296911509,
+      "inputId": 1,
+      "color": "#ffb252"
+    },
+    {
+      "id": 2111,
+      "outputModuleId": 5726895899473528,
+      "outputId": 0,
+      "inputModuleId": 4828178296911509,
+      "inputId": 0,
+      "color": "#52ffff"
+    },
+    {
+      "id": 2112,
+      "outputModuleId": 4828178296911509,
+      "outputId": 0,
+      "inputModuleId": 1,
+      "inputId": 0,
+      "color": "#52ff7d"
+    }
+  ]
+}

@@ -1,0 +1,2574 @@
+{
+  "version": "2.4.1",
+  "path": "D:\\Cardinal\\patches\\quadeca_life1.vcv",
+  "zoom": 0.75,
+  "gridOffset": [
+    0.0,
+    0.0
+  ],
+  "modules": [
+    {
+      "id": 8300000000000001,
+      "plugin": "Cardinal",
+      "model": "HostMIDI",
+      "version": "2.0.0",
+      "params": [],
+      "leftModuleId": 7100000000000001,
+      "rightModuleId": 7100000000000003,
+      "data": {
+        "pwRange": 0.0,
+        "smooth": false,
+        "forceGateGaps": false,
+        "channels": 8,
+        "polyMode": 0,
+        "lastPitch": 8192,
+        "lastMod": 0,
+        "inputChannel": 0,
+        "outputChannel": 0
+      },
+      "pos": [
+        0.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000002,
+      "plugin": "Bogaudio",
+      "model": "Bogaudio-Unison",
+      "version": "2.0",
+      "params": [
+        {
+          "id": 0,
+          "value": 6.0
+        },
+        {
+          "id": 1,
+          "value": 15.0
+        }
+      ],
+      "data": {},
+      "pos": [
+        11.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000003,
+      "plugin": "Fundamental",
+      "model": "VCO",
+      "version": "2.0",
+      "params": [],
+      "data": {},
+      "pos": [
+        16.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000004,
+      "plugin": "Fundamental",
+      "model": "VCF",
+      "version": "2.0",
+      "params": [
+        {
+          "id": 0,
+          "value": 0.3
+        },
+        {
+          "id": 1,
+          "value": 0.0
+        },
+        {
+          "id": 2,
+          "value": 0.35
+        },
+        {
+          "id": 3,
+          "value": 0.6
+        },
+        {
+          "id": 4,
+          "value": 0.4
+        },
+        {
+          "id": 5,
+          "value": 0.5
+        },
+        {
+          "id": 6,
+          "value": 0.0
+        }
+      ],
+      "data": {},
+      "pos": [
+        27.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000005,
+      "plugin": "Fundamental",
+      "model": "ADSR",
+      "version": "2.0",
+      "params": [
+        {
+          "id": 0,
+          "value": 0.01
+        },
+        {
+          "id": 1,
+          "value": 0.5
+        },
+        {
+          "id": 2,
+          "value": 0.25
+        },
+        {
+          "id": 3,
+          "value": 0.7
+        },
+        {
+          "id": 4,
+          "value": 0.0
+        },
+        {
+          "id": 5,
+          "value": 0.0
+        },
+        {
+          "id": 6,
+          "value": 0.0
+        },
+        {
+          "id": 7,
+          "value": 0.0
+        },
+        {
+          "id": 8,
+          "value": 0.0
+        }
+      ],
+      "data": {},
+      "pos": [
+        36.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000006,
+      "plugin": "Fundamental",
+      "model": "VCA-1",
+      "version": "2.0",
+      "params": [],
+      "data": {},
+      "pos": [
+        47.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000007,
+      "plugin": "Fundamental",
+      "model": "Sum",
+      "version": "2.0",
+      "params": [
+        {
+          "id": 0,
+          "value": 0.5
+        }
+      ],
+      "data": {},
+      "pos": [
+        52.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000008,
+      "plugin": "Bogaudio",
+      "model": "Bogaudio-FMOp",
+      "version": "2.0",
+      "params": [
+        {
+          "id": 0,
+          "value": 0.5
+        },
+        {
+          "id": 1,
+          "value": 0.0
+        },
+        {
+          "id": 2,
+          "value": 0.01
+        },
+        {
+          "id": 3,
+          "value": 0.35
+        },
+        {
+          "id": 4,
+          "value": 0.15
+        },
+        {
+          "id": 5,
+          "value": 0.5
+        },
+        {
+          "id": 6,
+          "value": 0.45
+        },
+        {
+          "id": 7,
+          "value": 0.15
+        },
+        {
+          "id": 8,
+          "value": 0.6
+        },
+        {
+          "id": 9,
+          "value": 1.0
+        },
+        {
+          "id": 10,
+          "value": 0.0
+        },
+        {
+          "id": 11,
+          "value": 0.0
+        }
+      ],
+      "data": {},
+      "pos": [
+        57.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000009,
+      "plugin": "Fundamental",
+      "model": "VCA-1",
+      "version": "2.0",
+      "params": [],
+      "data": {},
+      "pos": [
+        69.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000010,
+      "plugin": "SurgeXTRack",
+      "model": "SurgeXTFXDistortion",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 0.7440896034240723,
+          "id": 0
+        },
+        {
+          "value": 0.5498351454734802,
+          "id": 1
+        },
+        {
+          "value": 1.0,
+          "id": 2
+        },
+        {
+          "value": 0.687659740447998,
+          "id": 3
+        },
+        {
+          "value": 0.6800000667572021,
+          "id": 4
+        },
+        {
+          "value": 0.787856936454773,
+          "id": 5
+        },
+        {
+          "value": 0.703499972820282,
+          "id": 6
+        },
+        {
+          "value": 0.0,
+          "id": 7
+        },
+        {
+          "value": 0.704643964767456,
+          "id": 8
+        },
+        {
+          "value": 0.6038857698440552,
+          "id": 9
+        },
+        {
+          "value": 0.1666666716337204,
+          "id": 10
+        },
+        {
+          "value": 0.004999999888241291,
+          "id": 11
+        },
+        {
+          "value": 0.0,
+          "id": 12
+        },
+        {
+          "value": 0.0,
+          "id": 13
+        },
+        {
+          "value": 0.0,
+          "id": 14
+        },
+        {
+          "value": 0.0,
+          "id": 15
+        },
+        {
+          "value": 0.0,
+          "id": 16
+        },
+        {
+          "value": 0.0,
+          "id": 17
+        },
+        {
+          "value": 0.0,
+          "id": 18
+        },
+        {
+          "value": 0.0,
+          "id": 19
+        },
+        {
+          "value": 0.0,
+          "id": 20
+        },
+        {
+          "value": 0.0,
+          "id": 21
+        },
+        {
+          "value": 0.0,
+          "id": 22
+        },
+        {
+          "value": 0.0,
+          "id": 23
+        },
+        {
+          "value": 0.0,
+          "id": 24
+        },
+        {
+          "value": 0.0,
+          "id": 25
+        },
+        {
+          "value": 0.0,
+          "id": 26
+        },
+        {
+          "value": 0.0,
+          "id": 27
+        },
+        {
+          "value": 0.0,
+          "id": 28
+        },
+        {
+          "value": 0.0,
+          "id": 29
+        },
+        {
+          "value": 0.0,
+          "id": 30
+        },
+        {
+          "value": 0.0,
+          "id": 31
+        },
+        {
+          "value": 0.0,
+          "id": 32
+        },
+        {
+          "value": 0.0,
+          "id": 33
+        },
+        {
+          "value": 0.0,
+          "id": 34
+        },
+        {
+          "value": 0.0,
+          "id": 35
+        },
+        {
+          "value": 0.0,
+          "id": 36
+        },
+        {
+          "value": 0.0,
+          "id": 37
+        },
+        {
+          "value": 0.0,
+          "id": 38
+        },
+        {
+          "value": 0.0,
+          "id": 39
+        },
+        {
+          "value": 0.0,
+          "id": 40
+        },
+        {
+          "value": 0.0,
+          "id": 41
+        },
+        {
+          "value": 0.0,
+          "id": 42
+        },
+        {
+          "value": 0.0,
+          "id": 43
+        },
+        {
+          "value": 0.0,
+          "id": 44
+        },
+        {
+          "value": 0.0,
+          "id": 45
+        },
+        {
+          "value": 0.0,
+          "id": 46
+        },
+        {
+          "value": 0.0,
+          "id": 47
+        },
+        {
+          "value": 0.0,
+          "id": 48
+        },
+        {
+          "value": 0.0,
+          "id": 49
+        },
+        {
+          "value": 0.0,
+          "id": 50
+        },
+        {
+          "value": 0.0,
+          "id": 51
+        },
+        {
+          "value": 0.0,
+          "id": 52
+        },
+        {
+          "value": 0.0,
+          "id": 53
+        },
+        {
+          "value": 0.0,
+          "id": 54
+        },
+        {
+          "value": 0.0,
+          "id": 55
+        },
+        {
+          "value": 0.0,
+          "id": 56
+        },
+        {
+          "value": 0.0,
+          "id": 57
+        },
+        {
+          "value": 0.0,
+          "id": 58
+        },
+        {
+          "value": 0.0,
+          "id": 59
+        },
+        {
+          "value": 1.0,
+          "id": 60
+        },
+        {
+          "value": 1.0,
+          "id": 61
+        }
+      ],
+      "leftModuleId": 3401860011669571,
+      "rightModuleId": 3519844826238107,
+      "data": {
+        "xtshared": {
+          "streamingVersion": 1,
+          "buildInfo": "os:win surge:3313430 buildtime=Jun 22 2025 11:48:04",
+          "isCoupledToGlobalStyle": true,
+          "localStyle": 10003,
+          "localDisplayRegionColor": 900005,
+          "localModulationColor": 900005,
+          "localControlValueColor": 900001,
+          "localPowerButtonColor": 900003
+        },
+        "modulespecific": {
+          "loadedPreset": 9,
+          "presetName": "Overdrive",
+          "presetIsDirty": true,
+          "polyphonicMode": false,
+          "paramNatural": [
+            {
+              "index": 0,
+              "valtype": 2,
+              "val_f": 23.432601928710938
+            },
+            {
+              "index": 1,
+              "valtype": 2,
+              "val_f": 11.478569030761719
+            },
+            {
+              "index": 2,
+              "valtype": 2,
+              "val_f": 5.0
+            },
+            {
+              "index": 3,
+              "valtype": 2,
+              "val_f": 29.395767211914062
+            },
+            {
+              "index": 4,
+              "valtype": 2,
+              "val_f": 8.640003204345703
+            },
+            {
+              "index": 5,
+              "valtype": 2,
+              "val_f": 0.5757138729095459
+            },
+            {
+              "index": 6,
+              "valtype": 2,
+              "val_f": 19.535995483398438
+            },
+            {
+              "index": 7,
+              "valtype": 2,
+              "val_f": -60.0
+            },
+            {
+              "index": 8,
+              "valtype": 2,
+              "val_f": 3.5232198238372803
+            },
+            {
+              "index": 9,
+              "valtype": 2,
+              "val_f": 18.505149841308594
+            },
+            {
+              "index": 10,
+              "valtype": 2,
+              "val_f": -16.0
+            },
+            {
+              "index": 11,
+              "valtype": 0,
+              "val_i": 0
+            }
+          ]
+        }
+      },
+      "pos": [
+        74.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000011,
+      "plugin": "Fundamental",
+      "model": "Mixer",
+      "version": "2.0",
+      "params": [
+        {
+          "id": 0,
+          "value": 0.9
+        },
+        {
+          "id": 1,
+          "value": 0.0
+        },
+        {
+          "id": 2,
+          "value": 0.0
+        },
+        {
+          "id": 3,
+          "value": 0.0
+        },
+        {
+          "id": 4,
+          "value": 0.0
+        },
+        {
+          "id": 5,
+          "value": 0.0
+        }
+      ],
+      "data": {},
+      "pos": [
+        88.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000012,
+      "plugin": "Valley",
+      "model": "Plateau",
+      "version": "2.0",
+      "params": [
+        {
+          "id": 0,
+          "value": 0.85
+        },
+        {
+          "id": 1,
+          "value": 0.3
+        },
+        {
+          "id": 2,
+          "value": 0.02
+        },
+        {
+          "id": 3,
+          "value": 10.0
+        },
+        {
+          "id": 4,
+          "value": 10.0
+        },
+        {
+          "id": 5,
+          "value": 0.55
+        },
+        {
+          "id": 6,
+          "value": 9.0
+        },
+        {
+          "id": 7,
+          "value": 0.62
+        },
+        {
+          "id": 8,
+          "value": 10.0
+        },
+        {
+          "id": 9,
+          "value": 10.0
+        },
+        {
+          "id": 10,
+          "value": 0.3
+        },
+        {
+          "id": 11,
+          "value": 0.5
+        },
+        {
+          "id": 12,
+          "value": 1.0
+        }
+      ],
+      "data": {},
+      "pos": [
+        93.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000013,
+      "plugin": "Cardinal",
+      "model": "HostAudio2",
+      "version": "2.0.0",
+      "params": [
+        {
+          "value": 0.7943282127380371,
+          "id": 0
+        }
+      ],
+      "rightModuleId": 7100000000000009,
+      "data": {
+        "dcFilter": true
+      },
+      "pos": [
+        107.0,
+        0
+      ]
+    },
+    {
+      "id": 8300000000000014,
+      "plugin": "MindMeldModular",
+      "model": "ShapeMaster",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 9.0,
+          "id": 0
+        },
+        {
+          "value": 0.39966854453086853,
+          "id": 1
+        },
+        {
+          "value": 100.0,
+          "id": 2
+        },
+        {
+          "value": 0.0,
+          "id": 3
+        },
+        {
+          "value": 0.0,
+          "id": 4
+        },
+        {
+          "value": 0.0,
+          "id": 5
+        },
+        {
+          "value": 0.20029953122138977,
+          "id": 6
+        },
+        {
+          "value": 0.0,
+          "id": 7
+        },
+        {
+          "value": 1.0,
+          "id": 8
+        },
+        {
+          "value": 0.0,
+          "id": 9
+        },
+        {
+          "value": 0.0,
+          "id": 10
+        },
+        {
+          "value": -1.0,
+          "id": 11
+        },
+        {
+          "value": 1.0,
+          "id": 12
+        },
+        {
+          "value": 1.0,
+          "id": 13
+        },
+        {
+          "value": 0.0,
+          "id": 14
+        },
+        {
+          "value": 1.0,
+          "id": 15
+        },
+        {
+          "value": 0.0,
+          "id": 16
+        },
+        {
+          "value": 0.0,
+          "id": 17
+        },
+        {
+          "value": 0.0,
+          "id": 18
+        },
+        {
+          "value": 0.0,
+          "id": 19
+        },
+        {
+          "value": 0.0,
+          "id": 20
+        },
+        {
+          "value": 0.0,
+          "id": 21
+        },
+        {
+          "value": 0.0,
+          "id": 22
+        },
+        {
+          "value": 0.0,
+          "id": 23
+        },
+        {
+          "value": 0.0,
+          "id": 24
+        },
+        {
+          "value": 5.0,
+          "id": 25
+        },
+        {
+          "value": 0.39966854453086853,
+          "id": 26
+        },
+        {
+          "value": 100.0,
+          "id": 27
+        },
+        {
+          "value": 0.0,
+          "id": 28
+        },
+        {
+          "value": 0.0,
+          "id": 29
+        },
+        {
+          "value": 0.0,
+          "id": 30
+        },
+        {
+          "value": 0.0,
+          "id": 31
+        },
+        {
+          "value": 0.0,
+          "id": 32
+        },
+        {
+          "value": 1.0,
+          "id": 33
+        },
+        {
+          "value": 0.0,
+          "id": 34
+        },
+        {
+          "value": 0.0,
+          "id": 35
+        },
+        {
+          "value": -1.0,
+          "id": 36
+        },
+        {
+          "value": 1.0,
+          "id": 37
+        },
+        {
+          "value": 1.0,
+          "id": 38
+        },
+        {
+          "value": 5.0,
+          "id": 39
+        },
+        {
+          "value": 1.0,
+          "id": 40
+        },
+        {
+          "value": 0.0,
+          "id": 41
+        },
+        {
+          "value": 0.0,
+          "id": 42
+        },
+        {
+          "value": 0.0,
+          "id": 43
+        },
+        {
+          "value": 0.0,
+          "id": 44
+        },
+        {
+          "value": 0.0,
+          "id": 45
+        },
+        {
+          "value": 0.0,
+          "id": 46
+        },
+        {
+          "value": 0.0,
+          "id": 47
+        },
+        {
+          "value": 0.0,
+          "id": 48
+        },
+        {
+          "value": 0.0,
+          "id": 49
+        },
+        {
+          "value": 5.0,
+          "id": 50
+        },
+        {
+          "value": 0.09247458726167679,
+          "id": 51
+        },
+        {
+          "value": 100.0,
+          "id": 52
+        },
+        {
+          "value": 0.0,
+          "id": 53
+        },
+        {
+          "value": 0.0,
+          "id": 54
+        },
+        {
+          "value": 0.0,
+          "id": 55
+        },
+        {
+          "value": 0.0,
+          "id": 56
+        },
+        {
+          "value": 0.0,
+          "id": 57
+        },
+        {
+          "value": 1.0,
+          "id": 58
+        },
+        {
+          "value": 0.0,
+          "id": 59
+        },
+        {
+          "value": 0.9390000700950623,
+          "id": 60
+        },
+        {
+          "value": -1.0,
+          "id": 61
+        },
+        {
+          "value": 1.0,
+          "id": 62
+        },
+        {
+          "value": 1.0,
+          "id": 63
+        },
+        {
+          "value": 0.02409638650715351,
+          "id": 64
+        },
+        {
+          "value": 1.0,
+          "id": 65
+        },
+        {
+          "value": 0.0,
+          "id": 66
+        },
+        {
+          "value": 0.0,
+          "id": 67
+        },
+        {
+          "value": 0.0,
+          "id": 68
+        },
+        {
+          "value": 0.0,
+          "id": 69
+        },
+        {
+          "value": 0.0,
+          "id": 70
+        },
+        {
+          "value": 0.0,
+          "id": 71
+        },
+        {
+          "value": 0.0,
+          "id": 72
+        },
+        {
+          "value": 0.0,
+          "id": 73
+        },
+        {
+          "value": 0.0,
+          "id": 74
+        },
+        {
+          "value": 5.0,
+          "id": 75
+        },
+        {
+          "value": 0.27742376923561096,
+          "id": 76
+        },
+        {
+          "value": 100.0,
+          "id": 77
+        },
+        {
+          "value": 0.0,
+          "id": 78
+        },
+        {
+          "value": 0.0,
+          "id": 79
+        },
+        {
+          "value": 0.0,
+          "id": 80
+        },
+        {
+          "value": 0.0,
+          "id": 81
+        },
+        {
+          "value": 0.0,
+          "id": 82
+        },
+        {
+          "value": 1.0,
+          "id": 83
+        },
+        {
+          "value": 0.0,
+          "id": 84
+        },
+        {
+          "value": 0.0,
+          "id": 85
+        },
+        {
+          "value": -1.0,
+          "id": 86
+        },
+        {
+          "value": 1.0,
+          "id": 87
+        },
+        {
+          "value": 1.0,
+          "id": 88
+        },
+        {
+          "value": 5.0,
+          "id": 89
+        },
+        {
+          "value": 0.0,
+          "id": 90
+        },
+        {
+          "value": 0.0,
+          "id": 91
+        },
+        {
+          "value": 0.0,
+          "id": 92
+        },
+        {
+          "value": 0.0,
+          "id": 93
+        },
+        {
+          "value": 0.0,
+          "id": 94
+        },
+        {
+          "value": 0.0,
+          "id": 95
+        },
+        {
+          "value": 0.0,
+          "id": 96
+        },
+        {
+          "value": 0.0,
+          "id": 97
+        },
+        {
+          "value": 0.0,
+          "id": 98
+        },
+        {
+          "value": 0.0,
+          "id": 99
+        },
+        {
+          "value": 5.0,
+          "id": 100
+        },
+        {
+          "value": 0.33151793479919434,
+          "id": 101
+        },
+        {
+          "value": 100.0,
+          "id": 102
+        },
+        {
+          "value": 0.0,
+          "id": 103
+        },
+        {
+          "value": 0.0,
+          "id": 104
+        },
+        {
+          "value": 0.0,
+          "id": 105
+        },
+        {
+          "value": 0.0,
+          "id": 106
+        },
+        {
+          "value": 0.0,
+          "id": 107
+        },
+        {
+          "value": 1.0,
+          "id": 108
+        },
+        {
+          "value": 0.0,
+          "id": 109
+        },
+        {
+          "value": 0.0,
+          "id": 110
+        },
+        {
+          "value": -1.0,
+          "id": 111
+        },
+        {
+          "value": 1.0,
+          "id": 112
+        },
+        {
+          "value": 1.0,
+          "id": 113
+        },
+        {
+          "value": 5.0,
+          "id": 114
+        },
+        {
+          "value": 0.0,
+          "id": 115
+        },
+        {
+          "value": 0.0,
+          "id": 116
+        },
+        {
+          "value": 0.0,
+          "id": 117
+        },
+        {
+          "value": 0.0,
+          "id": 118
+        },
+        {
+          "value": 0.0,
+          "id": 119
+        },
+        {
+          "value": 0.0,
+          "id": 120
+        },
+        {
+          "value": 0.0,
+          "id": 121
+        },
+        {
+          "value": 0.0,
+          "id": 122
+        },
+        {
+          "value": 0.0,
+          "id": 123
+        },
+        {
+          "value": 0.0,
+          "id": 124
+        },
+        {
+          "value": 5.0,
+          "id": 125
+        },
+        {
+          "value": 0.39966854453086853,
+          "id": 126
+        },
+        {
+          "value": 100.0,
+          "id": 127
+        },
+        {
+          "value": 0.0,
+          "id": 128
+        },
+        {
+          "value": 0.0,
+          "id": 129
+        },
+        {
+          "value": 0.0,
+          "id": 130
+        },
+        {
+          "value": 0.0,
+          "id": 131
+        },
+        {
+          "value": 0.0,
+          "id": 132
+        },
+        {
+          "value": 1.0,
+          "id": 133
+        },
+        {
+          "value": 0.0,
+          "id": 134
+        },
+        {
+          "value": 0.0,
+          "id": 135
+        },
+        {
+          "value": -1.0,
+          "id": 136
+        },
+        {
+          "value": 1.0,
+          "id": 137
+        },
+        {
+          "value": 1.0,
+          "id": 138
+        },
+        {
+          "value": 5.0,
+          "id": 139
+        },
+        {
+          "value": 1.0,
+          "id": 140
+        },
+        {
+          "value": 0.0,
+          "id": 141
+        },
+        {
+          "value": 0.0,
+          "id": 142
+        },
+        {
+          "value": 0.0,
+          "id": 143
+        },
+        {
+          "value": 0.0,
+          "id": 144
+        },
+        {
+          "value": 0.0,
+          "id": 145
+        },
+        {
+          "value": 0.0,
+          "id": 146
+        },
+        {
+          "value": 0.0,
+          "id": 147
+        },
+        {
+          "value": 0.0,
+          "id": 148
+        },
+        {
+          "value": 0.0,
+          "id": 149
+        },
+        {
+          "value": 5.0,
+          "id": 150
+        },
+        {
+          "value": -0.7426989078521729,
+          "id": 151
+        },
+        {
+          "value": 100.0,
+          "id": 152
+        },
+        {
+          "value": 0.0,
+          "id": 153
+        },
+        {
+          "value": 0.0,
+          "id": 154
+        },
+        {
+          "value": 0.0,
+          "id": 155
+        },
+        {
+          "value": 0.0,
+          "id": 156
+        },
+        {
+          "value": 0.0,
+          "id": 157
+        },
+        {
+          "value": 1.0,
+          "id": 158
+        },
+        {
+          "value": 0.0,
+          "id": 159
+        },
+        {
+          "value": 0.0,
+          "id": 160
+        },
+        {
+          "value": -1.0,
+          "id": 161
+        },
+        {
+          "value": 1.0,
+          "id": 162
+        },
+        {
+          "value": 1.0,
+          "id": 163
+        },
+        {
+          "value": 5.0,
+          "id": 164
+        },
+        {
+          "value": 1.0,
+          "id": 165
+        },
+        {
+          "value": 0.0,
+          "id": 166
+        },
+        {
+          "value": 0.0,
+          "id": 167
+        },
+        {
+          "value": 0.0,
+          "id": 168
+        },
+        {
+          "value": 0.0,
+          "id": 169
+        },
+        {
+          "value": 0.0,
+          "id": 170
+        },
+        {
+          "value": 0.0,
+          "id": 171
+        },
+        {
+          "value": 0.0,
+          "id": 172
+        },
+        {
+          "value": 0.0,
+          "id": 173
+        },
+        {
+          "value": 0.0,
+          "id": 174
+        },
+        {
+          "value": 5.0,
+          "id": 175
+        },
+        {
+          "value": 0.0,
+          "id": 176
+        },
+        {
+          "value": 100.0,
+          "id": 177
+        },
+        {
+          "value": 0.0,
+          "id": 178
+        },
+        {
+          "value": 0.0,
+          "id": 179
+        },
+        {
+          "value": 0.0,
+          "id": 180
+        },
+        {
+          "value": 0.0,
+          "id": 181
+        },
+        {
+          "value": 0.0,
+          "id": 182
+        },
+        {
+          "value": 1.0,
+          "id": 183
+        },
+        {
+          "value": 0.0,
+          "id": 184
+        },
+        {
+          "value": 0.0,
+          "id": 185
+        },
+        {
+          "value": -1.0,
+          "id": 186
+        },
+        {
+          "value": 1.0,
+          "id": 187
+        },
+        {
+          "value": 1.0,
+          "id": 188
+        },
+        {
+          "value": 5.0,
+          "id": 189
+        },
+        {
+          "value": 1.0,
+          "id": 190
+        },
+        {
+          "value": 0.0,
+          "id": 191
+        },
+        {
+          "value": 0.0,
+          "id": 192
+        },
+        {
+          "value": 0.0,
+          "id": 193
+        },
+        {
+          "value": 0.0,
+          "id": 194
+        },
+        {
+          "value": 0.0,
+          "id": 195
+        },
+        {
+          "value": 0.0,
+          "id": 196
+        },
+        {
+          "value": 0.0,
+          "id": 197
+        },
+        {
+          "value": 0.0,
+          "id": 198
+        },
+        {
+          "value": 0.0,
+          "id": 199
+        },
+        {
+          "value": 0.0,
+          "id": 200
+        },
+        {
+          "value": 0.0,
+          "id": 201
+        },
+        {
+          "value": 0.0,
+          "id": 202
+        }
+      ],
+      "leftModuleId": 6504510993403881,
+      "rightModuleId": 1656728334645352,
+      "data": {
+        "running": true,
+        "ppqn": 48,
+        "ppqnAvg": 4,
+        "clockPeriodSynced": 0.5,
+        "miscSettings": 16842755,
+        "miscSettings2": 256,
+        "miscSettings3": 0,
+        "lineWidth": 1.0,
+        "channels": [
+          {
+            "hpfCutoffSqFreq": 3.605551242828369,
+            "lpfCutoffSqFreq": 141.4567108154297,
+            "sensitivity": 0.0,
+            "gainAdjustSc": 1.0,
+            "nodeTrigDuration": 0.0010000000474974513,
+            "gridX": 12,
+            "rangeIndex": 0,
+            "channelSettings": 0,
+            "channelSettings2": 65552,
+            "channelSettings3": 0,
+            "channelSettings4": 0,
+            "presetPath": "",
+            "shapePath": "",
+            "gainAdjustVca": 1.0,
+            "chanName": "Channel 1",
+            "r_numNodesMin": 5.0,
+            "r_numNodesMax": 30.0,
+            "r_ctrlMax": 100.0,
+            "r_zeroV": 0.0,
+            "r_maxV": 0.0,
+            "r_deltaChange": 50.0,
+            "r_deltaNodes": 50.0,
+            "r_scale": 4095,
+            "r_stepped": 0,
+            "r_grid": 0,
+            "r_quantized": 0,
+            "r_deltaMode": 0,
+            "shape": {
+              "pointsX": [
+                0.0,
+                0.0005000000237487257,
+                0.06199999898672104,
+                0.0625,
+                0.125,
+                0.24950000643730164,
+                0.25,
+                0.3333333432674408,
+                0.49950000643730164,
+                0.5,
+                0.5619999766349792,
+                0.5625,
+                0.625,
+                0.7494999766349792,
+                0.75,
+                0.8333333730697632,
+                0.8744999766349792,
+                0.875,
+                0.8901249766349792,
+                0.890625,
+                0.9057499766349792,
+                0.90625,
+                0.9213749766349792,
+                0.921875,
+                0.9369999766349792,
+                0.9375,
+                0.9526249766349792,
+                0.953125,
+                0.9682499766349792,
+                0.96875,
+                0.9838749766349792,
+                0.984375,
+                0.9994999766349792,
+                1.0
+              ],
+              "pointsY": [
+                0.0,
+                1.0,
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                0.30000001192092896,
+                0.0,
+                0.0,
+                1.0,
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                0.30000001192092896,
+                0.0,
+                0.0,
+                0.4122275114059448,
+                0.4122275114059448,
+                0.0,
+                0.0,
+                0.5565551519393921,
+                0.5565551519393921,
+                0.0,
+                0.0,
+                0.6784191131591797,
+                0.6784191131591797,
+                0.0,
+                0.0,
+                0.8868952393531799,
+                0.8868952393531799,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "ctrl": [
+                0.5,
+                0.5,
+                0.5,
+                0.6606799960136414,
+                0.5,
+                0.5,
+                0.21997418999671936,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.9425804615020752,
+                0.5,
+                0.5,
+                0.19503742456436157,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5
+              ],
+              "type": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "numPts": 34
+            },
+            "playMode": 0,
+            "triggerMode": 0,
+            "hysteresis": 0.20000000298023224,
+            "holdOff": 0.019999999552965164,
+            "loopStart": 0.5,
+            "loopEndAndSustain": 0.75,
+            "playHeadSettings": 16843008,
+            "playHeadSettings2": 65536,
+            "playHeadSettings3": 0
+          },
+          {
+            "hpfCutoffSqFreq": 3.605551242828369,
+            "lpfCutoffSqFreq": 144.9137725830078,
+            "sensitivity": 0.5,
+            "gainAdjustSc": 1.0,
+            "nodeTrigDuration": 0.0010000000474974513,
+            "gridX": 14,
+            "rangeIndex": 5,
+            "channelSettings": 256,
+            "channelSettings2": 65808,
+            "channelSettings3": 0,
+            "channelSettings4": 0,
+            "presetPath": "",
+            "shapePath": "",
+            "gainAdjustVca": 1.0,
+            "chanName": "Channel 2",
+            "r_numNodesMin": 5.0,
+            "r_numNodesMax": 30.0,
+            "r_ctrlMax": 100.0,
+            "r_zeroV": 0.0,
+            "r_maxV": 0.0,
+            "r_deltaChange": 50.0,
+            "r_deltaNodes": 50.0,
+            "r_scale": 4095,
+            "r_stepped": 0,
+            "r_grid": 0,
+            "r_quantized": 0,
+            "r_deltaMode": 0,
+            "shape": {
+              "pointsX": [
+                0.0,
+                0.0005000000237487257,
+                0.03125,
+                0.0625,
+                0.09375,
+                0.125,
+                0.15625,
+                0.1875,
+                0.21875,
+                0.25,
+                0.28125,
+                0.3125,
+                0.34375,
+                0.5,
+                1.0
+              ],
+              "pointsY": [
+                0.0,
+                1.0,
+                0.699999988079071,
+                0.8999999761581421,
+                0.6000000238418579,
+                0.800000011920929,
+                0.5,
+                0.699999988079071,
+                0.4000000059604645,
+                0.6000000238418579,
+                0.30000001192092896,
+                0.5,
+                0.20000000298023224,
+                1.0,
+                0.0
+              ],
+              "ctrl": [
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.17087756097316742,
+                0.16779910027980804,
+                0.5
+              ],
+              "type": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "numPts": 15
+            },
+            "playMode": 0,
+            "triggerMode": 0,
+            "hysteresis": 0.20000000298023224,
+            "holdOff": 0.009999999776482582,
+            "loopStart": 0.5,
+            "loopEndAndSustain": 0.75,
+            "playHeadSettings": 16843008,
+            "playHeadSettings2": 65536,
+            "playHeadSettings3": 0
+          },
+          {
+            "hpfCutoffSqFreq": 3.605551242828369,
+            "lpfCutoffSqFreq": 141.4567108154297,
+            "sensitivity": 0.0,
+            "gainAdjustSc": 1.0,
+            "nodeTrigDuration": 0.0010000000474974513,
+            "gridX": 16,
+            "rangeIndex": 0,
+            "channelSettings": 512,
+            "channelSettings2": 65552,
+            "channelSettings3": 0,
+            "channelSettings4": 0,
+            "presetPath": "C:/Users/86185/AppData/Local/Temp/Cardinal/resources/MindMeldModular/res/ShapeMaster/MindMeldPresets/Envelope/ADSR.smpr",
+            "shapePath": "",
+            "gainAdjustVca": 1.0,
+            "chanName": "Channel 3",
+            "r_numNodesMin": 5.0,
+            "r_numNodesMax": 30.0,
+            "r_ctrlMax": 100.0,
+            "r_zeroV": 0.0,
+            "r_maxV": 0.0,
+            "r_deltaChange": 50.0,
+            "r_deltaNodes": 50.0,
+            "r_scale": 4095,
+            "r_stepped": 0,
+            "r_grid": 0,
+            "r_quantized": 0,
+            "r_deltaMode": 0,
+            "shape": {
+              "pointsX": [
+                0.0,
+                0.25,
+                0.5113890171051025,
+                0.75,
+                1.0
+              ],
+              "pointsY": [
+                0.0,
+                1.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              "ctrl": [
+                0.5,
+                0.5,
+                0.8083548545837402,
+                0.5,
+                0.5
+              ],
+              "type": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "numPts": 5
+            },
+            "playMode": 0,
+            "triggerMode": 0,
+            "hysteresis": 0.20000000298023224,
+            "holdOff": 0.019999999552965164,
+            "loopStart": 0.0,
+            "loopEndAndSustain": 0.004999999888241291,
+            "playHeadSettings": 16843008,
+            "playHeadSettings2": 65536,
+            "playHeadSettings3": 0
+          },
+          {
+            "hpfCutoffSqFreq": 3.605551242828369,
+            "lpfCutoffSqFreq": 141.4567108154297,
+            "sensitivity": 0.5,
+            "gainAdjustSc": 1.0,
+            "nodeTrigDuration": 0.0010000000474974513,
+            "gridX": 16,
+            "rangeIndex": 0,
+            "channelSettings": 768,
+            "channelSettings2": 65552,
+            "channelSettings3": 0,
+            "channelSettings4": 0,
+            "presetPath": "C:/Users/86185/AppData/Local/Temp/Cardinal/resources/MindMeldModular/res/ShapeMaster/MindMeldPresets/LFO/Unipolar LFO/Square LFO Uni.smpr",
+            "shapePath": "",
+            "gainAdjustVca": 1.0,
+            "chanName": "Channel 4",
+            "r_numNodesMin": 5.0,
+            "r_numNodesMax": 30.0,
+            "r_ctrlMax": 100.0,
+            "r_zeroV": 0.0,
+            "r_maxV": 0.0,
+            "r_deltaChange": 50.0,
+            "r_deltaNodes": 50.0,
+            "r_scale": 4095,
+            "r_stepped": 0,
+            "r_grid": 0,
+            "r_quantized": 0,
+            "r_deltaMode": 0,
+            "shape": {
+              "pointsX": [
+                0.0,
+                9.999999747378752e-06,
+                0.4999900460243225,
+                0.5000000596046448,
+                0.5009999871253967,
+                0.9990000128746033,
+                1.0
+              ],
+              "pointsY": [
+                0.0,
+                0.16314935684204102,
+                0.15523779392242432,
+                0.15000000596046448,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "ctrl": [
+                0.011131849139928818,
+                0.5,
+                0.5,
+                0.9131945967674255,
+                0.5,
+                0.5,
+                0.5
+              ],
+              "type": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "numPts": 7
+            },
+            "playMode": 0,
+            "triggerMode": 0,
+            "hysteresis": 0.20000000298023224,
+            "holdOff": 0.019999999552965164,
+            "loopStart": 0.5,
+            "loopEndAndSustain": 0.75,
+            "playHeadSettings": 16843008,
+            "playHeadSettings2": 65536,
+            "playHeadSettings3": 1
+          },
+          {
+            "hpfCutoffSqFreq": 3.605551242828369,
+            "lpfCutoffSqFreq": 144.9137725830078,
+            "sensitivity": 0.5,
+            "gainAdjustSc": 1.0,
+            "nodeTrigDuration": 0.0010000000474974513,
+            "gridX": 16,
+            "rangeIndex": 0,
+            "channelSettings": 1024,
+            "channelSettings2": 65552,
+            "channelSettings3": 0,
+            "channelSettings4": 0,
+            "presetPath": "",
+            "shapePath": "",
+            "gainAdjustVca": 1.0,
+            "chanName": "Channel 5",
+            "r_numNodesMin": 5.0,
+            "r_numNodesMax": 30.0,
+            "r_ctrlMax": 100.0,
+            "r_zeroV": 0.0,
+            "r_maxV": 0.0,
+            "r_deltaChange": 50.0,
+            "r_deltaNodes": 50.0,
+            "r_scale": 4095,
+            "r_stepped": 0,
+            "r_grid": 0,
+            "r_quantized": 0,
+            "r_deltaMode": 0,
+            "shape": {
+              "pointsX": [
+                0.0,
+                0.1902385652065277,
+                0.1923820823431015,
+                0.3850802481174469,
+                0.38509026169776917,
+                0.5542395114898682,
+                0.5542495250701904,
+                0.7041268944740295,
+                0.7041369080543518,
+                0.7705014944076538,
+                0.7705115079879761,
+                0.828326940536499,
+                0.8283369541168213,
+                0.958400547504425,
+                1.0
+              ],
+              "pointsY": [
+                0.0,
+                0.0,
+                0.08224385976791382,
+                0.08782082796096802,
+                0.17718255519866943,
+                0.18833661079406738,
+                0.27209538221359253,
+                0.27767235040664673,
+                0.5289746522903442,
+                0.5345516800880432,
+                0.27767235040664673,
+                0.27767235040664673,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "ctrl": [
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5
+              ],
+              "type": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "numPts": 15
+            },
+            "playMode": 0,
+            "triggerMode": 0,
+            "hysteresis": 0.20000000298023224,
+            "holdOff": 0.009999999776482582,
+            "loopStart": 0.5,
+            "loopEndAndSustain": 0.75,
+            "playHeadSettings": 16843008,
+            "playHeadSettings2": 65536,
+            "playHeadSettings3": 0
+          },
+          {
+            "hpfCutoffSqFreq": 3.605551242828369,
+            "lpfCutoffSqFreq": 144.9137725830078,
+            "sensitivity": 0.5,
+            "gainAdjustSc": 1.0,
+            "nodeTrigDuration": 0.0010000000474974513,
+            "gridX": 16,
+            "rangeIndex": 5,
+            "channelSettings": 1280,
+            "channelSettings2": 65808,
+            "channelSettings3": 0,
+            "channelSettings4": 0,
+            "presetPath": "C:/Users/86185/AppData/Local/Temp/Cardinal/resources/MindMeldModular/res/ShapeMaster/CommunityPresets/Jakub Ciupinski/Oscillators/Vocal.smpr",
+            "shapePath": "",
+            "gainAdjustVca": 1.0,
+            "chanName": "Channel 6",
+            "r_numNodesMin": 5.0,
+            "r_numNodesMax": 30.0,
+            "r_ctrlMax": 100.0,
+            "r_zeroV": 0.0,
+            "r_maxV": 0.0,
+            "r_deltaChange": 50.0,
+            "r_deltaNodes": 50.0,
+            "r_scale": 4095,
+            "r_stepped": 0,
+            "r_grid": 0,
+            "r_quantized": 0,
+            "r_deltaMode": 0,
+            "shape": {
+              "pointsX": [
+                0.0,
+                0.06199999898672104,
+                0.0625,
+                0.125,
+                0.1875,
+                0.25,
+                0.3125,
+                0.375,
+                0.4375,
+                0.5,
+                0.5625,
+                0.625,
+                0.6875,
+                0.8745803833007812,
+                1.0
+              ],
+              "pointsY": [
+                0.501355767250061,
+                0.9960108399391174,
+                1.0,
+                0.0,
+                0.8999999761581421,
+                0.10000000149011612,
+                0.800000011920929,
+                0.20000000298023224,
+                0.699999988079071,
+                0.30000001192092896,
+                0.6000000238418579,
+                0.4000000059604645,
+                0.5,
+                0.8030067682266235,
+                0.501355767250061
+              ],
+              "ctrl": [
+                0.7905287742614746,
+                0.5,
+                0.7390771508216858,
+                0.6998624801635742,
+                0.7657586336135864,
+                0.7299489974975586,
+                0.6965771913528442,
+                0.6946470141410828,
+                0.6290130615234375,
+                0.6455404758453369,
+                0.7594598531723022,
+                0.7597941756248474,
+                0.1934325098991394,
+                0.7820534706115723,
+                0.5
+              ],
+              "type": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                0
+              ],
+              "numPts": 15
+            },
+            "playMode": 0,
+            "triggerMode": 0,
+            "hysteresis": 0.20000000298023224,
+            "holdOff": 0.009999999776482582,
+            "loopStart": 0.5,
+            "loopEndAndSustain": 0.75,
+            "playHeadSettings": 16843008,
+            "playHeadSettings2": 65536,
+            "playHeadSettings3": 0
+          },
+          {
+            "hpfCutoffSqFreq": 3.605551242828369,
+            "lpfCutoffSqFreq": 144.9137725830078,
+            "sensitivity": 0.5,
+            "gainAdjustSc": 1.0,
+            "nodeTrigDuration": 0.0010000000474974513,
+            "gridX": 16,
+            "rangeIndex": 5,
+            "channelSettings": 1536,
+            "channelSettings2": 65808,
+            "channelSettings3": 0,
+            "channelSettings4": 0,
+            "presetPath": "C:/Users/86185/AppData/Local/Temp/Cardinal/resources/MindMeldModular/res/ShapeMaster/CommunityPresets/Jakub Ciupinski/Oscillators/Jagged.smpr",
+            "shapePath": "",
+            "gainAdjustVca": 1.0,
+            "chanName": "Channel 7",
+            "r_numNodesMin": 5.0,
+            "r_numNodesMax": 30.0,
+            "r_ctrlMax": 100.0,
+            "r_zeroV": 0.0,
+            "r_maxV": 0.0,
+            "r_deltaChange": 50.0,
+            "r_deltaNodes": 50.0,
+            "r_scale": 4095,
+            "r_stepped": 0,
+            "r_grid": 0,
+            "r_quantized": 0,
+            "r_deltaMode": 0,
+            "shape": {
+              "pointsX": [
+                0.0,
+                0.06199999898672104,
+                0.25,
+                0.25049999356269836,
+                0.4375,
+                0.43799999356269836,
+                0.5,
+                0.5005000233650208,
+                0.5625,
+                0.5630000233650208,
+                0.7494999766349792,
+                0.75,
+                0.9375,
+                1.0
+              ],
+              "pointsY": [
+                0.5,
+                0.9959999918937683,
+                0.6000000238418579,
+                0.699999988079071,
+                0.30000001192092896,
+                0.4000000059604645,
+                0.0,
+                1.0,
+                0.6000000238418579,
+                0.699999988079071,
+                0.30000001192092896,
+                0.4000000059604645,
+                0.0,
+                0.5
+              ],
+              "ctrl": [
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5
+              ],
+              "type": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "numPts": 14
+            },
+            "playMode": 0,
+            "triggerMode": 0,
+            "hysteresis": 0.20000000298023224,
+            "holdOff": 0.009999999776482582,
+            "loopStart": 0.5,
+            "loopEndAndSustain": 0.75,
+            "playHeadSettings": 16843008,
+            "playHeadSettings2": 65536,
+            "playHeadSettings3": 0
+          },
+          {
+            "hpfCutoffSqFreq": 3.605551242828369,
+            "lpfCutoffSqFreq": 144.9137725830078,
+            "sensitivity": 0.5,
+            "gainAdjustSc": 1.0,
+            "nodeTrigDuration": 0.0010000000474974513,
+            "gridX": 16,
+            "rangeIndex": 0,
+            "channelSettings": 1792,
+            "channelSettings2": 65552,
+            "channelSettings3": 0,
+            "channelSettings4": 0,
+            "presetPath": "",
+            "shapePath": "",
+            "gainAdjustVca": 1.0,
+            "chanName": "Channel 8",
+            "r_numNodesMin": 5.0,
+            "r_numNodesMax": 30.0,
+            "r_ctrlMax": 100.0,
+            "r_zeroV": 0.0,
+            "r_maxV": 0.0,
+            "r_deltaChange": 50.0,
+            "r_deltaNodes": 50.0,
+            "r_scale": 4095,
+            "r_stepped": 0,
+            "r_grid": 0,
+            "r_quantized": 0,
+            "r_deltaMode": 0,
+            "shape": {
+              "pointsX": [
+                0.0,
+                0.5,
+                1.0
+              ],
+              "pointsY": [
+                0.0,
+                1.0,
+                0.0
+              ],
+              "ctrl": [
+                0.5,
+                0.5,
+                0.5
+              ],
+              "type": [
+                0,
+                0,
+                0
+              ],
+              "numPts": 3
+            },
+            "playMode": 0,
+            "triggerMode": 0,
+            "hysteresis": 0.20000000298023224,
+            "holdOff": 0.009999999776482582,
+            "loopStart": 0.5,
+            "loopEndAndSustain": 0.75,
+            "playHeadSettings": 16843008,
+            "playHeadSettings2": 65536,
+            "playHeadSettings3": 0
+          }
+        ],
+        "currChan": 1
+      },
+      "pos": [
+        0.0,
+        1
+      ]
+    },
+    {
+      "id": 8300000000000015,
+      "plugin": "Cardinal",
+      "model": "TextEditor",
+      "version": "2.0",
+      "params": [],
+      "data": {
+        "filepath": "",
+        "lang": "None",
+        "etext": "QUADECA \"LIFE 1\"  (2026)\n========================\nHyperpop saw stack x6 detuned, FM\ne-piano counter-layer, Overdrive,\nand a ShapeMaster curve sweeping the\nreverb wet. Press a key = the curve\nre-triggers from the top.\n\nROW 0  HostMIDI | Unison | VCO | VCF\n       | ADSR | VCA | Sum | FMOp | VCA\n       | Distortion | Mixer | Plateau\n       | HostAudio2\nROW 1  ShapeMaster | TextEditor\n\nHOW TO PLAY\n- Keys = 6-voice detuned saw stack\n- Hit harder = more filter resonance\n  (velocity -> VCF reso CV)\n- FMOp e-piano rides along; its VCA\n  knob = e-piano level vs saw\n- Watch the Plateau WET knob move by\n  itself: that is ShapeMaster ch2\n\nTUNING\n- Unison CHANNELS 6 / DETUNE 15c\n- Distortion DRIVE 0.74 (Overdrive)\n- ShapeMaster ch2 speed on its\n  FREQ knob; ADSR retriggers it\n",
+        "width": 26
+      },
+      "pos": [
+        40.0,
+        1
+      ]
+    }
+  ],
+  "cables": [
+    {
+      "id": 900000056,
+      "outputModuleId": 8300000000000001,
+      "outputId": 0,
+      "inputModuleId": 8300000000000002,
+      "inputId": 1
+    },
+    {
+      "id": 900000057,
+      "outputModuleId": 8300000000000001,
+      "outputId": 1,
+      "inputModuleId": 8300000000000002,
+      "inputId": 2
+    },
+    {
+      "id": 900000058,
+      "outputModuleId": 8300000000000001,
+      "outputId": 0,
+      "inputModuleId": 8300000000000008,
+      "inputId": 4
+    },
+    {
+      "id": 900000059,
+      "outputModuleId": 8300000000000001,
+      "outputId": 1,
+      "inputModuleId": 8300000000000008,
+      "inputId": 5
+    },
+    {
+      "id": 900000060,
+      "outputModuleId": 8300000000000001,
+      "outputId": 2,
+      "inputModuleId": 8300000000000004,
+      "inputId": 1
+    },
+    {
+      "id": 900000061,
+      "outputModuleId": 8300000000000001,
+      "outputId": 6,
+      "inputModuleId": 8300000000000005,
+      "inputId": 5
+    },
+    {
+      "id": 900000062,
+      "outputModuleId": 8300000000000002,
+      "outputId": 0,
+      "inputModuleId": 8300000000000003,
+      "inputId": 0
+    },
+    {
+      "id": 900000063,
+      "outputModuleId": 8300000000000002,
+      "outputId": 1,
+      "inputModuleId": 8300000000000005,
+      "inputId": 4
+    },
+    {
+      "id": 900000064,
+      "outputModuleId": 8300000000000003,
+      "outputId": 2,
+      "inputModuleId": 8300000000000004,
+      "inputId": 3
+    },
+    {
+      "id": 900000065,
+      "outputModuleId": 8300000000000005,
+      "outputId": 0,
+      "inputModuleId": 8300000000000004,
+      "inputId": 0
+    },
+    {
+      "id": 900000066,
+      "outputModuleId": 8300000000000005,
+      "outputId": 0,
+      "inputModuleId": 8300000000000006,
+      "inputId": 0
+    },
+    {
+      "id": 900000067,
+      "outputModuleId": 8300000000000005,
+      "outputId": 0,
+      "inputModuleId": 8300000000000014,
+      "inputId": 17
+    },
+    {
+      "id": 900000068,
+      "outputModuleId": 8300000000000004,
+      "outputId": 0,
+      "inputModuleId": 8300000000000006,
+      "inputId": 1
+    },
+    {
+      "id": 900000069,
+      "outputModuleId": 8300000000000006,
+      "outputId": 0,
+      "inputModuleId": 8300000000000007,
+      "inputId": 0
+    },
+    {
+      "id": 900000070,
+      "outputModuleId": 8300000000000007,
+      "outputId": 0,
+      "inputModuleId": 8300000000000010,
+      "inputId": 0
+    },
+    {
+      "id": 900000071,
+      "outputModuleId": 8300000000000008,
+      "outputId": 0,
+      "inputModuleId": 8300000000000009,
+      "inputId": 1
+    },
+    {
+      "id": 900000072,
+      "outputModuleId": 8300000000000009,
+      "outputId": 0,
+      "inputModuleId": 8300000000000010,
+      "inputId": 1
+    },
+    {
+      "id": 900000073,
+      "outputModuleId": 8300000000000010,
+      "outputId": 0,
+      "inputModuleId": 8300000000000011,
+      "inputId": 0
+    },
+    {
+      "id": 900000074,
+      "outputModuleId": 8300000000000010,
+      "outputId": 1,
+      "inputModuleId": 8300000000000011,
+      "inputId": 1
+    },
+    {
+      "id": 900000075,
+      "outputModuleId": 8300000000000014,
+      "outputId": 9,
+      "inputModuleId": 8300000000000012,
+      "inputId": 3
+    },
+    {
+      "id": 900000076,
+      "outputModuleId": 8300000000000011,
+      "outputId": 0,
+      "inputModuleId": 8300000000000012,
+      "inputId": 0
+    },
+    {
+      "id": 900000077,
+      "outputModuleId": 8300000000000011,
+      "outputId": 0,
+      "inputModuleId": 8300000000000012,
+      "inputId": 1
+    },
+    {
+      "id": 900000078,
+      "outputModuleId": 8300000000000012,
+      "outputId": 0,
+      "inputModuleId": 8300000000000013,
+      "inputId": 0
+    },
+    {
+      "id": 900000079,
+      "outputModuleId": 8300000000000012,
+      "outputId": 1,
+      "inputModuleId": 8300000000000013,
+      "inputId": 1
+    }
+  ]
+}

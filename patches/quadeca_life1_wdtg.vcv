@@ -1,0 +1,2014 @@
+{
+  "version": "2.0.0",
+  "zoom": 1.0,
+  "modules": [
+    {
+      "id": 9000000000000002,
+      "plugin": "ImpromptuModular",
+      "model": "Clocked",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 96.0,
+          "id": 0
+        },
+        {
+          "value": -9.0,
+          "id": 1
+        },
+        {
+          "value": 4.0,
+          "id": 2
+        },
+        {
+          "value": 0.0,
+          "id": 3
+        },
+        {
+          "value": 0.0,
+          "id": 4
+        },
+        {
+          "value": 0.0,
+          "id": 5
+        },
+        {
+          "value": 0.0,
+          "id": 6
+        },
+        {
+          "value": 0.0,
+          "id": 7
+        },
+        {
+          "value": 0.5,
+          "id": 8
+        },
+        {
+          "value": 0.5,
+          "id": 9
+        },
+        {
+          "value": 0.842175304889679,
+          "id": 10
+        },
+        {
+          "value": 0.5,
+          "id": 11
+        },
+        {
+          "value": 0.0,
+          "id": 12
+        },
+        {
+          "value": 0.0,
+          "id": 13
+        },
+        {
+          "value": 0.0,
+          "id": 14
+        },
+        {
+          "value": 0.0,
+          "id": 15
+        },
+        {
+          "value": 0.0,
+          "id": 16
+        },
+        {
+          "value": 0.0,
+          "id": 17
+        },
+        {
+          "value": 0.0,
+          "id": 18
+        },
+        {
+          "value": 0.0,
+          "id": 19
+        }
+      ],
+      "rightModuleId": null,
+      "data": {
+        "panelTheme": 1,
+        "panelContrast": 220.0,
+        "running": false,
+        "displayDelayNoteMode": true,
+        "bpmDetectionMode": false,
+        "resetOnStartStop": 0,
+        "ppqn": 4,
+        "resetClockOutputsHigh": false,
+        "momentaryRunInput": true,
+        "forceCvOnBpmOut": false,
+        "clockMaster": false
+      },
+      "pos": [
+        0.0,
+        0
+      ],
+      "leftModuleId": null
+    },
+    {
+      "id": 9000000000000003,
+      "plugin": "MindMeldModular",
+      "model": "MixMasterJr",
+      "version": "2.2.3",
+      "params": [
+        {
+          "value": 1.0,
+          "id": 0
+        },
+        {
+          "value": 1.0,
+          "id": 1
+        },
+        {
+          "value": 1.0,
+          "id": 2
+        },
+        {
+          "value": 1.0,
+          "id": 3
+        },
+        {
+          "value": 1.0,
+          "id": 4
+        },
+        {
+          "value": 1.0,
+          "id": 5
+        },
+        {
+          "value": 1.0,
+          "id": 6
+        },
+        {
+          "value": 1.0,
+          "id": 7
+        },
+        {
+          "value": 1.0,
+          "id": 8
+        },
+        {
+          "value": 1.0,
+          "id": 9
+        },
+        {
+          "value": 0.5,
+          "id": 10
+        },
+        {
+          "value": 0.5,
+          "id": 11
+        },
+        {
+          "value": 0.5,
+          "id": 12
+        },
+        {
+          "value": 0.5,
+          "id": 13
+        },
+        {
+          "value": 0.5,
+          "id": 14
+        },
+        {
+          "value": 0.5,
+          "id": 15
+        },
+        {
+          "value": 0.5,
+          "id": 16
+        },
+        {
+          "value": 0.5,
+          "id": 17
+        },
+        {
+          "value": 0.5,
+          "id": 18
+        },
+        {
+          "value": 0.5,
+          "id": 19
+        },
+        {
+          "value": 1.0,
+          "id": 20
+        },
+        {
+          "value": 0.0,
+          "id": 21
+        },
+        {
+          "value": 0.0,
+          "id": 22
+        },
+        {
+          "value": 0.0,
+          "id": 23
+        },
+        {
+          "value": 0.0,
+          "id": 24
+        },
+        {
+          "value": 0.0,
+          "id": 25
+        },
+        {
+          "value": 0.0,
+          "id": 26
+        },
+        {
+          "value": 0.0,
+          "id": 27
+        },
+        {
+          "value": 0.0,
+          "id": 28
+        },
+        {
+          "value": 0.0,
+          "id": 29
+        },
+        {
+          "value": 0.0,
+          "id": 30
+        },
+        {
+          "value": 0.0,
+          "id": 31
+        },
+        {
+          "value": 0.0,
+          "id": 32
+        },
+        {
+          "value": 0.0,
+          "id": 33
+        },
+        {
+          "value": 0.0,
+          "id": 34
+        },
+        {
+          "value": 0.0,
+          "id": 35
+        },
+        {
+          "value": 0.0,
+          "id": 36
+        },
+        {
+          "value": 0.0,
+          "id": 37
+        },
+        {
+          "value": 0.0,
+          "id": 38
+        },
+        {
+          "value": 0.0,
+          "id": 39
+        },
+        {
+          "value": 0.0,
+          "id": 40
+        },
+        {
+          "value": 0.0,
+          "id": 41
+        },
+        {
+          "value": 0.0,
+          "id": 42
+        },
+        {
+          "value": 1.0,
+          "id": 43
+        },
+        {
+          "value": 0.0,
+          "id": 44
+        },
+        {
+          "value": 0.0,
+          "id": 45
+        },
+        {
+          "value": 0.0,
+          "id": 46
+        },
+        {
+          "value": 0.0,
+          "id": 47
+        },
+        {
+          "value": 0.0,
+          "id": 48
+        },
+        {
+          "value": 0.0,
+          "id": 49
+        },
+        {
+          "value": 0.0,
+          "id": 50
+        },
+        {
+          "value": 0.0,
+          "id": 51
+        },
+        {
+          "value": 13.0,
+          "id": 52
+        },
+        {
+          "value": 13.0,
+          "id": 53
+        },
+        {
+          "value": 13.0,
+          "id": 54
+        },
+        {
+          "value": 13.0,
+          "id": 55
+        },
+        {
+          "value": 13.0,
+          "id": 56
+        },
+        {
+          "value": 13.0,
+          "id": 57
+        },
+        {
+          "value": 13.0,
+          "id": 58
+        },
+        {
+          "value": 13.0,
+          "id": 59
+        },
+        {
+          "value": 20010.0,
+          "id": 60
+        },
+        {
+          "value": 20010.0,
+          "id": 61
+        },
+        {
+          "value": 20010.0,
+          "id": 62
+        },
+        {
+          "value": 20010.0,
+          "id": 63
+        },
+        {
+          "value": 20010.0,
+          "id": 64
+        },
+        {
+          "value": 20010.0,
+          "id": 65
+        },
+        {
+          "value": 20010.0,
+          "id": 66
+        },
+        {
+          "value": 20010.0,
+          "id": 67
+        },
+        {
+          "value": 13.0,
+          "id": 68
+        },
+        {
+          "value": 13.0,
+          "id": 69
+        },
+        {
+          "value": 20010.0,
+          "id": 70
+        },
+        {
+          "value": 20010.0,
+          "id": 71
+        }
+      ],
+      "leftModuleId": null,
+      "rightModuleId": null,
+      "data": {
+        "trackLabels": "-01--02--03--04--05--06--07--08-GRP1GRP2",
+        "panLawMono": 1,
+        "panLawStereo": 1,
+        "directOutsMode": 3,
+        "directOutsSkipGroupedTracks": 0,
+        "auxSendsMode": 3,
+        "groupsControlTrackSendLevels": 0,
+        "auxReturnsMutedWhenMainSolo": 0,
+        "auxReturnsSolosMuteDry": 0,
+        "chainMode": 0,
+        "colorAndCloak": 117440512,
+        "symmetricalFade": false,
+        "fadeCvOutsWithVolCv": false,
+        "linkBitMask": 0,
+        "filterPos": 1,
+        "groupedAuxReturnFeedbackProtection": 1,
+        "ecoMode": 65535,
+        "momentaryCvButtons": 1,
+        "masterFaderScalesSends": 0,
+        "polySpreadVandP": 0,
+        "linearVolCvInputs": 0,
+        "id_t0_gainAdjust": 1.0,
+        "id_t0_fadeRate": 0.0,
+        "id_t0_fadeProfile": 0.0,
+        "id_t0_directOutsMode": 3,
+        "id_t0_auxSendsMode": 3,
+        "id_t0_panLawStereo": 1,
+        "id_t0_vuColorThemeLocal": 0,
+        "id_t0_filterPos": 1,
+        "id_t0_dispColorLocal": 0,
+        "id_t0_momentCvMuteLocal": 1,
+        "id_t0_momentCvSoloLocal": 1,
+        "id_t0_polyStereo": 0,
+        "id_t0_panCvLevel": 1.0,
+        "id_t0_stereoWidth": 1.0,
+        "id_t0_invertInput": 0,
+        "id_t1_gainAdjust": 1.0,
+        "id_t1_fadeRate": 0.0,
+        "id_t1_fadeProfile": 0.0,
+        "id_t1_directOutsMode": 3,
+        "id_t1_auxSendsMode": 3,
+        "id_t1_panLawStereo": 1,
+        "id_t1_vuColorThemeLocal": 0,
+        "id_t1_filterPos": 1,
+        "id_t1_dispColorLocal": 0,
+        "id_t1_momentCvMuteLocal": 1,
+        "id_t1_momentCvSoloLocal": 1,
+        "id_t1_polyStereo": 0,
+        "id_t1_panCvLevel": 1.0,
+        "id_t1_stereoWidth": 1.0,
+        "id_t1_invertInput": 0,
+        "id_t2_gainAdjust": 1.0,
+        "id_t2_fadeRate": 0.0,
+        "id_t2_fadeProfile": 0.0,
+        "id_t2_directOutsMode": 3,
+        "id_t2_auxSendsMode": 3,
+        "id_t2_panLawStereo": 1,
+        "id_t2_vuColorThemeLocal": 0,
+        "id_t2_filterPos": 1,
+        "id_t2_dispColorLocal": 0,
+        "id_t2_momentCvMuteLocal": 1,
+        "id_t2_momentCvSoloLocal": 1,
+        "id_t2_polyStereo": 0,
+        "id_t2_panCvLevel": 1.0,
+        "id_t2_stereoWidth": 1.0,
+        "id_t2_invertInput": 0,
+        "id_t3_gainAdjust": 1.0,
+        "id_t3_fadeRate": 0.0,
+        "id_t3_fadeProfile": 0.0,
+        "id_t3_directOutsMode": 3,
+        "id_t3_auxSendsMode": 3,
+        "id_t3_panLawStereo": 1,
+        "id_t3_vuColorThemeLocal": 0,
+        "id_t3_filterPos": 1,
+        "id_t3_dispColorLocal": 0,
+        "id_t3_momentCvMuteLocal": 1,
+        "id_t3_momentCvSoloLocal": 1,
+        "id_t3_polyStereo": 0,
+        "id_t3_panCvLevel": 1.0,
+        "id_t3_stereoWidth": 1.0,
+        "id_t3_invertInput": 0,
+        "id_t4_gainAdjust": 1.0,
+        "id_t4_fadeRate": 0.0,
+        "id_t4_fadeProfile": 0.0,
+        "id_t4_directOutsMode": 3,
+        "id_t4_auxSendsMode": 3,
+        "id_t4_panLawStereo": 1,
+        "id_t4_vuColorThemeLocal": 0,
+        "id_t4_filterPos": 1,
+        "id_t4_dispColorLocal": 0,
+        "id_t4_momentCvMuteLocal": 1,
+        "id_t4_momentCvSoloLocal": 1,
+        "id_t4_polyStereo": 0,
+        "id_t4_panCvLevel": 1.0,
+        "id_t4_stereoWidth": 1.0,
+        "id_t4_invertInput": 0,
+        "id_t5_gainAdjust": 1.0,
+        "id_t5_fadeRate": 0.0,
+        "id_t5_fadeProfile": 0.0,
+        "id_t5_directOutsMode": 3,
+        "id_t5_auxSendsMode": 3,
+        "id_t5_panLawStereo": 1,
+        "id_t5_vuColorThemeLocal": 0,
+        "id_t5_filterPos": 1,
+        "id_t5_dispColorLocal": 0,
+        "id_t5_momentCvMuteLocal": 1,
+        "id_t5_momentCvSoloLocal": 1,
+        "id_t5_polyStereo": 0,
+        "id_t5_panCvLevel": 1.0,
+        "id_t5_stereoWidth": 1.0,
+        "id_t5_invertInput": 0,
+        "id_t6_gainAdjust": 1.0,
+        "id_t6_fadeRate": 0.0,
+        "id_t6_fadeProfile": 0.0,
+        "id_t6_directOutsMode": 3,
+        "id_t6_auxSendsMode": 3,
+        "id_t6_panLawStereo": 1,
+        "id_t6_vuColorThemeLocal": 0,
+        "id_t6_filterPos": 1,
+        "id_t6_dispColorLocal": 0,
+        "id_t6_momentCvMuteLocal": 1,
+        "id_t6_momentCvSoloLocal": 1,
+        "id_t6_polyStereo": 0,
+        "id_t6_panCvLevel": 1.0,
+        "id_t6_stereoWidth": 1.0,
+        "id_t6_invertInput": 0,
+        "id_t7_gainAdjust": 1.0,
+        "id_t7_fadeRate": 0.0,
+        "id_t7_fadeProfile": 0.0,
+        "id_t7_directOutsMode": 3,
+        "id_t7_auxSendsMode": 3,
+        "id_t7_panLawStereo": 1,
+        "id_t7_vuColorThemeLocal": 0,
+        "id_t7_filterPos": 1,
+        "id_t7_dispColorLocal": 0,
+        "id_t7_momentCvMuteLocal": 1,
+        "id_t7_momentCvSoloLocal": 1,
+        "id_t7_polyStereo": 0,
+        "id_t7_panCvLevel": 1.0,
+        "id_t7_stereoWidth": 1.0,
+        "id_t7_invertInput": 0,
+        "id_g0_gainAdjust": 1.0,
+        "id_g0_fadeRate": 0.0,
+        "id_g0_fadeProfile": 0.0,
+        "id_g0_directOutsMode": 3,
+        "id_g0_auxSendsMode": 3,
+        "id_g0_panLawStereo": 1,
+        "id_g0_vuColorThemeLocal": 0,
+        "id_g0_filterPos": 1,
+        "id_g0_dispColorLocal": 0,
+        "id_g0_momentCvMuteLocal": 1,
+        "id_g0_momentCvSoloLocal": 1,
+        "id_g0_panCvLevel": 1.0,
+        "id_g0_stereoWidth": 1.0,
+        "id_g1_gainAdjust": 1.0,
+        "id_g1_fadeRate": 0.0,
+        "id_g1_fadeProfile": 0.0,
+        "id_g1_directOutsMode": 3,
+        "id_g1_auxSendsMode": 3,
+        "id_g1_panLawStereo": 1,
+        "id_g1_vuColorThemeLocal": 0,
+        "id_g1_filterPos": 1,
+        "id_g1_dispColorLocal": 0,
+        "id_g1_momentCvMuteLocal": 1,
+        "id_g1_momentCvSoloLocal": 1,
+        "id_g1_panCvLevel": 1.0,
+        "id_g1_stereoWidth": 1.0,
+        "dcBlock": false,
+        "clipping": 0,
+        "fadeRate": 0.0,
+        "fadeProfile": 0.0,
+        "vuColorThemeLocal": 0,
+        "dispColorLocal": 0,
+        "momentCvMuteLocal": 1,
+        "momentCvDimLocal": 1,
+        "momentCvMonoLocal": 1,
+        "chainOnly": 0,
+        "dimGain": 0.2511900067329407,
+        "masterLabel": "MASTER"
+      },
+      "pos": [
+        100.0,
+        0
+      ]
+    },
+    {
+      "id": 9000000000000004,
+      "plugin": "Valley",
+      "model": "Feline",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 6.53995418548584,
+          "id": 0
+        },
+        {
+          "value": 7.0799946784973145,
+          "id": 1
+        },
+        {
+          "value": 1.0,
+          "id": 2
+        },
+        {
+          "value": 0.0,
+          "id": 3
+        },
+        {
+          "value": 0.32399994134902954,
+          "id": 4
+        },
+        {
+          "value": 0.4400005042552948,
+          "id": 5
+        },
+        {
+          "value": 0.6734975576400757,
+          "id": 6
+        },
+        {
+          "value": 0.0,
+          "id": 7
+        },
+        {
+          "value": 0.0,
+          "id": 8
+        },
+        {
+          "value": 0.0,
+          "id": 9
+        },
+        {
+          "value": 0.0,
+          "id": 10
+        },
+        {
+          "value": 0.0,
+          "id": 11
+        },
+        {
+          "value": 0.45542141795158386,
+          "id": 12
+        },
+        {
+          "value": 0.0,
+          "id": 13
+        },
+        {
+          "value": 0.0,
+          "id": 14
+        },
+        {
+          "value": 0.0,
+          "id": 15
+        },
+        {
+          "value": 0.0,
+          "id": 16
+        }
+      ],
+      "leftModuleId": null,
+      "rightModuleId": null,
+      "data": {
+        "panelStyle": 0
+      },
+      "pos": [
+        138.0,
+        0
+      ]
+    },
+    {
+      "id": 9000000000000005,
+      "plugin": "Cardinal",
+      "model": "HostAudio2",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 1.0,
+          "id": 0
+        }
+      ],
+      "rightModuleId": null,
+      "data": {
+        "dcFilter": true
+      },
+      "pos": [
+        152.0,
+        0
+      ],
+      "leftModuleId": null
+    },
+    {
+      "id": 9000000000000010,
+      "plugin": "rcm",
+      "model": "rcm-pianoroll",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 0.0,
+          "id": 0
+        },
+        {
+          "value": 0.0,
+          "id": 1
+        }
+      ],
+      "leftModuleId": null,
+      "data": {
+        "backgroundHue": 0.5,
+        "backgroundSaturation": 1.0,
+        "backgroundLuminosity": 0.25,
+        "patterns": [
+          {
+            "numberOfMeasures": 1,
+            "beatsPerMeasure": 4,
+            "divisionsPerBeat": 4,
+            "measures": [
+              {
+                "notes": [
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 47,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 50,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 48,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 40,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 50,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 40,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  }
+                ]
+              },
+              {
+                "notes": [
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "currentPattern": 0,
+        "currentStep": 12,
+        "clockDelay": 0,
+        "sequenceRunning": false,
+        "lowestDisplayNote": 36,
+        "notesToShow": 18,
+        "currentMeasure": 0,
+        "driverMode": false
+      },
+      "pos": [
+        22.0,
+        0
+      ],
+      "rightModuleId": null
+    },
+    {
+      "id": 9000000000000013,
+      "plugin": "AudibleInstruments",
+      "model": "Elements",
+      "version": "2.0",
+      "params": [
+        {
+          "id": 0,
+          "value": 0.6
+        },
+        {
+          "id": 1,
+          "value": 0.4
+        },
+        {
+          "id": 2,
+          "value": 0.0
+        },
+        {
+          "id": 3,
+          "value": 0.35
+        },
+        {
+          "id": 4,
+          "value": 0.0
+        },
+        {
+          "id": 5,
+          "value": 0.0
+        },
+        {
+          "id": 6,
+          "value": 0.0
+        },
+        {
+          "id": 7,
+          "value": 0.32
+        },
+        {
+          "id": 8,
+          "value": 0.6
+        },
+        {
+          "id": 9,
+          "value": 0.5
+        },
+        {
+          "id": 10,
+          "value": 0.45
+        },
+        {
+          "id": 11,
+          "value": 0.55
+        },
+        {
+          "id": 12,
+          "value": 0.5
+        },
+        {
+          "id": 13,
+          "value": 0.5
+        },
+        {
+          "id": 14,
+          "value": 0.55
+        },
+        {
+          "id": 15,
+          "value": 0.5
+        },
+        {
+          "id": 16,
+          "value": 0.35
+        },
+        {
+          "id": 17,
+          "value": 0.0
+        },
+        {
+          "id": 18,
+          "value": 0.0
+        },
+        {
+          "id": 19,
+          "value": 0.0
+        },
+        {
+          "id": 20,
+          "value": 0.0
+        },
+        {
+          "id": 21,
+          "value": 0.0
+        },
+        {
+          "id": 22,
+          "value": 0.0
+        },
+        {
+          "id": 23,
+          "value": 0.0
+        },
+        {
+          "id": 24,
+          "value": 0.0
+        },
+        {
+          "id": 25,
+          "value": 0.0
+        },
+        {
+          "id": 26,
+          "value": 0.0
+        }
+      ],
+      "data": {},
+      "pos": [
+        64.0,
+        0
+      ],
+      "leftModuleId": null,
+      "rightModuleId": null
+    },
+    {
+      "id": 9000000000000019,
+      "plugin": "rcm",
+      "model": "rcm-pianoroll",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 0.0,
+          "id": 0
+        },
+        {
+          "value": 0.0,
+          "id": 1
+        }
+      ],
+      "leftModuleId": null,
+      "data": {
+        "backgroundHue": 0.5,
+        "backgroundSaturation": 1.0,
+        "backgroundLuminosity": 0.25,
+        "patterns": [
+          {
+            "numberOfMeasures": 1,
+            "beatsPerMeasure": 4,
+            "divisionsPerBeat": 4,
+            "measures": [
+              {
+                "notes": [
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 47,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 50,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 48,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 40,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 50,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 40,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  }
+                ]
+              },
+              {
+                "notes": [
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "currentPattern": 0,
+        "currentStep": 12,
+        "clockDelay": 0,
+        "sequenceRunning": false,
+        "lowestDisplayNote": 36,
+        "notesToShow": 18,
+        "currentMeasure": 0,
+        "driverMode": false
+      },
+      "pos": [
+        0.0,
+        1
+      ],
+      "rightModuleId": null
+    },
+    {
+      "id": 9000000000000022,
+      "plugin": "Bogaudio",
+      "model": "Bogaudio-VCO",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 261.63,
+          "id": 0
+        },
+        {
+          "value": 0.0,
+          "id": 1
+        },
+        {
+          "value": 0.5,
+          "id": 2
+        },
+        {
+          "value": 0.55,
+          "id": 3
+        },
+        {
+          "value": 0.0,
+          "id": 4
+        },
+        {
+          "value": 1.0,
+          "id": 5
+        },
+        {
+          "value": 0.0,
+          "id": 6
+        }
+      ],
+      "leftModuleId": null,
+      "rightModuleId": null,
+      "data": {
+        "poly_input": 0,
+        "dc_correction": true
+      },
+      "pos": [
+        42.0,
+        1
+      ]
+    },
+    {
+      "id": 9000000000000024,
+      "plugin": "Bogaudio",
+      "model": "Bogaudio-VCF",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 1500.0,
+          "id": 0
+        },
+        {
+          "value": 0.2843378186225891,
+          "id": 1
+        },
+        {
+          "value": 0.45662593841552734,
+          "id": 2
+        },
+        {
+          "value": 1.6,
+          "id": 3
+        },
+        {
+          "value": 1.0,
+          "id": 4
+        },
+        {
+          "value": 0.7180712819099426,
+          "id": 5
+        }
+      ],
+      "leftModuleId": null,
+      "data": {
+        "bandwidthMode": "pitched"
+      },
+      "pos": [
+        54.0,
+        1
+      ],
+      "rightModuleId": null
+    },
+    {
+      "id": 9000000000000027,
+      "plugin": "Bogaudio",
+      "model": "Bogaudio-ADSR",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 0.015,
+          "id": 0
+        },
+        {
+          "value": 0.4,
+          "id": 1
+        },
+        {
+          "value": 0.45,
+          "id": 2
+        },
+        {
+          "value": 0.35,
+          "id": 3
+        },
+        {
+          "value": 0.0,
+          "id": 4
+        }
+      ],
+      "rightModuleId": null,
+      "data": {
+        "invert": 1.0
+      },
+      "pos": [
+        66.0,
+        1
+      ],
+      "leftModuleId": null
+    },
+    {
+      "id": 9000000000000030,
+      "plugin": "Fundamental",
+      "model": "Split",
+      "version": "2.0",
+      "params": [],
+      "leftModuleId": null,
+      "rightModuleId": null,
+      "pos": [
+        71.0,
+        1
+      ],
+      "data": {}
+    },
+    {
+      "id": 9000000000000035,
+      "plugin": "rcm",
+      "model": "rcm-pianoroll",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 0.0,
+          "id": 0
+        },
+        {
+          "value": 0.0,
+          "id": 1
+        }
+      ],
+      "leftModuleId": null,
+      "data": {
+        "backgroundHue": 0.5,
+        "backgroundSaturation": 1.0,
+        "backgroundLuminosity": 0.25,
+        "patterns": [
+          {
+            "numberOfMeasures": 1,
+            "beatsPerMeasure": 4,
+            "divisionsPerBeat": 4,
+            "measures": [
+              {
+                "notes": [
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 47,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 50,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 48,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 43,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 40,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 50,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 45,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  },
+                  {
+                    "pitch": 40,
+                    "velocity": 0.75,
+                    "retrigger": true,
+                    "active": true
+                  }
+                ]
+              },
+              {
+                "notes": [
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  },
+                  {
+                    "pitch": 0,
+                    "velocity": 0.0,
+                    "retrigger": false,
+                    "active": false
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "currentPattern": 0,
+        "currentStep": 12,
+        "clockDelay": 0,
+        "sequenceRunning": false,
+        "lowestDisplayNote": 36,
+        "notesToShow": 18,
+        "currentMeasure": 0,
+        "driverMode": false
+      },
+      "pos": [
+        78.0,
+        1
+      ],
+      "rightModuleId": null
+    },
+    {
+      "id": 9000000000000038,
+      "plugin": "AudibleInstruments",
+      "model": "Plaits",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 4.0,
+          "id": 0
+        },
+        {
+          "value": 0.0,
+          "id": 1
+        },
+        {
+          "value": 440.0,
+          "id": 2
+        },
+        {
+          "value": 0.35,
+          "id": 3
+        },
+        {
+          "value": 0.5,
+          "id": 4
+        },
+        {
+          "value": 0.2,
+          "id": 5
+        },
+        {
+          "value": 0.0,
+          "id": 6
+        },
+        {
+          "value": 0.0,
+          "id": 7
+        },
+        {
+          "value": 0.0,
+          "id": 8
+        },
+        {
+          "value": 0.5,
+          "id": 9
+        },
+        {
+          "value": 0.5,
+          "id": 10
+        }
+      ],
+      "leftModuleId": null,
+      "rightModuleId": null,
+      "data": {
+        "lowCpu": true,
+        "model": 14
+      },
+      "pos": [
+        120.0,
+        1
+      ]
+    },
+    {
+      "id": 9000000000000041,
+      "plugin": "HetrickCV",
+      "model": "Waveshaper",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 0.3,
+          "id": 0
+        },
+        {
+          "value": 0.5,
+          "id": 1
+        },
+        {
+          "value": 0.8,
+          "id": 2
+        }
+      ],
+      "leftModuleId": null,
+      "rightModuleId": null,
+      "pos": [
+        134.0,
+        1
+      ],
+      "data": {}
+    },
+    {
+      "id": 9000000000000043,
+      "plugin": "Fundamental",
+      "model": "Split",
+      "version": "2.0",
+      "params": [],
+      "leftModuleId": null,
+      "rightModuleId": null,
+      "pos": [
+        142.0,
+        1
+      ],
+      "data": {}
+    }
+  ],
+  "cables": [
+    {
+      "id": 9000000000000006,
+      "outputModuleId": 9000000000000003,
+      "outputId": 2,
+      "inputModuleId": 9000000000000005,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000007,
+      "outputModuleId": 9000000000000003,
+      "outputId": 3,
+      "inputModuleId": 9000000000000005,
+      "inputId": 1
+    },
+    {
+      "id": 9000000000000008,
+      "outputModuleId": 9000000000000004,
+      "outputId": 0,
+      "inputModuleId": 9000000000000003,
+      "inputId": 6
+    },
+    {
+      "id": 9000000000000009,
+      "outputModuleId": 9000000000000004,
+      "outputId": 1,
+      "inputModuleId": 9000000000000003,
+      "inputId": 7
+    },
+    {
+      "id": 9000000000000011,
+      "outputModuleId": 9000000000000002,
+      "outputId": 0,
+      "inputModuleId": 9000000000000010,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000012,
+      "outputModuleId": 9000000000000002,
+      "outputId": 5,
+      "inputModuleId": 9000000000000010,
+      "inputId": 1
+    },
+    {
+      "id": 9000000000000014,
+      "outputModuleId": 9000000000000010,
+      "outputId": 5,
+      "inputModuleId": 9000000000000013,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000015,
+      "outputModuleId": 9000000000000010,
+      "outputId": 6,
+      "inputModuleId": 9000000000000013,
+      "inputId": 2
+    },
+    {
+      "id": 9000000000000016,
+      "outputModuleId": 9000000000000013,
+      "outputId": 0,
+      "inputModuleId": 9000000000000003,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000017,
+      "outputModuleId": 9000000000000013,
+      "outputId": 1,
+      "inputModuleId": 9000000000000003,
+      "inputId": 1
+    },
+    {
+      "id": 9000000000000018,
+      "outputModuleId": 9000000000000013,
+      "outputId": 0,
+      "inputModuleId": 9000000000000004,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000020,
+      "outputModuleId": 9000000000000002,
+      "outputId": 0,
+      "inputModuleId": 9000000000000019,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000021,
+      "outputModuleId": 9000000000000002,
+      "outputId": 5,
+      "inputModuleId": 9000000000000019,
+      "inputId": 1
+    },
+    {
+      "id": 9000000000000023,
+      "outputModuleId": 9000000000000019,
+      "outputId": 5,
+      "inputModuleId": 9000000000000022,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000025,
+      "outputModuleId": 9000000000000022,
+      "outputId": 1,
+      "inputModuleId": 9000000000000024,
+      "inputId": 3
+    },
+    {
+      "id": 9000000000000026,
+      "outputModuleId": 9000000000000019,
+      "outputId": 5,
+      "inputModuleId": 9000000000000024,
+      "inputId": 2
+    },
+    {
+      "id": 9000000000000028,
+      "outputModuleId": 9000000000000019,
+      "outputId": 6,
+      "inputModuleId": 9000000000000027,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000029,
+      "outputModuleId": 9000000000000027,
+      "outputId": 0,
+      "inputModuleId": 9000000000000024,
+      "inputId": 1
+    },
+    {
+      "id": 9000000000000031,
+      "outputModuleId": 9000000000000024,
+      "outputId": 0,
+      "inputModuleId": 9000000000000030,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000032,
+      "outputModuleId": 9000000000000030,
+      "outputId": 0,
+      "inputModuleId": 9000000000000003,
+      "inputId": 2
+    },
+    {
+      "id": 9000000000000033,
+      "outputModuleId": 9000000000000030,
+      "outputId": 1,
+      "inputModuleId": 9000000000000003,
+      "inputId": 3
+    },
+    {
+      "id": 9000000000000034,
+      "outputModuleId": 9000000000000024,
+      "outputId": 0,
+      "inputModuleId": 9000000000000004,
+      "inputId": 1
+    },
+    {
+      "id": 9000000000000036,
+      "outputModuleId": 9000000000000002,
+      "outputId": 0,
+      "inputModuleId": 9000000000000035,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000037,
+      "outputModuleId": 9000000000000002,
+      "outputId": 5,
+      "inputModuleId": 9000000000000035,
+      "inputId": 1
+    },
+    {
+      "id": 9000000000000039,
+      "outputModuleId": 9000000000000035,
+      "outputId": 5,
+      "inputModuleId": 9000000000000038,
+      "inputId": 7
+    },
+    {
+      "id": 9000000000000040,
+      "outputModuleId": 9000000000000035,
+      "outputId": 6,
+      "inputModuleId": 9000000000000038,
+      "inputId": 5
+    },
+    {
+      "id": 9000000000000042,
+      "outputModuleId": 9000000000000038,
+      "outputId": 0,
+      "inputModuleId": 9000000000000041,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000044,
+      "outputModuleId": 9000000000000041,
+      "outputId": 0,
+      "inputModuleId": 9000000000000043,
+      "inputId": 0
+    },
+    {
+      "id": 9000000000000045,
+      "outputModuleId": 9000000000000043,
+      "outputId": 0,
+      "inputModuleId": 9000000000000003,
+      "inputId": 4
+    },
+    {
+      "id": 9000000000000046,
+      "outputModuleId": 9000000000000043,
+      "outputId": 1,
+      "inputModuleId": 9000000000000003,
+      "inputId": 5
+    }
+  ],
+  "gridOffset": [
+    0,
+    0
+  ]
+}
