@@ -198,7 +198,19 @@ cardinal-mcp/
 
 ---
 
-## 工作流示例(我都没试过)
+## 工作流示例
+
+> 下面三段是**「你可以怎么跟 AI 说话」的演示**，展示的是预期对话，不是验证过的执行记录。
+>
+> **实际在真机上跑过的东西**单独列在这里：
+>
+> | | |
+> |---|---|
+> | Quadeca 风格机架 | 5 张机架在 Cardinal 里实机加载通过（`docs/QUADECA-PATCHES-ACCEPTANCE.md`，2026-10-17 实机版）。那份验收单还记着它抓出的两个问题：端口越界会崩；时钟源选错则加载成功但不会播 |
+> | `quadeca_life1_wdtg.vcv` | 已确认有声音（人耳确认） |
+> | `mini_arranger_expanded.vcv` | MiniArranger 主模块 + 扩展器，已验收 |
+> | `mini_arranger_8voice*.vcv` | 已生成，**待实机验收**（`docs/8VOICE-PATCH-ACCEPTANCE.md`） |
+> | 全部 52 个机架 | 静态审计全部解析通过 |
 
 ### "把合成器变亮一点"
 

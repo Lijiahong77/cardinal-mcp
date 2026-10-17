@@ -211,7 +211,20 @@ cardinal-mcp/
 
 ---
 
-## Workflow examples（I haven't try yet😂）
+## Workflow examples
+
+> The three snippets below are **illustrations of how you would talk to the AI** — they show
+> the intended conversation, not a transcript of a verified run.
+>
+> **What has actually been run on hardware** is recorded separately:
+>
+> | | |
+> |---|---|
+> | Quadeca-style racks | 5 racks loaded successfully in Cardinal (`docs/QUADECA-PATCHES-ACCEPTANCE.md`, real-hardware run 2026-10-17). That acceptance sheet also documents two bugs it caught — a port-index overflow that crashes, and a wrong clock source that loads fine but never plays |
+> | `quadeca_life1_wdtg.vcv` | confirmed audible by ear |
+> | `mini_arranger_expanded.vcv` | the MiniArranger package with its expander, accepted |
+> | `mini_arranger_8voice*.vcv` | generated, **awaiting hardware acceptance** (`docs/8VOICE-PATCH-ACCEPTANCE.md`) |
+> | All 52 patches | parse cleanly under static audit |
 
 ### "Make the synth brighter"
 
