@@ -53,6 +53,23 @@ Cardinal 是 VCV Rack 的硬分叉（DISTRHO 出品），本身是为了拿来�
 - 想把"手点鼠标搭的合成器机架"变成可以 `git diff` 的纯文本的人。
 - 想要在没有 GUI 的环境（远程、CI）里预生成、预校验机架的人。
 
+### 拿到自己机器上用
+
+这些工具本来就是打算让人拿去用的，所以先说清楚几件事：
+
+- **没有写死任何个人路径。** `tools/cardinal_mcp.py` 从自身文件位置推导仓库根，
+  `CARDINAL_IP` / `CARDINAL_PORT` / `CARDINAL_PATCH_DIR` 全是环境变量且有可用默认值。
+  **clone 到哪都能跑。**
+- **`mcp.example.json` 是模板**，把里面的 `<REPO>` 换成你的 clone 路径即可。
+- **用采样的机架按"相对仓库根"解析采样路径。** 移动仓库位置后 `samples/` 仍然有效；
+  但如果你**删掉 `samples/` 目录**，那几个用采样器的机架（`demo_S4`、`demo_S5`、
+  `quadeca_scrapyard*`）会加载成功但**不出声**，其余部分不受影响。
+  想把采样换成自己的素材时，用 `tools/relocate_samples.py` 批量重写路径。
+- **硬性前提只有 Python 3.13 + 一个 Cardinal standalone 版本**，pip 依赖两个，都在
+  `requirements.txt` 里。
+- **只在 Windows 上完整测过。** `winmidi.py` / `winprobe.py` 用 Win32 API，截图工具假定
+  Windows 桌面。机架生成那套工具本身跨平台，但 **MIDI 输入只在 Windows 上验证过**。
+
 ---
 
 ## 30 秒上手

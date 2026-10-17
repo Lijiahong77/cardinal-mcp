@@ -1,15 +1,16 @@
 {
-  "_comment_top": "MCP 客户端配置示例。复制到你的 MCP 客户端的 mcp.json / claude_desktop_config.json / 等。修改 command / args / env 即可。",
+  "_comment_top": "MCP 客户端配置示例。复制后修改 command / args / env 里的路径为你自己的位置。",
   "_comment_env": "所有环境变量都有合理默认值，不设 env 也能跑（patch 目录会落到 ./patches）。强烈建议显式设 CARDINAL_PATCH_DIR 指你的机架目录。",
+  "_comment_paths": "把 <REPO> 替换为你 clone 到的目录，例如 D:/Cardinal 或 ~/Cardinal。注意用正斜杠 /，在 Windows 上也能工作。",
 
   "mcpServers": {
     "cardinal": {
       "command": "python",
       "args": [
-        "D:/Cardinal/tools/cardinal_mcp.py"
+        "<REPO>/tools/cardinal_mcp.py"
       ],
       "env": {
-        "CARDINAL_PATCH_DIR": "D:/Cardinal/patches",
+        "CARDINAL_PATCH_DIR": "<REPO>/patches",
         "CARDINAL_IP": "127.0.0.1",
         "CARDINAL_PORT": "2228",
         "CARDINAL_TIMEOUT": "1.5"

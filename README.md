@@ -60,6 +60,25 @@ no structured output, module positions are all drag-and-drop in the GUI.
 - Anyone who wants to turn a "mouse-built synth rack" into plain text they can `git diff`.
 - Anyone who wants to pre-generate and pre-validate racks in a headless / CI environment.
 
+### Using this on your own machine
+
+The tools are meant to be reused, so a few things worth knowing up front:
+
+- **No personal paths are baked in.** `tools/cardinal_mcp.py` locates the repository from its
+  own file location, and `CARDINAL_IP` / `CARDINAL_PORT` / `CARDINAL_PATCH_DIR` are all
+  environment variables with working defaults. Clone it anywhere.
+- **`mcp.example.json` is a template.** Replace `<REPO>` with your clone path.
+- **Patches that use samples resolve them relative to the repository root.** If you move the
+  repository, the bundled `samples/` still works. If you *delete* the `samples/` directory,
+  the sampler-based patches (`demo_S4`, `demo_S5`, `quadeca_scrapyard*`) will load but be
+  silent — nothing else breaks. `tools/relocate_samples.py` exists if you ever need to
+  rewrite those paths for your own sample library.
+- **Python 3.13 and a Cardinal standalone build are the only real prerequisites.** Two pip
+  packages, both in `requirements.txt`.
+- **Windows is the tested platform.** `winmidi.py` / `winprobe.py` use Win32 APIs and the
+  screenshot tools assume a Windows desktop. The patch-authoring tools themselves are
+  cross-platform, but MIDI input has only been exercised on Windows.
+
 ---
 
 ## 30-second start

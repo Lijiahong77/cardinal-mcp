@@ -7164,10 +7164,10 @@
         }
       ],
       "data": {
-        "loaded_sample_path_1": "D:\\Cardinal\\samples\\melody2\\m_D4.wav",
-        "loaded_sample_path_2": "D:\\Cardinal\\samples\\melody2\\m_A67m.wav",
-        "loaded_sample_path_3": "D:\\Cardinal\\samples\\melody2\\m_F4.wav",
-        "loaded_sample_path_4": "D:\\Cardinal\\samples\\melody2\\m_G4.wav",
+        "loaded_sample_path_1": "samples/melody2/m_D4.wav",
+        "loaded_sample_path_2": "samples/melody2/m_A67m.wav",
+        "loaded_sample_path_3": "samples/melody2/m_F4.wav",
+        "loaded_sample_path_4": "samples/melody2/m_G4.wav",
         "loaded_sample_path_5": "",
         "loaded_sample_path_6": "",
         "loaded_sample_path_7": "",
