@@ -12,6 +12,12 @@ refs/*.tpl.vcv
 # 从上游抓的 C++ 源码缓存（GPL-3.0；paramlib.py 会自动重新下载）
 tools/_srccache/
 
+# 第三方作品/资料：不随附，只在 docs/ATTRIBUTION.md 标注来源
+refs/biset-doc/
+refs/starsea-pkg/
+refs/_skill_backups/
+tools/_bisect_archived/
+
 # MidiSuite（键盘厂商软件）界面截图
 refs/smk25_config/
 
@@ -35,12 +41,29 @@ patches/helm_full_3row_*.vcv
 patches/helm_full_before_2row_*.vcv
 patches/helm_before_full.vcv
 patches/helm_keys_live_backup.vcv
+# 自动生成的 .bak-* 快照（机架与文档通用）
+*.bak-*
+
+# ---------- 构建产物与本机日志：体积上 GB 级，绝不外传 ----------
+# win64/ 是 WSL2 交叉编译出来的 Cardinal 可执行文件 + resources
+# （含 5 个历史 CardinalNative.exe 备份，约 884 MB）
+win64/
+# tmp/ 是构建日志、上游 resources.tar.gz、窗口截图等本机痕迹（约 88 MB）
+tmp/
+# 20260915 清理前的全量快照
+_backup_cleanup_*/
 
 # ---------- 一次性临时探针 / 列表脚本（不在工作流里重用） ----------
 .tmp_*.py
 # _publish_prep.py 是把"本机专属"信息脱敏进 docs/ 用的一次性脚本
 # 自己内部就带着待替换的本机标识，留着等于把「要藏的东西」写在仓库里
 tools/_publish_prep.py
+# tools/_* 是排查崩溃时的一次性探针（46 个），不进主干工作流；
+# 结论已经写进 docs/ 与记忆，脚本本身只留本机
+tools/_*
+# 探针脚本的输出日志
+tools/*.log
+tools/--help
 
 # ---------- 本地配置 ----------
 mcp.local.json
