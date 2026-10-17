@@ -128,8 +128,8 @@ Get-NetUDPEndpoint -LocalPort 2228 -ErrorAction SilentlyContinue
 | `cardinal_load_patch` | 把某个 .vcv 推给 Cardinal（含 zoom + gridOffset） | 让 AI 切音色 |
 | `cardinal_set_param` | 拧任意模块的旋钮：`moduleId + paramId + value` | 改 cutoff / release / 等 |
 | `cardinal_set_host_param` | 改 Cardinal 内置的 24 个宿主参数 | 调音频接口/采样率等 |
-| `cardinal_read_live` | 读 Cardinal 正在运行的机架（走实时自动存档读回） | 想看用户在 GUI 里改了啥 |
-| `cardinal_save_live` | 把当前 GUI 状态落盘成 .vcv | 用户手动改完不存档就丢 |
+| `cardinal_read_live` | 读 Cardinal 正在运行的机架（走实时自动存档读回；返回里带 `stale` 新鲜度标记） | 想看用户在 GUI 里改了啥 |
+| `cardinal_save_live` | 把当前 GUI 状态落盘成 .vcv（同样带 `stale` 标记） | 用户手动改完不存档就丢 |
 | `cardinal_module_params` | 列某模块的参数清单（名 → 编号） | 找参数编号 |
 | `cardinal_find_param` | 把口语翻成参数编号（"亮一点"→Cutoff） | 让 AI 用自然语说话 |
 | `cardinal_music` | 节奏型 / 和弦进行 / 音色配方查询 | 让 AI 用知识库回答 |
@@ -253,7 +253,8 @@ AI: → cardinal_patch_info 找 SnareDrumN
 | 不支持 | 原因 |
 |---|---|
 | 实时 MIDI/CV 注入 | Cardinal OSC 只有 `/load /param /host-param /hello` 四条消息，没有 MIDI 注入 |
-| 参数变化自动回读 | 实时自动存档只在结构性事件后写盘（详见 DESIGN-NOTES 约束 16）。参数改变了看不见，只能人眼看 GUI |
+| 参数变化自动回读 | 实时自动存档只在 `/load` 或 GUI 显式保存时写盘 —— **`/param` 改参数不写，也没有定时器**（26.02 实测）。改完参数要验证只能看 GUI。详见 `docs/DESIGN-NOTES.md` 坑 8 |
+| 直接信任 `read_live` 的结果 | 如果留下过多次会话的存档，最新那个文件可能属于**上一次**会话。`read_live` / `save_live` 现在会返回 `stale` / `age_seconds` / `note`，用之前先看这三个字段。详见 坑 8b |
 | 无人值守（headless）运行 | Cardinal standalone 没有 headless 版本（VCV Rack Pro 才有，Cardinal 不带）|
 | Linux/macOS 测试 | 本仓库只在 Windows 上跑通过；Python 工具都是跨平台的，但 `winmidi.py` / `winprobe.py` 用 Win32 API |
 | LMMS / DAW 录音闭环 | 那是另一个项目（Cardinal.vst 装到 DAW 里），本仓库只到 standalone + OSC |

@@ -189,20 +189,28 @@ python shot.py <输出.png> [缩放宽]
 
 ---
 
-### 2.6 一次性侦察脚本（8 个，`_` 前缀，非正式工具）
+### 2.6 一次性侦察脚本（`_` 前缀，非正式工具）
+
+> ⚠️ **2026-09-15 变更**：下列 7 个已完成使命的侦察脚本按李的指示**移出仓库**，
+> 归档在 `D:\Cardinal\_backup_cleanup_20260915\tools\`（需要时拷回即可）。
+> 本节保留清单作为"研究过程化石"的索引。
 
 | 文件 | 行数 | 用途 |
 |---|---|---|
 | `_drums_probe.py` | 84 | 拉取 WSTD-Drums 全部鼓模块源码，解析声部数/触发口/音频出口/参数编号 |
 | `_fetch_examples.py` | 54 | 下载 Cardinal 官方示例机架并列出各自用到的模块 |
 | `_tpl_probe.py` | 37 | 探查官方模板的模块与接线结构 |
-| `_mcp_test.py` | 66 | 给 `cardinal_mcp.py` 做冒烟测试（模拟 MCP 客户端走握手） |
-| `_verify.py` | 52 | 端到端验证 MCP ↔ Cardinal 链路 |
 | `_abtest.py` | 70 | 分离测试分析：对比「未按 KNOB-B」与「按过 KNOB-B」两种状态的差异 |
 | `_timeline.py` | 99 | 按时间线拆解 MIDI 采集数据 |
 | `_timeline2.py` | 75 | 按 2 秒分桶拆解，区分"哪一段操作产生了什么消息" |
+| `_publish_prep.py` | — | 把要外发的中文文档搬进 docs/ 并脱敏本机信息 |
 
-这些是**研究过程的化石**，刻意保留——下次遇到同类问题可以直接改。
+**仍在库内的 2 个**（改完 MCP 服务后可做回归验证，故保留）：
+
+| 文件 | 行数 | 用途 |
+|---|---|---|
+| `_mcp_test.py` | 66 | 给 `cardinal_mcp.py` 做冒烟测试（模拟 MCP 客户端走握手） |
+| `_verify.py` | 52 | 端到端验证 MCP ↔ Cardinal 链路 |
 
 ---
 
@@ -239,7 +247,7 @@ python shot.py <输出.png> [缩放宽]
 
 覆盖的模块：`HostAudio2` `HostMIDI` `TextEditor` `ADSR` `Mixer` `Sum` `VCA-1` `VCF` `VCO` `Clocked` `MixMasterJr` `Plateau` `BassDrum9` `CR78` `ClosedHiHat`。
 
-### 4.3 `patches/` — 20 个机架文件
+### 4.3 `patches/` — 12 个机架文件（2026-09-15 清理后）
 
 **在用的：**
 
@@ -252,7 +260,10 @@ python shot.py <输出.png> [缩放宽]
 | `helm_drums.vcv` | 鼓机架：Clocked 自走时钟(BPM100) → BassDrum9/ClosedHiHat/CR78 → Mixer |
 | `helm_keys_warm_pad.vcv` | warm_pad 音色预设，供试听对比 |
 
-**备份（保险，别删）：** `helm_before_full.vcv`、`helm_keys_live_backup.vcv`、以及 `helm_full_before_*` / `helm_full_3row_*` 系列共 12 个（对应每次重排/修复前的时间点）。
+**备份（保险）：** `helm_before_full.vcv`（SMK25 全接入之前的基线）、以及最近 3 个 `helm_full_before_*`（09-13 的 reverb / shortverb / velres 三个时间点）。
+
+> ⚠️ **2026-09-15 变更**：原 12 个 `helm_full_before_*` 里的 9 个（09-12 旧回退点）、`helm_full_3row_*` 两个废弃三行方案、以及 `helm_keys_live_backup.vcv`，已按李的指示移出，
+> 归档在 `D:\Cardinal\_backup_cleanup_20260915\patches\`。
 
 ### 4.4 `refs/` — 参考与证据
 
@@ -317,11 +328,34 @@ python shot.py <输出.png> [缩放宽]
 **真相**：**这台机器的 Git Bash 里 `head` 命令不存在**，我用 `| head -20` 截输出把结果全吞了。
 **规矩**：**别用管道截断来判断"有没有结果"。** 一律用 python 过滤。
 
-### 坑 8：用错了读回手段
+### 坑 8：自动存档不是参数监视器（2026-09-13 实测补全）
 
-**错**：想用 `watch_knobs.py` 轮询存档来验证旋钮映射是否生效。
-**真相**：**自动存档的写入速率太低，它不是参数监视器。** 能读到"结构"，读不到"实时值"。
-**规矩**：**先确认一个通道的能力边界，再决定用它做什么。**
+**错**：以为 `%TEMP%\Cardinal.NNNN\patch.json` 是"实时镜像"，想用它读回刚改的旋钮。
+**实测（Cardinal 26.02，2026-09-13）**：
+
+| 触发动作 | 存档刷新？ |
+|---|---|
+| OSC `/load` 推机架 | ✅ 刷新 |
+| OSC `/param` 改旋钮 | ❌ **不刷新** |
+| 空闲 20 秒 | ❌ 不刷新（**根本没有定时器**） |
+| GUI 里 Ctrl+S | ✅ 刷新 |
+
+**规矩**：**改完参数要验证，别读存档 —— 用截图。** 存档能读"结构"，读不到"实时值"。
+**已验证的验证手法**：同一小块屏幕 1:1 抓两次做逐像素差 —— 静止时哈希**完全稳定**（连抓 3 次同值），
+改参数后只有旋钮周边 **181 个像素**变（出现在 25×21px 的小方块里）。
+对比图见 `refs/_knob_compare.png`（左 0.0 / 右 1.0，白针明显转过）。
+
+### 坑 8b：多实例存档槽会认错（2026-09-13 实测）
+
+**现象**：`read_live` 报 20 个模块，但屏幕上明明是 7 个模块的默认 patch。
+**真相**：`%TEMP%` 下并存 `Cardinal.0001`（上一次会话遗留）和 `Cardinal.0002`（今天这个实例）。
+今天的实例**启动后还没写过存档**，`0002` 的时间戳还停在 Cardinal 安装包的出厂日期（2026-03-01），
+于是"取 mtime 最新"选中了昨天的 `0001`。
+**规矩**：**读回来的东西必须带"新鲜度"判断，不能默认它等于屏幕。**
+**已修**：`read_live` / `save_live` 现在返回 `stale` / `age_seconds` / `note` 三个字段；
+判据是 **Cardinal 进程启动时间**（`cardinal_proc_start()`，纯 ctypes 调 `GetProcessTimes`）——
+存档时间早于进程启动时间，就一定是上一个会话的遗留。
+**可用的推论**：`/load` 会强制刷新存档，所以"推完机架立刻读"是可信的；但别拿它读 `/param`。
 
 ### 坑 9：Add-Type 被安全策略挡了
 
@@ -389,14 +423,9 @@ python shot.py <输出.png> [缩放宽]
 [排版]   layout_patch.py   708   排班 + guard 门禁 + apply 重排
          state.py           91   文件 vs 内存 差异诊断
          watch_knobs.py     80   早期轮询工具（已确认无效，留档）
-[侦察]   _drums_probe.py    84   \
-         _fetch_examples.py 54   |
-         _tpl_probe.py      37   |  8 个一次性研究脚本
-         _mcp_test.py       66   |  刻意保留作化石
-         _verify.py         52   |
-         _abtest.py         70   |
-         _timeline.py       99   |
-         _timeline2.py      75   /
+[侦察]   _mcp_test.py       66   \  冒烟测试（保留）
+         _verify.py         52   /  端到端验证（保留）
+         ── 另 7 个侦察脚本 2026-09-15 移出 → _backup_cleanup_20260915\tools\
 ```
 
 ### 数据

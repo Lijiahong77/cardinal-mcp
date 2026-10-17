@@ -201,6 +201,7 @@ You:  Raise the filter brightness of the current patch a bit
 AI:   → cardinal_patch_info  (get the VCF moduleId)
      → cardinal_find_param (plain language → "Cutoff")
      → cardinal_set_param (Cutoff value = 0.75)
+     → screenshot the knob (tools/shot.py) to confirm it actually moved
      → tells you in plain words: cutoff 0.5 → 0.75, sounds brighter
 ```
 
@@ -270,7 +271,8 @@ AI:   → cardinal_patch_info to find SnareDrumN
 | Not supported | Why |
 |---|---|
 | Live MIDI/CV injection | Cardinal OSC only has 4 messages: `/load /param /host-param /hello`; no MIDI injection |
-| Auto read-back of param changes | The live autosave is only written after structural events (see DESIGN-NOTES constraint 16); param changes are invisible until you look at the GUI |
+| Auto read-back of param changes | The live autosave is only flushed on `/load` or an explicit GUI save — **not** on `/param` changes and **not** on a timer (measured on 26.02). After a `set_param`, verify by looking at the GUI, not by re-reading. See `docs/DESIGN-NOTES.md` 坑 8. |
+| Trusting `read_live` blindly | If several Cardinal sessions leave autosaves behind, the newest file may belong to a *previous* session. `read_live` / `save_live` now return `stale` / `age_seconds` / `note`; check them. See 坑 8b. |
 | Unattended (headless) runs | Cardinal standalone has no headless build (VCV Rack Pro does; Cardinal doesn't) |
 | Linux/macOS testing | Only verified on Windows; the Python tools are cross-platform, but `winmidi.py` / `winprobe.py` use the Win32 API |
 | LMMS / DAW recording loop | That's a separate project (Cardinal.vst into a DAW); this repo stops at standalone + OSC |
