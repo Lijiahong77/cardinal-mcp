@@ -1,8 +1,35 @@
 # -*- coding: utf-8 -*-
 """临时诊断：机架文件 vs Cardinal 实时存档 vs OSC 状态。"""
-import sys, os, glob, time, socket
+import sys, os, glob, time, socket, struct
 sys.path.insert(0, r'D:\Cardinal\tools')
 import patchio
+
+
+def osc_packet(addr, *args):
+    """Minimal OSC 1.0 encoder (no external deps) - enough for /hello.
+
+    Why this exists: sending a bare b'/hello' does NOT work. An OSC packet is
+    <address> + <type-tag-string> + <arguments>, each padded to 4 bytes; the
+    type tag string is mandatory (even when empty it is just ","). Cardinal's
+    OSC parser silently ignores a packet without it, which made this probe
+    report "no reply" while the server was in fact alive. Verified 2026-09-13:
+    bare '/hello' -> timeout; proper packet -> ['features', ''].
+    """
+    def pad(b):
+        return b + b'\x00' * (-len(b) % 4)
+
+    tags = ','
+    for a in args:
+        tags += 'i' if isinstance(a, int) else ('f' if isinstance(a, float) else 's')
+    out = pad(addr.encode('ascii') + b'\x00') + pad(tags.encode('ascii') + b'\x00')
+    for a in args:
+        if isinstance(a, int):
+            out += struct.pack('>i', a)
+        elif isinstance(a, float):
+            out += struct.pack('>f', a)
+        else:
+            out += pad(str(a).encode('utf-8') + b'\x00')
+    return out
 
 TEMP = os.environ.get('TEMP', '')
 F = r'D:\Cardinal\patches\helm_full.vcv'
@@ -65,7 +92,7 @@ for port in (2228, 7000, 7001):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(0.6)
     try:
-        s.sendto(b'/hello', ('127.0.0.1', port))
+        s.sendto(osc_packet('/hello'), ('127.0.0.1', port))
         dta, _ = s.recvfrom(2048)
         print('   端口 %d 有回应: %r' % (port, dta[:60]))
     except Exception as e:

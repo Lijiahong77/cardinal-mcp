@@ -21,6 +21,13 @@ MANIFEST_DIR = r"C:\Program Files\Cardinal-win64-26.02\Cardinal.lv2\resources\Pl
 # patch 里可能出现的 plugin 别名 -> 清单里的 slug
 ALIAS = {"DrumKit": "WSTD-Drums", "WSTD-Drums": "WSTD-Drums"}
 
+# 自建包（Starsea）没有 PluginManifests 清单，但模块真实存在于本机 exe
+# （李的 mini_arranger_expanded.vcv / mini_arranger_audition.vcv 一直在用）。
+KNOWN_EXTRA = {
+    ("Starsea", "Starsea-MiniArranger"),
+    ("Starsea", "Starsea-MiniArrangerExpander"),
+}
+
 
 def build_db():
     db = {}
@@ -39,6 +46,7 @@ def main(paths):
     print(f"模块字典: {len(db)} 个模块\n")
     bad = 0
     for path in paths:
+        file_bad = 0
         print(f"--- {os.path.basename(path)} ---")
         try:
             d = patchio.read_patch(path)
@@ -54,28 +62,29 @@ def main(paths):
         dup = {i for i in ids if ids.count(i) > 1}
         if dup:
             print(f"  [FAIL] 重复模块 id: {dup}")
-            bad += 1
+            file_bad += 1
 
         byid = {m["id"]: m for m in mods}
         for m in mods:
             plugin = ALIAS.get(m["plugin"], m["plugin"])
-            if (plugin, m["model"]) not in db:
+            if (plugin, m["model"]) not in db and (plugin, m["model"]) not in KNOWN_EXTRA:
                 print(f"  [FAIL] 未知模块: {m['plugin']}/{m['model']}")
-                bad += 1
+                file_bad += 1
 
         for c in d.get("cables", []):
             for key, kind in (("outputModuleId", "源"), ("inputModuleId", "目标")):
                 if c[key] not in byid:
                     print(f"  [FAIL] 线缆 {c.get('id')} 的{kind}模块 {c[key]} 不存在")
-                    bad += 1
+                    file_bad += 1
 
         cids = [c.get("id") for c in d.get("cables", [])]
         if len(set(cids)) != len(cids):
             print("  [FAIL] 线缆 id 重复")
-            bad += 1
+            file_bad += 1
 
+        bad += file_bad
         print(f"  模块 {len(mods)} 个, 线缆 {len(d.get('cables', []))} 根 -> "
-              f"{'OK' if bad == 0 else '有问题'}")
+              f"{'OK' if file_bad == 0 else '有问题'}")
     print(f"\n总计问题数: {bad}")
     return bad
 

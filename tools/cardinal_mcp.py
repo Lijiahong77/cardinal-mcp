@@ -283,9 +283,95 @@ def ping():
 
 
 # ================================================================ Live autosave
-# Cardinal continuously mirrors its running patch to %TEMP%\Cardinal.XXXX\patch.json.
-# THIS is how we "read" the live state — OSC can only WRITE parameters, never
-# read them. So read_live()/save_live() read this file instead of talking OSC.
+# Cardinal mirrors its running patch to %TEMP%\Cardinal.XXXX\patch.json, and THIS
+# is the only way to "read" live state — OSC can only WRITE, never read.
+#
+# IMPORTANT — the mirror is NOT continuous (measured 2026-09-13 on 26.02):
+#   * flushed on /load                 -> yes, verified
+#   * flushed on a /param change       -> NO. knob tweaks never reach the file.
+#   * flushed on a timer               -> NO. 20 s idle left mtime untouched.
+#   * flushed on explicit GUI save     -> yes (Ctrl+S rewrites it)
+# Consequences to keep in mind:
+#   1. Right after launching Cardinal the newest file on disk may belong to a
+#      PREVIOUS session, so treat the read as "last known state", not "current".
+#   2. Because /param writes are invisible here, verify a set_param() by
+#      looking at the GUI (screenshot), not by re-reading this file.
+# `stale` / `age_seconds` in the return value of read_live() flag case 1.
+
+# ---- Cardinal process introspection: lets us judge autosave freshness -------
+# We cannot ask Cardinal for the time, but we CAN ask Windows when the running
+# Cardinal.exe started. If the autosave predates that, it cannot describe the
+# current session. Pure ctypes so the repo stays dependency-free.
+
+def cardinal_proc_start():
+    """Epoch seconds at which Cardinal.exe started; None if unknown/not running."""
+    if not sys.platform.startswith("win"):
+        return None
+    try:
+        import ctypes
+        import ctypes.wintypes as wintypes
+
+        TH32CS_SNAPPROCESS = 0x00000002
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+        class PROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", ctypes.c_long),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", ctypes.c_char * 260),
+            ]
+
+        class FILETIME(ctypes.Structure):
+            _fields_ = [("dwLowDateTime", wintypes.DWORD),
+                        ("dwHighDateTime", wintypes.DWORD)]
+
+        k32 = ctypes.windll.kernel32
+
+        # 1. walk the process list looking for Cardinal.exe
+        snap = k32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snap in (0, -1):
+            return None
+        pid = None
+        try:
+            e = PROCESSENTRY32()
+            e.dwSize = ctypes.sizeof(PROCESSENTRY32)
+            ok = k32.Process32First(snap, ctypes.byref(e))
+            while ok:
+                if e.szExeFile.lower() == b"cardinal.exe":
+                    pid = e.th32ProcessID
+                    break
+                ok = k32.Process32Next(snap, ctypes.byref(e))
+        finally:
+            k32.CloseHandle(snap)
+        if pid is None:
+            return None
+
+        # 2. ask for that process' creation time
+        h = k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not h:
+            return None
+        try:
+            creation, exit_, kernel, user = FILETIME(), FILETIME(), FILETIME(), FILETIME()
+            ok = k32.GetProcessTimes(h, ctypes.byref(creation), ctypes.byref(exit_),
+                                     ctypes.byref(kernel), ctypes.byref(user))
+            if not ok:
+                return None
+        finally:
+            k32.CloseHandle(h)
+
+        # FILETIME = 100-ns ticks since 1601-01-01 UTC -> epoch seconds
+        ticks = (creation.dwHighDateTime << 32) | creation.dwLowDateTime
+        return ticks / 1e7 - 11644473600.0
+    except Exception:
+        return None
+
 
 def live_patch_path():
     """Find Cardinal's live autosave file; return (newest_path, temp_base).
@@ -293,6 +379,10 @@ def live_patch_path():
     Cardinal makes a folder like `Cardinal.0001` (or `Cardinal.0001/autosave`).
     We glob for `Cardinal*/patch.json` (and one nested variant) and pick the
     most recently modified. Returns (None, base) if nothing is found.
+
+    NOTE: "most recently modified" is a heuristic, and it can pick the wrong
+    slot — a fresh Cardinal that has not been written to yet leaves the newest
+    file belonging to the previous session. Callers should check staleness.
     """
     import glob
     base = os.environ.get("TEMP") or os.path.join(
@@ -312,6 +402,12 @@ def read_live():
 
     Cardinal rewrites this file on structural events; reading it mid-write can
     yield a half-written JSON, so we retry a few times with a short sleep.
+
+    The result carries `stale` / `age_seconds` / `note`. Read those before
+    trusting the payload: the autosave is only flushed on /load or a GUI save,
+    so (a) a freshly launched Cardinal may leave a stale file from a previous
+    session behind, and (b) parameter tweaks made through OSC are never
+    reflected here at all.
     """
     path, base = live_patch_path()
     if not path:
@@ -329,6 +425,27 @@ def read_live():
         return {"error": f"live autosave unreadable (Cardinal writing?): {last_err}",
                 "path": path}
 
+    # --- freshness check -------------------------------------------------
+    # The autosave is only flushed on structural events (see the section note
+    # above). If the file predates the running Cardinal process, it describes an
+    # earlier session and must not be presented as the current state.
+    mtime = os.path.getmtime(path)
+    started = cardinal_proc_start()
+    stale = bool(started and mtime + 1.0 < started)
+    if stale:
+        stale_note = ("autosave PREDATES the running Cardinal process (file %s vs "
+                      "process start %s) — treat this as LAST KNOWN state, not what "
+                      "is on screen. Cardinal only flushes the autosave on /load or "
+                      "a GUI save; /param tweaks never appear here. Verify params "
+                      "with a screenshot."
+                      % (time.strftime("%H:%M:%S", time.localtime(mtime)),
+                         time.strftime("%H:%M:%S", time.localtime(started))))
+    else:
+        stale_note = ("autosave is not older than the running process, so the "
+                      "module/cable structure should match the GUI. Caveat: /param "
+                      "tweaks are NOT written to the autosave — verify those with "
+                      "a screenshot.")
+
     import paramlib as pl
     mods = []
     for m in d.get("modules", []):
@@ -345,7 +462,10 @@ def read_live():
         entry["named_params"] = named
         mods.append(entry)
     return {"live": True, "file": path,
-            "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getmtime(path))),
+            "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime)),
+            "age_seconds": int(time.time() - mtime),
+            "stale": stale,
+            "note": stale_note,
             "modules": mods, "cables": len(d.get("cables", []))}
 
 
@@ -354,11 +474,20 @@ def save_live(name, overwrite=True):
 
     Anything the user tweaks in the GUI lives only in Cardinal's process memory
     until they save. If they close without saving, it's gone — call this to keep it.
+
+    CAUTION: this reads the autosave file, which is NOT refreshed on /param
+    changes. The saved .vcv therefore reflects the last structural event (a
+    /load or a GUI save), not necessarily the knob positions visible right now.
+    Use the GUI's own Save, or re-load the patch, if you need those captured.
+    Returns a `stale` flag so callers can tell.
     """
     path, base = live_patch_path()
     if not path:
         return {"error": "no Cardinal live autosave found; Cardinal may not be running.",
                 "searched_in": base}
+    mtime = os.path.getmtime(path)
+    started = cardinal_proc_start()
+    stale = bool(started and mtime + 1.0 < started)
     d = patchio.read_patch(path)
     # Keep only the fields that form a valid patch; drop runtime-only keys.
     keep = {k: d[k] for k in ("version", "zoom", "modules", "cables") if k in d}
@@ -371,7 +500,9 @@ def save_live(name, overwrite=True):
     os.makedirs(PATCH_DIR, exist_ok=True)
     patchio.write_patch(out, keep)
     return {"ok": True, "saved": out, "modules": len(keep.get("modules", [])),
-            "cables": len(keep.get("cables", [])), "bytes": os.path.getsize(out)}
+            "cables": len(keep.get("cables", [])), "bytes": os.path.getsize(out),
+            "source_mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime)),
+            "stale": stale}
 
 
 # ================================================================ Param queries
@@ -598,13 +729,17 @@ TOOLS = [
         "name": "cardinal_read_live",
         "description": "Read the patch Cardinal is currently running (including each module's "
                        "named params). OSC can only write, not read — this path uses Cardinal's "
-                       "live autosave file, so it sees the GUI without disturbing the user.",
+                       "live autosave file, so it sees the GUI without disturbing the user. "
+                       "The autosave is only flushed on /load or a GUI save, so check the "
+                       "returned `stale` flag; and note that /param tweaks never appear here "
+                       "(verify those with a screenshot).",
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "cardinal_save_live",
         "description": "Persist Cardinal's current state to a .vcv file. GUI tweaks only live in "
-                       "the process and vanish on close — use this to keep them.",
+                       "the process and vanish on close — use this to keep them. Reads the "
+                       "autosave file, so it returns a `stale` flag too.",
         "inputSchema": {
             "type": "object",
             "properties": {

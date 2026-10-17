@@ -144,6 +144,15 @@ WIDTH_BY_PLUGIN_MODEL = {
     "Cardinal/ExpanderMIDI": 3,
     "Cardinal/Blank": 9,
     "Cardinal/Carla": 9,
+    # ---- rcm-modules (piano roll) — measured 2026-09-21: panel px 600 / 15 ----
+    "rcm/rcm-pianoroll": 40,
+    # ---- ImpromptuModular — measured 2026-09-21: 101.6mm / 5.08 ----
+    "ImpromptuModular/Clocked": 20,
+    # ---- LittleUtils — measured 2026-09-21: ButtonModule.svg width 45px / 15 ----
+    "LittleUtils/Button": 3,
+    # ---- Starsea (own package) — 2026-09-21: MiniArranger.svg width 152.4mm / 5.08 ----
+    "Starsea/MiniArranger": 40,
+    "Starsea/MiniArrangerExpander": 24,
     # ---- Fundamental ----
     "Fundamental/VCO": 9,
     "Fundamental/WTVCO": 7,
@@ -177,6 +186,52 @@ WIDTH_BY_PLUGIN_MODEL = {
     "WSTD-Drums/Gnome": 9,
     "WSTD-Drums/MarionetteBass": 15,
     "WSTD-Drums/Sequencer": 32,
+    # ---- measured 2026-10-17 from Cardinal 26.02 panels (Quadeca patches) ----
+    # plugin slug is the manifest slug, NOT the install dir name
+    # (dir BogaudioModules -> slug Bogaudio; dir surgext -> slug SurgeXTRack).
+    "AudibleInstruments/Rings": 14,        # 71.12mm / 5.08
+    "AudibleInstruments/Elements": 34,
+    "AudibleInstruments/Clouds": 18,
+    "AudibleInstruments/Plaits": 12,      # plaits.svg measured 2026-10-17
+    "voxglitch/SamplerX8": 28,             # samplerx8_panel.svg 142.24mm
+    "voxglitch/GrainEngineMK2": 20,        # grain_engine_mk2_panel.svg 101.6mm
+    "voxglitch/Autobreak": 8,
+    # 🔴 KEY = norm_plugin(slug) + "/" + model, and norm_plugin maps a patch's
+    # plugin slug to its INSTALL DIRECTORY name. So the Bogaudio family (slug
+    # `Bogaudio`, dir `BogaudioModules`) must be keyed "BogaudioModules/...".
+    # Keying it "Bogaudio/..." silently falls through to DEFAULT_WIDTH=10 —
+    # that is exactly how Bogaudio-ADSR (really 3 HP) ended up overlapping its
+    # right-hand neighbour on 2026-10-17.
+    "BogaudioModules/Bogaudio-VCO": 10,    # vco.svg 2026-10-17
+    "BogaudioModules/Bogaudio-VCF": 10,    # vcf.svg 2026-10-17
+    "BogaudioModules/Bogaudio-ADSR": 3,    # adsr.svg 2026-10-17 (only 3 HP!)
+    "BogaudioModules/Bogaudio-LVCO": 3,
+    "BogaudioModules/Bogaudio-LVCF": 3,
+    "BogaudioModules/Bogaudio-SampleHold": 3,
+    "BogaudioModules/Bogaudio-Unison": 3,  # Unison.svg 45px
+    "BogaudioModules/Bogaudio-FMOp": 10,   # FMOp.svg
+    "BogaudioModules/Bogaudio-Shaper": 10,
+    "BogaudioModules/Bogaudio-ShaperPlus": 15,
+    "BogaudioModules/Bogaudio-DADSRH": 10,
+    "BogaudioModules/Bogaudio-DADSRHPlus": 15,
+    "BogaudioModules/Bogaudio-Matrix44": 10,
+    "BogaudioModules/Bogaudio-Matrix81": 6,
+    "Fundamental/Split": 5,                # split.svg 2026-10-17
+    # ---- code-drawn panels (no SVG) -> width inferred from coordinates in
+    #      patches that actually load. Feline has no SVG and no same-row neighbour
+    #      in any local patch, so it takes the Valley family value (Plateau=12).
+    #      Rule (see header #4): when unsure, OVERESTIMATE.
+    "HetrickCV/Waveshaper": 6,            # inferred: x=52 -> next x=58
+    # ⚠️ 查表用的是 norm_plugin(slug) = 安装目录名，所以 Valley 家族的 key 必须写
+    # `ValleyAudio/...`（不是 slug `Valley/...`），否则永远匹配不上、退化成 DEFAULT_WIDTH=10。
+    "ValleyAudio/Feline": 12,             # no SVG, no neighbour; Valley family value
+    "ValleyAudio/Terrorform": 12,
+    "ValleyAudio/Interzone": 32,
+    "ValleyAudio/Sequential": 12,
+    "MindMeldModular/ShapeMaster": 38,     # 193mm
+    # SurgeXTRack panels are code-drawn (no SVG) -> width inferred from
+    # Final Patch Work.vcv coordinates (Distortion x=171 -> next x=183).
+    "SurgeXTRack/SurgeXTFXDistortion": 12,
 }
 
 # When a panel file name differs from the model name (used by `widths` check).
@@ -221,7 +276,7 @@ DRUM_MODELS = {
 #   row 0 = synth + control map + output (x up to ~110 cells)
 #   row 1 = label + drums + mixer     (x up to ~122 cells)
 LAYOUT = [
-    # ---------------- row 0: synth chain + control + output ----------------
+    # ---------------- row 0: helm synth chain ----------------
     ("2",                  0, 9),    # HostMIDI      9 HP — keys on ch1 only
     ("3",                  0, 9),    # VCO           9
     ("4",                  0, 7),    # VCF           7
@@ -244,6 +299,48 @@ LAYOUT = [
     ("108",                1, 3),    # Mixer         3 (drum bus B)
     ("3130453735965577",   1, 36),   # MixMasterJr  36 (8-track mixer, measured 36 HP)
 ]
+
+# ================================================================
+# LAYOUT per patch (2026-10-17)
+# =================================================================
+# 🔴 THE iron rule, restated because it was violated twice:
+#   `pos[1]` (y) is a ROW NUMBER, not cells. Keep the rack to<= 2 rows
+#   (screen is ~88 cells tall; 3 rows already fill it and force dragging).
+#   Modules in a row MUST sit shoulder-to-shoulder: x += width + GAP(2).
+#   Never hand-write pos by "looks about right" — add the row here and run
+#   `apply`. `guard` fails the build if the file drifts from this table.
+#
+# ---------------- quadeca_life1_wdtg ----------------
+#   TWO rows. Row 0 alone was 309 cells ≈ 4635 px — nearly 2 screens wide, so it
+#   still forced horizontal dragging. Split by voice so each row fits the view:
+#     row 0 = 时钟 + 大提琴声部 + 混音/混响/输出  (≈ 158 cells ≈ 2370 px)
+#     row 1 = 电钢声部 + 吉他声部                    (≈ 152 cells ≈ 2280 px)
+#   Within a row, x always increases: `do_layout` computes x += width + GAP(2),
+#   so the list order below IS the left-to-right order. Never hand-write pos.
+WDTG_LAYOUT = [
+    # ---------------- row 0: clock + cello + master ----------------
+    ("9000000000000002",   0, 20),   # Clocked     20HP — RUN key lives here
+    ("9000000000000010",   0, 40),   # pianoroll  40HP — cello note layer
+    ("9000000000000013",   0, 34),   # Elements   34HP — bowed-string physical model
+    ("9000000000000003",   0, 36),   # MixMasterJr 36HP — 8-track mixer
+    ("9000000000000004",   0, 12),   # Feline      12HP — send reverb
+    ("9000000000000005",   0, 8),    # HostAudio2   8HP — main output
+    # ---------------- row 1: electric piano + flamenco guitar ----------------
+    ("9000000000000019",   1, 40),   # pianoroll  40HP — EP note layer
+    ("9000000000000022",   1, 10),   # Bogaudio-VCO 10HP
+    ("9000000000000024",   1, 10),   # Bogaudio-VCF 10HP
+    ("9000000000000027",   1, 3),    # Bogaudio-ADSR 3HP
+    ("9000000000000030",   1, 5),    # Split       5HP — mono -> L/R
+    ("9000000000000035",   1, 40),   # pianoroll  40HP — guitar note layer
+    ("9000000000000038",   1, 12),   # Plaits      12HP — PLUCK
+    ("9000000000000041",   1, 6),    # Waveshaper  6HP — light grit
+    ("9000000000000043",   1, 5),    # Split       5HP
+]
+
+# Which layout table applies to which patch (basename match).
+LAYOUT_FOR_PATCH = {
+    "quadeca_life1_wdtg.vcv": WDTG_LAYOUT,
+}
 
 # The label-panel text (written into TextEditor's data.etext). Width 26 cells ≈ 65
 # chars — keep it under that.
@@ -339,18 +436,31 @@ def resolved_pos(m):
 
 # ================================================================ Layout core
 
-def do_layout(d):
+def pick_layout(filename):
+    """Choose the layout table for a patch by its basename."""
+    base = os.path.basename(filename or "")
+    if base in LAYOUT_FOR_PATCH:
+        return LAYOUT_FOR_PATCH[base]
+    # Also accept a versioned sibling, e.g. foo__v1955.vcv -> foo.vcv
+    stem = base.split('__v')[0] + '.vcv'
+    if stem in LAYOUT_FOR_PATCH:
+        return LAYOUT_FOR_PATCH[stem]
+    return LAYOUT
+
+
+def do_layout(d, layout=None):
     """Compute the new coordinates.
 
     Returns (new_pos {id: [x, y]}, registered_id_set, unregistered_modules, log_lines).
     """
+    layout = layout if layout is not None else LAYOUT
     mods = d.get("modules", [])
     by = {sid(m["id"]): m for m in mods}
     widths = {mid: estimate_width(m) for mid, m in by.items()}
 
     declared = {}          # id -> (row, width)
     missing = []
-    for mid, row, w in LAYOUT:
+    for mid, row, w in layout:
         if mid not in by:
             missing.append(mid)
             continue
@@ -459,8 +569,10 @@ def report_input_dupes(d, by):
     return lines
 
 
-def analyze(d, strict=False):
+def analyze(d, strict=False, layout=None):
     """Unified layout + wiring health check. Returns (hard_errors, soft_warnings).
+
+    `layout` = the coordinate table in force for this patch (see `pick_layout`).
 
     Rationale for tiers: HARD = will definitely break (invisible / overlapping /
     dropped cable); SOFT = non-conforming but currently usable (row misalignment,
@@ -488,7 +600,7 @@ def analyze(d, strict=False):
         hard.append("input port double-connect: " + line.strip())
 
     # Unregistered modules.
-    declared = {mid for mid, _r, _w in LAYOUT}
+    declared = {mid for mid, _r, _w in (layout if layout is not None else LAYOUT)}
     unreg = [m for m in mods if sid(m["id"]) not in declared]
     if unreg:
         names = ["%s(%s)" % (m.get("model"), m["id"]) for m in unreg]
@@ -542,6 +654,41 @@ def scan_panel_svgs(resources=RESOURCES):
     return out
 
 
+def resolve_panel_width(panels, model):
+    """Find a model's panel width in a plugin's panel dict. Three-tier fallback.
+
+    Exact match first, then strip common decorations (`_panel`, `Panel`/`PanelDark`,
+    `-dark`/`-lowcontrast`, `Module`), then substring. Without the fallbacks the
+    `widths` self-check reported27 legit entries as "panel not found", i.e. a
+    self-check that checks nothing.
+    """
+    stem = model.lower()
+    if stem in panels:
+        return stem
+    stripped = re.sub(r"(module|panel|_panel|-panel|dark|light|lowcontrast|"
+                      r"latif|plastic|_white|_dark)$", "", stem)
+    stripped = stripped.strip("_-")
+    if stripped in panels:
+        return stripped
+    cands = [k for k in panels if stripped and stripped in k]
+    if len(cands) == 1:
+        return cands[0]
+    if cands:
+        # Prefer the shortest candidate: `ADSR.svg` over `ADSR-dark.svg`.
+        return min(cands, key=len)
+    # Last resort: drop a vendor prefix baked into the model name
+    # (`rcm-pianoroll` -> PianoRoll.svg, `Bogaudio-ADSR` -> ADSR.svg).
+    # Only accept a UNIQUE hit, otherwise we would silently guess.
+    if "-" in stripped:
+        tail = stripped.rsplit("-", 1)[1]
+        if tail in panels:
+            return tail
+        cands = [k for k in panels if tail and tail in k]
+        if len(cands) == 1:
+            return cands[0]
+    return None
+
+
 def cmd_widths():
     """Re-measure panel widths and verify the table values are still accurate."""
     tree = scan_panel_svgs()
@@ -557,11 +704,15 @@ def cmd_widths():
     bad, missing = 0, 0
     for key, want in sorted(WIDTH_BY_PLUGIN_MODEL.items()):
         plugin, model = key.split("/", 1)
-        stem = SVG_ALIAS.get((plugin, model), model.lower())
-        got = tree.get(plugin, {}).get(stem)
+        stem = SVG_ALIAS.get((plugin, model))
+        got = tree.get(plugin, {}).get(stem) if stem else None
         if got is None:
-            print("   %-34s table %5.1f   panel not found (panel name may be %s.svg; add to SVG_ALIAS)"
-                  % (key, want, stem))
+            stem = resolve_panel_width(tree.get(plugin, {}), model)
+            got = tree.get(plugin, {}).get(stem) if stem else None
+        if got is None:
+            print("   %-34s table %5.1f   panel not found (no SVG under %s/res; "
+                  "code-drawn panel, width came from real patch coordinates)"
+                  % (key, want, plugin))
             missing += 1
         elif abs(got - want) > 0.05:
             print("   %-34s table %5.1f   !! panel measured %.1f — table stale, update it"
@@ -601,9 +752,10 @@ def guard_file(path, strict=False):
     """GATE: layout + wiring double check. Returns 1 if any HARD error."""
     d = patchio.read_patch(path)
     mods = d.get("modules", [])
-    hard, soft = analyze(d, strict=strict)
+    lay = pick_layout(path)
+    hard, soft = analyze(d, strict=strict, layout=lay)
 
-    target, _declared, _unreg, log = do_layout(d)
+    target, _declared, _unreg, log = do_layout(d, lay)
     actual = {sid(m["id"]): resolved_pos(m) for m in mods}
     drift = [mid for mid in target
              if mid not in actual
@@ -651,7 +803,7 @@ def apply_file(path, push=False, strict=False, write_etext=True):
     shutil.copy2(path, bak)
     print("[backup]", os.path.basename(bak))
 
-    pos, _declared, unreg, log = do_layout(d)
+    pos, _declared, unreg, log = do_layout(d, pick_layout(path))
     print("layout computed:")
     for line in log:
         print(line)

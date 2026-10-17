@@ -113,7 +113,7 @@ def decode(status, d1, d2):
     return "UNKNOWN", ch, d1, d2, ""
 
 
-def listen(device_indices, seconds=8.0):
+def listen(device_indices, seconds=8.0, on_message=None):
     """监听若干输入端口，返回 [(相对秒, 设备idx, status, d1, d2), ...]。"""
     records = []
     handles, procs = [], []
@@ -123,8 +123,11 @@ def listen(device_indices, seconds=8.0):
         def _cb(hmi, msg, inst, p1, p2):
             if msg == MIM_DATA:
                 b = p1 & 0xFFFFFFFF
-                records.append((time.monotonic() - t0, idx,
-                                b & 0xFF, (b >> 8) & 0xFF, (b >> 16) & 0xFF))
+                rec = (time.monotonic() - t0, idx,
+                       b & 0xFF, (b >> 8) & 0xFF, (b >> 16) & 0xFF)
+                records.append(rec)
+                if on_message is not None:
+                    on_message(rec)
         return _MIDIINPROC(_cb)
 
     for idx in device_indices:
