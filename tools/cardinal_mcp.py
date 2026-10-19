@@ -4,6 +4,10 @@
 This is the entry point of the `cardinal-mcp` project. It speaks MCP
 (JSON-RPC 2.0) over stdio, and behind that talks to Cardinal via OSC.
 
+Protocol level: handshake with version negotiation (server supports up to
+2025-06-18 — tool annotations + structured tool output; older clients are
+honored at their own version). capabilities advertises tools only.
+
 What it exposes (12 semantic tools)
 ------------------------------------
   cardinal_ping               check OSC connectivity to Cardinal
@@ -41,6 +45,8 @@ Run modes
 import io
 import json
 import os
+import re
+import shutil
 import socket
 import sys
 import time
@@ -53,6 +59,13 @@ REPO_ROOT = os.path.dirname(HERE)
 
 sys.path.insert(0, HERE)
 import patchio  # noqa: E402  (local helper, imported after sys.path fix)
+import modbrowser  # noqa: E402  (module library, reads Cardinal's PluginManifests)
+import topology  # noqa: E402  (rack wiring / role recognition)
+import seq  # noqa: E402  (sequencer notes = piano-roll equivalent)
+import abc_export  # noqa: E402  (sequencer notes -> .abc text score)
+import samplelib  # noqa: E402  (sampler slots = right-click 'Load sample' equivalent)
+import interaction_map  # noqa: E402  (human UI operation -> source code index)
+import paramlib as pl  # noqa: E402  (param name -> number dictionary)
 
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_message import OscMessage
@@ -261,6 +274,246 @@ def set_param(module_id, param_id, value):
             "value": float(value)}
 
 
+# ★ 2026-10-19 批次 A1：按名字设参数。
+def _find_module_instances(d, module):
+    """在 patch dict 里找某型号的全部模块实例（大小写不敏感；支持 plugin/model）。
+
+    返回 (instances, all_modules)。instances 每项是 patch 里的原 module dict。
+    机架里常有 2 个同型号（2 个 VCA-1 是常态），所以返回列表而不是单个，
+    由调用方用 instance 序号挑 —— 永远把「有几个、挑了哪个」报出来。
+    """
+    if "/" in module:
+        plug_want, model_want = module.split("/", 1)
+        want = plug_want.lower() + "/" + model_want.lower()
+    else:
+        want = module.lower()
+    hits = [m for m in d.get("modules", [])
+            if want in (m["plugin"] + "/" + m["model"]).lower()]
+    return hits, d.get("modules", [])
+
+
+def _resolve_param_id(entry, param):
+    """把「参数名或数字」翻成 param_id。返回 (param_id, info, note) 或 (None, None, err)。
+
+    - 数字       -> 直接当 id 用（调用方会再做 reserved 检查）
+    - 名字       -> 先精确匹配再子串匹配；多个同名槽返回第一个并在 note 里说明
+    - 匹配只认有名字的槽 —— reserved 槽 name=None，天然不会被名字命中
+    """
+    params = entry["params"]
+    if re.fullmatch(r"\d+", str(param).strip()):
+        pid = int(param)
+        info = params.get(str(pid))
+        if info is None:
+            return None, None, f"param {pid} 不在本字典里（共 {len(params)} 槽）"
+        return pid, info, None
+    want = str(param).strip().lower()
+    exact = [int(pid) for pid, v in params.items()
+             if (v.get("name") or "").lower() == want]
+    if exact:
+        note = None
+        if len(exact) > 1:
+            note = f"有 {len(exact)} 个同名参数槽，取最小的 id {min(exact)}；" \
+                   f"要选别的请用数字 param。全部同名 id: {sorted(except0) if False else sorted(exact)}"
+        return min(exact), params.get(str(min(exact))), note
+    part = [int(pid) for pid, v in params.items()
+            if want in (v.get("name") or "").lower()]
+    if not exact and not [pid for pid, v in params.items() if want in (v.get("name") or "").lower()]:
+        return None, None, f"找不到参数「{param}」"
+    pid = min(exact or partial)
+    info = params.get(str(pid))
+    note = (f"没有精确同名参数，按子串匹配命中" if not exact else None)
+    return pid, info, note
+
+
+def set_param_by_name(patch, module, param, value, instance=0, load_after=False):
+    """按「型号名 + 参数名」设参数，写 .vcv 文件（可选 /load 热加载）。
+
+    与 cardinal_set_param（按编号、走 OSC 实时）互补。关键防线：
+    🔴 **拒绝废弃槽**（kind=="reserved"，如 VCF 1 号、Clocked 14 号）——
+    这些槽是 enum 占位（2.0 版移除但保留编号），`/param` 设进去不报错
+    但永远没效果；写进文件比报错更隐蔽，所以在这里直接拦下。
+    机架里有多个同型号模块时，用 instance（0 起）挑第几个，返回里
+    永远带「共几个 / 挑了哪个 / 它的位置」。
+    """
+    import paramlib as pl
+    p = resolve(patch)
+    if not os.path.exists(p):
+        return {"error": f"patch not found: {p}"}
+    d = patchio.read_patch(p)
+
+    hits, all_mods = _find_module_instances(d, module)
+    if not hits:
+        return {"error": f"机架里没有「{module}」",
+                "available": sorted({m["model"] for m in all_mods})}
+    if not 0 <= int(instance) < len(hits):
+        return {"error": f"机架里有 {len(hits)} 个 {module}，instance={instance} 越界",
+                "instances": [{"instance": i, "module_id": m["id"],
+                               "pos": (m.get("pos") or [None, None])[0]}
+                              for i, m in enumerate(hits)]}
+    mod = hits[int(instance)]
+
+    entry = pl.lookup(mod["plugin"], mod["model"])
+    if not entry:
+        return {"error": f"{mod['plugin']}/{mod['model']} 不在参数字典里"}
+    pid, info, note = _resolve_param_id(entry, param)
+    if pid is None:
+        return {"error": note}
+
+    # 🔴 核心守门：reserved 槽拒绝写。设进去不报错但没效果，是静默失败。
+    if (info or {}).get("kind") == "reserved":
+        return {"error": f"param {pid} 是废弃占位槽（{info.get('enum')}），"
+                         f"写了也没有任何效果，已拒绝",
+                "module": f"{mod['plugin']}/{mod['model']}",
+                "hint": "用 cardinal_module_params 看有效参数表"}
+
+    lo, hi = (info or {}).get("min"), (info or {}).get("max")
+    warnings = []
+    if lo is not None and hi is not None and not (lo <= float(value) <= hi):
+        warnings.append(f"值 {value} 超出该参数范围 {lo}..{hi}，照写不裁剪")
+    if note:
+        warnings.append(note)
+
+    params = mod.setdefault("params", [])
+    for q in params:
+        if q.get("id") == pid:
+            q["value"] = float(value)
+            break
+    else:
+        params.append({"id": pid, "value": float(value)})
+
+    bak = p + ".bak-param"
+    shutil.copy2(p, bak)
+    patchio.write_patch(p, d)
+
+    out = {"ok": True, "patch": os.path.basename(p), "backup": bak,
+           "module": f"{mod['plugin']}/{mod['model']}",
+           "module_id": mod["id"], "param_id": pid,
+           "param_name": (info or {}).get("name"), "kind": (info or {}).get("kind"),
+           "value": float(value)}
+    if len(hits) > 1:
+        out["note_instances"] = f"机架里有 {len(hits)} 个 {mod['model']}，本次改的是 instance={instance}"
+    if warnings:
+        out["warnings"] = warnings
+    if load_after:
+        out["loaded"] = load_patch(p)
+    return out
+
+
+# ================================================================ Audit (A2)
+# ★ 2026-10-19 批次 A2：聚合 5 个审计脚本成一个工具。
+#   会崩：ports（接口越界）→ chain（音高/门接错+死胡同）
+#   会哑：values（量纲护栏）→ flow（信号流可达性）
+#   validate（结构）兜底。少跑一个就可能放过「加载即崩」或「永哑」机架。
+
+def _audit_validate(p):
+    """结构校验（validate.py 的无打印版）：JSON 可读、模块 id 不重复、
+    线缆两端存在、模块在 PluginManifests 里（Starsea 自建包同规则放行）。"""
+    known_extra = {("Starsea", "Starsea-MiniArranger"),
+                   ("Starsea", "Starsea-MiniArrangerExpander")}
+    problems = []
+    try:
+        d = patchio.read_patch(p)
+    except Exception as e:  # noqa: BLE001
+        return [f"读取失败: {e}"]
+    mods = d.get("modules", [])
+    ids = [m["id"] for m in mods]
+    dup = {i for i in ids if ids.count(i) > 1}
+    if dup:
+        problems.append(f"重复模块 id: {sorted(dup)}")
+
+    known = None
+    try:
+        lib = modbrowser.LIB.load()
+        if not lib.error:
+            known = {(m["plugin"], m["model"]) for m in lib.modules}
+    except Exception:  # noqa: BLE001
+        known = None
+    if known is not None:
+        for m in mods:
+            key = (m["plugin"], m["model"])
+            if key not in known and key not in known_extra:
+                problems.append(f"未知模块: {m['plugin']}/{m['model']}")
+    for c in d.get("cables", []):
+        for key in ("outputModuleId", "inputModuleId"):
+            if c.get(key) not in {m["id"] for m in mods}:
+                problems.append(f"线缆 {c.get('id')} 端点模块 {c.get(key)} 不存在")
+    cids = [c.get("id") for c in d.get("cables", [])]
+    if len(set(cids)) != len(cids):
+        problems.append("线缆 id 重复")
+    return problems
+
+
+def cardinal_audit(name, checks=None):
+    """Run the pre-load audits on one patch (aggregates the 5 offline scripts).
+
+    checks: subset of [ports, values, flow, chain, validate]; default = all five.
+    verdict: FAIL = hard failures — do NOT load into Cardinal (端口越界类加载即崩);
+             WARN = only soft warnings; PASS = clean.
+    ⚠️ Static audits can never prove a rack actually sounds — pair with
+    cardinal_scan_signal on the running rack for that.
+    """
+    p = resolve(name)
+    if not os.path.exists(p):
+        return {"error": f"patch not found: {p}"}
+    import audit_ports   # noqa: E402
+    import audit_values  # noqa: E402
+    import audit_flow    # noqa: E402
+    import audit_chain   # noqa: E402
+    import contextlib as _cctxlib
+    import io as _cio
+
+    checks = checks or ["ports", "values", "flow", "chain", "validate"]
+    out = {"patch": os.path.basename(p), "checks": {}}
+
+    if "ports" in checks:
+        try:
+            bad = audit_ports.audit(p, verbose=False)
+        except Exception as e:  # noqa: BLE001
+            bad = [f"audit_ports crashed: {e}"]
+        out["checks"]["ports"] = {"ok": not bad, "hard": len(bad),
+                                  "violations": sorted(set(bad))}
+
+    if "values" in checks:
+        try:
+            # audit_values 返回 (硬否决数, 告警数) —— 两个 int，不是列表
+            with _cctxlib.redirect_stdout(_cio.StringIO()):
+                hard, soft = audit_values.audit(p, verbose=False)
+            hard, soft = int(hard or 0), int(soft or 0)
+            out["checks"]["values"] = {"ok": hard == 0, "hard": hard,
+                                       "warnings": soft}
+        except Exception as e:  # noqa: BLE001
+            out["checks"]["values"] = {"ok": False, "error": f"audit_values crashed: {e}"}
+        except Exception as e:  # noqa: BLE001
+            out["checks"]["values"] = {"ok": False, "error": f"audit_values crashed: {e}"}
+
+    if "flow" in checks:
+        try:
+            with _cctxlib.redirect_stdout(_cio.StringIO()):
+                n_flow = audit_flow.audit(p)
+            out["checks"]["flow"] = {"ok": n_flow == 0, "hard": n_flow}
+        except Exception as e:  # noqa: BLE001
+            out["checks"]["flow"] = {"ok": False, "error": f"audit_flow crashed: {e}"}
+
+    if "chain" in checks:
+        try:
+            with _cctxlib.redirect_stdout(_cio.StringIO()):
+                n_chain = audit_chain.audit(p, os.path.basename(p))
+            out["checks"]["chain"] = {"ok": n_chain == 0, "hard": n_chain}
+        except Exception as e:  # noqa: BLE001
+            out["checks"]["chain"] = {"ok": False, "error": f"audit_chain crashed: {e}"}
+
+    if "validate" in checks:
+        problems = _audit_validate(p)
+        out["checks"]["validate"] = {"ok": not problems, "problems": problems}
+
+    # FAIL = 任一检查 ok=False；WARN = 全 ok 但有软告警
+    fail = any(not v.get("ok", True) for v in out["checks"].values())
+    soft_total = (out["checks"].get("values", {}).get("warnings", 0)
+                  + len(out["checks"].get("validate", {}).get("problems") or []))
+    out["verdict"] = "FAIL" if fail else ("WARN" if soft_total else "PASS")
+    return out
+
+
 def set_host_param(port, value):
     """Set one of Cardinal's 24 host parameters via OSC `/host-param` (port 0-23).
 
@@ -273,6 +526,177 @@ def set_host_param(port, value):
     return {"ok": True, "port": int(port), "value": float(value)}
 
 
+# ================================================================ Deploy + diff (A3)
+# ★ 2026-10-19 批次 A3：生成→加载→读回比对闭环。
+#   E8 死锁（李拍板降级）：/param 改动永不落盘、/param-get 探针未编译
+#   ⇒ 本闭环只验结构（模块集合 + 接线表），参数验证等批次 B 编译后补全。
+
+# ================================================================ Port semantics (A4)
+# 语义分类只认词根，不硬造。audit_chain.py 手工核实的口（Rings PITCH=6、
+# ADSR 门=4、鼓 IN16=触发…）是权威 —— 它们直接来自源码 enum，优先级最高。
+
+# 手工核实的语义（audit_chain.py 的表，来自源码逐个核对）
+_PORT_AUTHORITY = {
+    ("AudibleInstruments/Rings", "in", 6): "pitch",   # Rings PITCH_INPUT（0-5 是各种 MOD）
+    ("Fundamental/VCO", "in", 0): "pitch",
+    ("Fundamental/ADSR", "in", 4): "gate",
+    ("WSTD-Drums/BassDrum9", "in", 16): "gate",
+    ("WSTD-Drums/SnareDrumN", "in", 16): "gate",
+    ("WSTD-Drums/ClosedHiHat", "in", 16): "gate",
+    ("WSTD-Drums/OpenHiHat", "in", 16): "gate",
+    ("WSTD-Drums/SnareDrumN", "in", 16): "gate",
+    ("WSTD-Drums/Tomi", "in", 16): "gate",
+    ("WSTD-Drums/CR78", "in", 16): "gate",
+    ("WSTD-Drums/DMX", "in", 16): "gate",
+    ("ImpromptuModular/Clocked", "out", 0): "clock",
+    ("ImpromptuModular/Clocked", "out", 5): "run",
+}
+
+
+def _classify_port(direction, enum, name):
+    """端口语义分类：只认词根，不猜。认不出就标 cv/other，绝不硬标 audio。"""
+    text = ((enum or "") + " " + (name or "")).upper()
+    if "GATE" in text or "TRIG" in text:
+        return "gate/trig"
+    if "PITCH" in text or "V/OCT" in text or "VOCT" in text:
+        return "pitch"
+    if "CLOCK" in text or "CLK" in text:
+        return "clock"
+    if "SIGNAL" in text or "ENVELOPE" in text or "AUDIO" in text:
+        return "audio/env"
+    if direction == "out" and re.search(r"(LPF|HPF|FILTER|MAIN|LEFT|RIGHT)", text):
+        return "audio"          # VCF 的 LPF/HPF 输出口是音频
+    if re.search(r"\b(SIN|SAW|TRI|SQR|SINE|SAWTOOTH|SQUARE|TRIANGLE)\b", text):
+        return "audio"          # VCO 的波形是输出口
+    return "cv/other"
+
+
+def cardinal_port_semantics(module=None, patch=None, module_id=None):
+    """查一个模块的端口语义表：每个口是 pitch/gate/clock/audio/cv。
+
+    数据源（两层）：
+      1. paramlib 从源码解析的 configInput/configOutput label + enum 名
+         （Bogaudio 与 Fundamental 同名模块端口完全不同 —— 本表按真实插件区分）
+      2. 手工核实的权威覆盖（audit_chain 的 PITCH/GATE 表）
+    用在接线前：把线接到哪个口，靠这张表不靠猜。
+    """
+    entry = None
+    if patch and (module or patch):
+        if not os.path.exists(resolve(patch)):
+            return {"error": f"patch not found: {resolve(patch)}"}
+        d = patchio.read_patch(resolve(patch))
+        hits = [m for m in d.get("modules", [])
+                if not module or module.lower() in (m["plugin"] + "/" + m["model"]).lower()]
+        if not hits:
+            return {"error": f"patch has no module {module}"}
+        mod = hits[0]
+        plugin, model = mod["plugin"], mod["model"]
+        entry = pl.lookup(plugin, model)
+    elif module:
+        if "/" in module:
+            plugin, model = module.split("/", 1)
+        else:
+            plugin, model = None, module
+        entry = pl.lookup(plugin, model)
+    if not entry:
+        return {"error": f"{module} not in param dictionary",
+                "known": sorted(pl.load().keys())}
+    plugin, model = entry["plugin"], entry["model"]
+    ports = entry.get("ports") or {}
+
+    def rows(direction):
+        field = "inputs" if direction == "in" else "outputs"
+        out = []
+        for x in ports.get(field, []):
+            auth = _PORT_AUTHORITY.get((f"{plugin}/{model}", direction, x["id"]))
+            sem = auth or _classify_port(direction, x.get("enum"), x.get("name"))
+            out.append({"id": x["id"], "name": x.get("name"),
+                        "enum": x.get("enum"), "semantic": sem})
+        return out
+
+    ins, outs = rows("in"), rows("out")
+    if not ins and not outs:
+        note = ("本模块端口表为空（源码不在字典覆盖内，如 WSTD-Drums 的父类动态注册）"
+                "—— 用 audit_ports LIMITS / PORTS.md 手工表兜底")
+    else:
+        note = None
+    return {"module": f"{plugin}/{model}", "inputs": ins, "outputs": outs,
+            **({"note": note} if note else {})}
+
+
+def cardinal_diff(name):
+    """比对磁盘上的 .vcv 与运行中 Cardinal 的结构（模块 + 接线）。
+
+    只验结构不验参数（E8 降级）。stale=true 说明 autosave 是上一会话
+    的残留，结果不可当真 —— 绝不用空数据掩盖。
+    """
+    p = resolve(name)
+    if not os.path.exists(p):
+        return {"error": "patch not found: %s" % p}
+    live_path, _base = live_patch_path()
+    if not live_path:
+        return {"error": "no Cardinal live autosave found; Cardinal may not be running.",
+                "searched_in": _base}
+    d_file = patchio.read_patch(p)
+    d_live = patchio.read_patch(live_path)
+
+    mods_f = {(m["id"], m["plugin"], m["model"]) for m in d_file.get("modules", [])}
+    mods_l = {(m["id"], m["plugin"], m["model"]) for m in d_live.get("modules", [])}
+    cab_f = {(c.get("outputModuleId"), c.get("outputId"),
+              c.get("inputModuleId"), c.get("inputId"))
+             for c in d_file.get("cables", [])}
+    cab_l = {(c.get("outputModuleId"), c.get("outputId"),
+              c.get("inputModuleId"), c.get("inputId"))
+             for c in d_live.get("cables", [])}
+    miss_m = mods_f - mods_l      # 文件里有、引擎没加载 —— 静默丢弃类 bug
+    miss_c = cab_f - cab_l
+    extra_m = mods_l - mods_f
+    extra_c = cab_l - cab_f
+    started = cardinal_proc_start()
+    stale = bool(started and os.path.getmtime(live_path) + 1.0 < started)
+    note = ("autosave 比进程还旧 ⇒ 上一会话残留，结果不可当真" if stale else
+            "结构比对基于 live autosave；参数值不在比对范围（E8 降级）")
+    if started is None:
+        note += "；⚠️ 未检测到运行中的 Cardinal 进程 —— 比对对象可能是残留 autosave"
+    return {
+        "patch": os.path.basename(p),
+        "match": not (miss_m or extra_m or miss_c or extra_c),
+        "modules_file": len(mods_f), "modules_live": len(mods_l),
+        "cables_file": len(cab_f), "cables_live": len(cab_l),
+        "missing_modules": sorted("%s/%s(#%s)" % (pl, md, i) for i, pl, md in miss_m),
+        "extra_modules": sorted("%s/%s(#%s)" % (pl, md, i) for i, pl, md in extra_m),
+        "missing_cables": ["%s#%s -> %s#%s" % c for c in sorted(miss_c)],
+        "extra_cables": ["%s#%s -> %s#%s" % c for c in sorted(extra_c)],
+        "stale": stale,
+        "note": note}
+
+
+def cardinal_deploy(name, load_after=True):
+    """一键部署：备份 → 五项审计（FAIL 拒发）→ /load → 结构读回比对。
+
+    顺序即防线：崩类问题被审计拦在加载前；diff 证明「文件里的东西
+    引擎真的都装上了」。参数值不在比对范围（E8 降级，编译后补全）。
+    """
+    p = resolve(name)
+    if not os.path.exists(p):
+        return {"error": "patch not found: %s" % p}
+    bak = p + ".bak-deploy"
+    shutil.copy2(p, bak)
+    au = cardinal_audit(name)
+    if au.get("verdict") == "FAIL":
+        return {"ok": False, "deployed": False, "backup": bak,
+                "why": "audit FAIL —— 加载即崩类问题，先修再部署", "audit": au}
+    loaded = load_patch(p)
+    if not isinstance(loaded, dict) or not loaded.get("ok"):
+        return {"ok": False, "deployed": False, "backup": bak,
+                "why": "/load failed（Cardinal 开着吗？OSC 开了吗）",
+                "load_result": loaded}
+    time.sleep(1.0)          # 引擎装载 + autosave 落盘需要一点时间
+    diff = cardinal_diff(name)
+    return {"ok": True, "deployed": os.path.basename(p), "backup": bak,
+            "audit_verdict": au.get("verdict"), "diff": diff}
+
+
 def ping():
     """Send OSC `/hello` and expect a `/resp` back — pure connectivity probe."""
     res = link().ask("/hello")
@@ -280,6 +704,167 @@ def ping():
         return {"ok": False, "target": f"{CARDINAL_IP}:{CARDINAL_PORT}",
                 "note": "no /resp received. Confirm Cardinal OSC enabled + port matches."}
     return {"ok": True, "reply": [str(x) for x in res]}
+
+
+# ============================================================ OSC read probes
+# ★ 2026-10-19：Cardinal 原版 OSC **只能写不能读**（只有 /hello /param /
+#   /host-param /load，且都不回数据）。下面这组工具依赖**李本机编译的**
+#   打了补丁的 Cardinal（tools/osc_patch/），它新增了 5 个只读端点：
+#     /modules  /param-get  /ports  /signal  /light
+#   ⚠️ 若返回 {"error": "probe_not_supported"}，说明跑的是**未打补丁的 exe**。
+#   重编译：bash tools/cross_build_cardinal.sh（先关掉 Cardinal）
+
+PROBE_UNSUPPORTED = {
+    "error": "probe_not_supported",
+    "note": "This Cardinal build has no read probes. Rebuild with "
+            "tools/osc_patch/inject_osc_read.py applied, or run "
+            "tools/cross_build_cardinal.sh. Original Cardinal OSC can only write.",
+}
+
+
+def _ask(tag, address, args=()):
+    """Send one probe and parse the two-string `/resp` ("tag", "payload").
+
+    Returns None when the peer did not answer, which is how we detect an
+    unpatched build (its fallback handler silently drops unknown paths).
+    """
+    res = link().ask(address, args, timeout=1.5)
+    if res is None or len(res) < 2:
+        return None
+    if str(res[0]) != tag:
+        return None
+    return str(res[1])
+
+
+def live_modules():
+    """List every module currently instantiated in the RUNNING Cardinal.
+
+    This is the ground truth of what the engine really loaded — it catches the
+    class of bug where a .vcv file is fine on disk but the engine silently
+    dropped a module (e.g. wrong plugin slug).
+    """
+    payload = _ask("modules", "/modules")
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    mods = []
+    for item in payload.split(","):
+        if not item.strip():
+            continue
+        try:
+            mid, rest = item.split(":", 1)
+            plug, model = rest.split("|", 1)
+            mods.append({"module_id": int(mid), "plugin": plug, "model": model})
+        except ValueError:
+            continue
+    return {"ok": True, "count": len(mods), "modules": mods}
+
+
+def get_param(module_id, param_id):
+    """Read back one knob's DISPLAY value (the physical number, not the stored one).
+
+    Cardinal stores most knobs normalized (ADSR.Attack stores 0.275 but shows
+    275 ms; Bogaudio-VCO.Frequency stores 6.0 octaves but shows 220 Hz). The
+    patched build returns getDisplayValue(), i.e. the number a human can judge.
+    """
+    payload = _ask("param", "/param-get", [("h", int(module_id)), ("i", int(param_id))])
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    try:
+        val = float(payload)
+    except (TypeError, ValueError):
+        return {"ok": False, "module_id": module_id, "param_id": param_id,
+                "raw": payload, "note": "empty = module or param slot not found"}
+    return {"ok": True, "module_id": int(module_id), "param_id": int(param_id),
+            "display_value": val}
+
+
+def _parse_ports(payload):
+    """Parse the /ports payload into a list of port dicts.
+
+    Wire format per port: `<dir>:<index>:<channels>:<v0>:<v1>:<v2>:<v3>`
+    where dir is `in` or `out`.
+    """
+    out = []
+    for item in payload.split("|"):
+        if not item.strip():
+            continue
+        f = item.split(":")
+        if len(f) < 4:
+            continue
+        try:
+            volts = [float(x) for x in f[3:7]]
+        except ValueError:
+            volts = []
+        out.append({
+            "direction": f[0],
+            "index": int(f[1]),
+            "channels": int(f[2]),
+            "connected": int(f[2]) > 0,
+            "voltages": volts,
+            "peak": max((abs(v) for v in volts), default=0.0),
+        })
+    return out
+
+
+def module_ports(module_id):
+    """Read a module's live port state: is each port wired, and is there signal NOW?
+
+    This directly answers "does this patch actually make sound?" without any
+    offline rendering — it asks the engine what is on each port right now.
+    Three distinct states are separable:
+        channels == 0     -> port isn't wired at all (statically dead)
+        channels > 0, all voltages 0 -> wired but silent at this instant
+        any voltage != 0   -> signal present
+    """
+    payload = _ask("ports", "/ports", [("h", int(module_id))])
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    ports = _parse_ports(payload)
+    wired = [p for p in ports if p["connected"]]
+    live = [p for p in wired if p["peak"] > 1e-4]
+    return {
+        "ok": True,
+        "module_id": int(module_id),
+        "ports": ports,
+        "wired": len(wired),
+        "live": len(live),
+        "silent": len(wired) - len(live),
+    }
+
+
+def scan_signal(threshold=1e-4):
+    """Scan the whole rack and report which modules currently emit a non-zero voltage.
+
+    The direct answer to "is anything actually sounding right now". A module whose
+    every connected output sits at 0 V is producing no sound at this instant.
+    """
+    payload = _ask("signal", "/signal")
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    hits = {}
+    for item in payload.split(","):
+        if not item.strip():
+            continue
+        try:
+            mid, peak = item.split(":", 1)
+            hits[int(mid)] = float(peak)
+        except ValueError:
+            continue
+    return {"ok": True, "threshold": threshold,
+            "emitting": len(hits), "peaks": hits}
+
+
+def get_light(module_id, light_id):
+    """Read an LED's brightness — e.g. Clocked's RUN lamp tells you if it is running."""
+    payload = _ask("light", "/light", [("h", int(module_id)), ("i", int(light_id))])
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    try:
+        return {"ok": True, "module_id": int(module_id), "light_id": int(light_id),
+                "brightness": float(payload)}
+    except (TypeError, ValueError):
+        return {"ok": False, "module_id": module_id, "light_id": light_id,
+                "raw": payload}
 
 
 # ================================================================ Live autosave
@@ -647,13 +1232,13 @@ def music(what="styles", arg=None, key=None):
             "valid": ["styles", "drums", "chords", "recipes", "recipe", "suggest"]}
 
 
-def apply_recipe(patch, recipe_name, load_after=False):
+def apply_recipe(patch, recipe_name, load_after=False, weight=1.0):
     """Write a tone recipe into a patch; optionally load it into Cardinal after."""
     import musiclib as ml
     p = resolve(patch)
     if not os.path.exists(p):
         return {"error": f"patch not found: {p}"}
-    res = ml.apply_recipe(p, recipe_name)
+    res = ml.apply_recipe(p, recipe_name, weight=weight)
     if res.get("error"):
         return res
     if load_after and res.get("written"):
@@ -672,12 +1257,18 @@ TOOLS = [
         "name": "cardinal_ping",
         "description": "Test OSC connectivity to Cardinal standalone. "
                        "Cardinal must first manually enable Engine -> Enable OSC remote control.",
-        "inputSchema": {"type": "object", "properties": {}},
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_list_patches",
         "description": "List all .vcv patch files in the patch directory.",
-        "inputSchema": {"type": "object", "properties": {}},
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_patch_info",
@@ -687,16 +1278,24 @@ TOOLS = [
             "type": "object",
             "properties": {"name": {"type": "string", "description": "file name or full path"}},
             "required": ["name"],
+            "additionalProperties": False,
         },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_load_patch",
-        "description": "Load a .vcv patch into the running Cardinal (includes zoom + gridOffset).",
+        "description": "Load a .vcv patch into the running Cardinal (includes zoom + gridOffset). "
+                       "Replaces whatever rack is currently open — unsaved GUI edits are lost.",
         "inputSchema": {
             "type": "object",
             "properties": {"name": {"type": "string", "description": "file name or full path"}},
             "required": ["name"],
+            "additionalProperties": False,
         },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": False, "openWorldHint": False},
     },
     {
         "name": "cardinal_set_param",
@@ -705,12 +1304,42 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "module_id": {"type": "integer", "description": "module id"},
-                "param_id": {"type": "integer", "description": "param slot, 0-based"},
+                "module_id": {"type": "integer", "minimum": 0, "description": "module id"},
+                "param_id": {"type": "integer", "minimum": 0, "description": "param slot, 0-based"},
                 "value": {"type": "number", "description": "target value, usually 0.0 - 1.0"},
             },
             "required": ["module_id", "param_id", "value"],
+            "additionalProperties": False,
         },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_set_param_by_name",
+        "description": "Set one knob by PARAM NAME on a patch file (then optionally "
+                       "hot-reload). 'module' selects by model, 'instance' picks which one "
+                       "when the rack has several of the same model (always reported). "
+        "🔴 REFUSES reserved/removed slots (e.g. VCF param 1, Clocked param 14): "
+                       "writing them succeeds silently but does NOTHING — that silence is "
+                       "the trap this tool exists to close.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string", "description": "patch file name"},
+                "module": {"type": "string", "description": "model name, e.g. VCF (or plugin/model)"},
+                "param": {"type": "string", "description": "param name like 'Cutoff frequency', or a number"},
+                "value": {"type": "number"},
+                "instance": {"type": "integer", "minimum": 0,
+                             "description": "which of several same-model modules (0-based, default 0)"},
+                "load_after": {"type": "boolean", "default": False},
+            },
+            "required": ["patch", "module", "param", "value"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_set_host_param",
@@ -719,11 +1348,15 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "port": {"type": "integer", "description": "0-23"},
-                "value": {"type": "number", "description": "0.0 - 1.0"},
+                "port": {"type": "integer", "minimum": 0, "maximum": 23, "description": "0-23"},
+                "value": {"type": "number", "minimum": 0, "maximum": 1, "description": "0.0 - 1.0"},
             },
             "required": ["port", "value"],
+            "additionalProperties": False,
         },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_read_live",
@@ -733,7 +1366,10 @@ TOOLS = [
                        "The autosave is only flushed on /load or a GUI save, so check the "
                        "returned `stale` flag; and note that /param tweaks never appear here "
                        "(verify those with a screenshot).",
-        "inputSchema": {"type": "object", "properties": {}},
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_save_live",
@@ -747,7 +1383,11 @@ TOOLS = [
                 "overwrite": {"type": "boolean", "description": "default true"},
             },
             "required": ["name"],
+            "additionalProperties": False,
         },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": False, "openWorldHint": False},
     },
     {
         "name": "cardinal_module_params",
@@ -760,10 +1400,14 @@ TOOLS = [
             "properties": {
                 "patch": {"type": "string", "description": "patch file name (optional)"},
                 "module": {"type": "string", "description": "module name like VCF or Clocked"},
-                "module_id": {"type": "integer", "description": "or use module id directly"},
+                "module_id": {"type": "integer", "minimum": 0,
+                              "description": "or use module id directly"},
                 "keyword": {"type": "string", "description": "search by param name, e.g. cutoff"},
             },
+            "additionalProperties": False,
         },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_find_param",
@@ -776,7 +1420,10 @@ TOOLS = [
                 "human": {"type": "string", "description": "intent, e.g. 'brighter' / 'more reverb'"},
             },
             "required": ["module", "human"],
+            "additionalProperties": False,
         },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_music",
@@ -792,25 +1439,466 @@ TOOLS = [
                 "key": {"type": "string", "description": "key, e.g. 'D minor', 'F major'"},
             },
             "required": ["what"],
+            "additionalProperties": False,
         },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_apply_recipe",
         "description": "Write a tone recipe into a patch file (optionally load it into Cardinal "
                        "after). Recipe param names are translated to numbers; anything unfound is "
-                       "reported explicitly.",
+                       "reported explicitly. ALL same-model modules in the rack are updated "
+                       "(e.g. both VCA-1s), and a `weight` 0..1 blends between each knob's "
+                       "current value and the recipe target (0.5 = halfway; out-of-range "
+                       "values are clamped and the effective value reported). NOT idempotent: "
+                       "re-applying the same weight<1 recipe blends AGAIN from the new current "
+                       "values.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "patch": {"type": "string", "description": "patch file name"},
                 "recipe": {"type": "string", "description": "recipe name, e.g. warm_pad"},
+                "weight": {"type": "number", "minimum": 0, "maximum": 1,
+                           "description": "0..1 blend: 1 = fully recipe "
+                           "(default), 0.5 = halfway between current and recipe"},
                 "load_after": {"type": "boolean",
                                "description": "load immediately after writing (replaces current rack)"},
             },
             "required": ["patch", "recipe"],
+            "additionalProperties": False,
         },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
+    # ---------------- OSC read probes (need the patched Cardinal build) -------
+    {
+        "name": "cardinal_audit",
+        "description": "Run ALL five pre-load audits on a patch in one call: ports "
+                       "(socket index overrun = crash on load) / values (dimensions and numeric "
+                       "guardrails = silent or crash) / flow (signal-flow reachability = mute) / "
+                       "chain (pitch/gate wiring + dead-end modules) / validate (structure: "
+                       "duplicate ids, dangling cables, unknown modules). verdict FAIL = do not "
+                       "load into Cardinal; WARN = soft warnings only; PASS = clean. "
+        "⚠️ Static audits can never prove a rack actually sounds — pair with "
+                       "cardinal_scan_signal on the running rack.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "patch file name or full path"},
+                "checks": {"type": "array", "items": {"type": "string",
+                           "enum": ["ports", "values", "flow", "chain", "validate"]},
+                           "description": "default: all five"},
+            },
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_deploy",
+        "description": "One-click deploy: backup the .vcv, run all five audits (refuse to "
+                       "load on FAIL — crash-class problems are stopped BEFORE /load), push "
+                       "into the running Cardinal, wait, then read back and diff STRUCTURE "
+                       "(modules + cables). Parameter values are NOT compared (E8: /param "
+                       "writes never reach the autosave until the patched build exists).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "patch file name or full path"},
+                "load_after": {"type": "boolean", "default": True,
+                               "description": "load into running Cardinal after auditing"},
+            },
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_diff",
+        "description": "Compare the on-disk .vcv against what Cardinal is actually running "
+                       "(module set + every cable endpoint). missing_modules = present in the "
+                       "file but silently dropped by the engine. Structure only — parameter "
+                       "values are excluded by design (E8), and the result carries a `stale` "
+                       "flag because the autosave only flushes on /load or a GUI save.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"name": {"type": "string", "description": "patch file name or path"}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_port_semantics",
+        "description": "Look up a module's PORT semantics: which socket is pitch / gate / "
+                       "clock / audio / cv, per id. Data comes from the module's real source "
+                       "code (configInput/configOutput labels + InputIds/OutputIds enums) — "
+                       "Bogaudio and Fundamental modules with the SAME NAME have completely "
+                       "different sockets, and this table knows the difference. Use BEFORE "
+                       "wiring: route cables by this table, not by guessing.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "module": {"type": "string", "description": "module name, e.g. 'VCF' or 'Bogaudio/Bogaudio-VCF'"},
+                "patch": {"type": "string", "description": "optional: query as used inside this patch"},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_live_modules",
+        "description": "★ READ the RUNNING Cardinal: list every module the engine actually "
+                       "instantiated (module_id + plugin + model). This is ground truth — it "
+                       "catches modules that were silently dropped from the patch. "
+                       "Use this instead of guessing ids from the file. "
+                       "Returns error=probe_not_supported on an unpatched build.",
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_get_param",
+        "description": "★ READ one knob's current DISPLAY value from the running Cardinal "
+                       "(the physical number shown on the panel, e.g. 275 for 275 ms — not the "
+                       "normalized 0.275 stored in the file). Use it to VERIFY that a "
+                       "cardinal_set_param actually landed.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "module_id": {"type": "integer", "minimum": 0,
+                              "description": "from cardinal_live_modules"},
+                "param_id": {"type": "integer", "minimum": 0,
+                             "description": "from cardinal_module_params"},
+            },
+            "required": ["module_id", "param_id"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_module_ports",
+        "description": "★ READ a module's live port state: for every input/output port, whether "
+                       "it is wired (channels>0) and its current voltage. Separates three cases: "
+                       "not wired / wired but silent right now / signal present. "
+                       "This is how you answer 'does this patch actually make sound?' "
+                       "WITHOUT offline rendering.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"module_id": {"type": "integer", "minimum": 0,
+                                         "description": "from cardinal_live_modules"}},
+            "required": ["module_id"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_scan_signal",
+        "description": "★ Scan the WHOLE running rack and report which modules are emitting a "
+                       "non-zero voltage right now (module_id -> peak). A module absent from the "
+                       "result is producing no sound at this instant. "
+                       "This is the direct answer to 'is it actually sounding?' — call it twice "
+                       "a second apart to tell a steady tone from silence.",
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_get_light",
+        "description": "★ READ an LED's brightness in the running rack — e.g. Clocked's RUN lamp "
+                       "tells you whether the transport is actually running.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "module_id": {"type": "integer", "minimum": 0},
+                "light_id": {"type": "integer", "minimum": 0},
+            },
+            "required": ["module_id", "light_id"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_module_search",
+        "description": "Search the installed module library — the same data behind the human's "
+                       "right-click 'Add module' browser (1407 modules / 85 brands / 104 official tags "
+                       "read live from Cardinal's PluginManifests). Query in ENGLISH: matches "
+                       "name, slug, official tags, description. Use this BEFORE picking modules, "
+                       "never from memory. Every hit carries manualUrl so Li can judge; ports "
+                       "and params are NOT here (use cardinal_module_params for those).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "English keywords, e.g. 'warm pad'"},
+                "tags": {"type": "array", "items": {"type": "string"},
+                         "description": "Exact official tags, e.g. ['Oscillator']"},
+                "brand": {"type": "string", "description": "Brand filter, e.g. 'SurgeXTRack'"},
+                "limit": {"type": "integer", "minimum": 1, "default": 20},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_module_tags",
+        "description": "List all official module tags with counts (the human's Tags filter menu), "
+                       "plus every brand. Use when cardinal_module_search returns nothing useful — "
+                       "pick a tag from here and retry.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"limit": {"type": "integer", "minimum": 1}},
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_module_brands",
+        "description": "List all module brands with module counts.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"limit": {"type": "integer", "minimum": 1}},
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_module_detail",
+        "description": "Full manifest record for one module (name/description/tags/manualURL) plus "
+                       "sibling modules from the same brand. Does NOT include port or param "
+                       "definitions — those are not in the manifest.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"plugin": {"type": "string"}, "model": {"type": "string"}},
+            "required": ["model"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_topology",
+        "description": "Read a rack's wiring the way Li sees it on screen: which module feeds which, "
+                       "each module's role (oscillator/filter/envelope/vca/reverb/…), official tags, "
+                       "and whether signal can reach HostAudio2. Answers 'what is this rack actually "
+                       "doing' WITHOUT re-reading the generator code. Reads the .vcv file; after a "
+                       "patched build, pair with cardinal_scan_signal for live voltage.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"name": {"type": "string", "description": "patch name (omit .vcv)"}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_seq_read",
+        "description": "Read sequencer notes the way Li sees them on the piano-roll — measures as "
+                       "rows, notes by name (C5/F3), not raw MIDI numbers. Handles both sequencer "
+                       "families with different rules: rcm-pianoroll (fixed grid, rests written as "
+                       "pitch=0/active=false) and Starsea-MiniArranger (sparse, rests = absent, "
+                       "length spans cells). Start here before editing notes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string"},
+                "module": {"type": "string", "description": "e.g. pianoroll / MiniArranger"},
+                "pattern": {"type": "integer", "minimum": 0, "default": 0},
+                "track": {"type": "integer", "minimum": 0, "default": 0},
+            },
+            "required": ["patch"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_export_abc",
+        "description": "Export sequencer notes (rcm-pianoroll or Starsea-MiniArranger) to an "
+                       "editable .abc text score — the 'see and edit music as text' deliverable. "
+                       "Pure text: note names + durations, renderable by EasyABC/abcjs. Writes "
+                       "<patch>.abc next to the .vcv by default (overwrites a previous export).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string"},
+                "module": {"type": "string", "description": "filter by sequencer model name"},
+                "pattern": {"type": "integer", "minimum": 0, "default": 0},
+                "out_path": {"type": "string", "description": "optional .abc path"},
+            },
+            "required": ["patch"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_samples_list",
+        "description": "Browse the sample library (86+ wavs under samples/) — the AI equivalent of Li "
+                       "opening a file dialog. Use BEFORE loading a sample so you pick from what "
+                       "actually exists instead of guessing filenames.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "subdir": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "default": 300},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_sample_inspect",
+        "description": "Show which samples each sampler slot currently holds, and flag slots whose "
+                       "file no longer exists on disk (a silently dead sampler). Equivalent to "
+                       "reading the slots off the panel.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"patch": {"type": "string"}},
+            "required": ["patch"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_sample_load",
+        "description": "Load a wav into a sampler slot — the AI equivalent of right-click → "
+                       "'Load sample'. Refuses missing files and out-of-range slots, backs up "
+                       "first, and writes the path style already used by that module so other "
+                       "slots keep resolving. Pass load_after=true to hot-reload.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string"},
+                "file": {"type": "string", "description": "e.g. melody2/m_D4.wav (relative to samples/)"},
+                "slot": {"type": "integer", "minimum": 1, "maximum": 8,
+                         "description": "1-based, NOT 0-based"},
+                "module": {"type": "string", "description": "disambiguates when several samplers"},
+                "load_after": {"type": "boolean", "default": False},
+            },
+            "required": ["patch", "file", "slot"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_sample_clear",
+        "description": "Empty one sampler slot (clear the loaded sample).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string"},
+                "slot": {"type": "integer", "minimum": 1, "maximum": 8,
+                         "description": "1-based"},
+                "module": {"type": "string"},
+            },
+            "required": ["patch", "slot"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_seq_edit_note",
+        "description": "Edit ONE sequencer note — the equivalent of clicking a cell on the piano-roll. "
+                       "Change a pitch, or clear a cell to a rest. Refuses out-of-range and "
+                       "wrong-length writes instead of writing corrupt data, always backs up, and "
+                       "warns when a pitch change will cut a sustained note. Writes the .vcv file; "
+                       "pass load_after=true to hot-reload into running Cardinal.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string"},
+                "module": {"type": "string"},
+                "measure": {"type": "integer", "minimum": 0},
+                "step": {"type": "integer", "minimum": 0},
+                "pitch": {"type": "integer", "minimum": 0, "maximum": 127,
+                          "description": "MIDI note number, omit to rest a cell. "
+                          "Starsea tracks accept 12..108 only (engine clamps); rcm stores 0..127"},
+                "length": {"type": "integer", "minimum": 1, "maximum": 16,
+                           "description": "Starsea only, cells"},
+                "velocity": {"type": "number", "minimum": 0, "maximum": 1},
+                "retrigger": {"type": "boolean", "description": "rcm only"},
+                "active": {"type": "boolean", "description": "rcm only; omit to keep current"},
+                "clear": {"type": "boolean", "description": "delete the note instead of editing"},
+                "pattern": {"type": "integer", "minimum": 0, "default": 0},
+                "track": {"type": "integer", "minimum": 0, "default": 0},
+                "load_after": {"type": "boolean", "default": False},
+            },
+            "required": ["patch", "module", "measure", "step"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_seq_set_running",
+        "description": "Start or stop a sequencer's transport (the RUN button). Note: patches "
+                       "loaded with running=false stay silent by design — Li presses play himself.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string"},
+                "module": {"type": "string"},
+                "running": {"type": "boolean"},
+                "pattern": {"type": "integer", "minimum": 0, "default": 0},
+                "track": {"type": "integer", "minimum": 0, "default": 0},
+                "load_after": {"type": "boolean", "default": False},
+            },
+            "required": ["patch", "module", "running"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_actions",
+        "description": "List every operation the human can perform in Cardinal's UI, and for each: "
+                       "where its UI entry point lives in the source, whether it can be called "
+                       "programmatically, and which MCP tool already covers it. Use this BEFORE "
+                       "deciding to write a script + reload — the principle is: find the code path "
+                       "the human's button triggers and call that, instead of regenerating a patch. "
+                       "Filter by status: ready / partial / planned / blocked.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string",
+                           "enum": ["ready", "partial", "planned", "blocked"]},
+                "id": {"type": "string", "description": "single action detail, e.g. load-sample"},
+                "only_ready": {"type": "boolean",
+                               "description": "shortcut: what can I do right now"},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
 ]
+
+
 
 # Map each tool name to a lambda that calls the underlying Python function.
 # Keeps the JSON-RPC dispatch table tiny and obvious.
@@ -820,6 +1908,9 @@ DISPATCH = {
     "cardinal_patch_info": lambda a: patch_info(a["name"]),
     "cardinal_load_patch": lambda a: load_patch(a["name"]),
     "cardinal_set_param": lambda a: set_param(a["module_id"], a["param_id"], a["value"]),
+    "cardinal_set_param_by_name": lambda a: set_param_by_name(
+        a["patch"], a["module"], a["param"], a["value"],
+        a.get("instance", 0), a.get("load_after", False)),
     "cardinal_set_host_param": lambda a: set_host_param(a["port"], a["value"]),
     "cardinal_read_live": lambda a: read_live(),
     "cardinal_save_live": lambda a: save_live(a["name"], a.get("overwrite", True)),
@@ -828,7 +1919,55 @@ DISPATCH = {
     "cardinal_find_param": lambda a: find_param(a["module"], a["human"]),
     "cardinal_music": lambda a: music(a.get("what", "styles"), a.get("arg"), a.get("key")),
     "cardinal_apply_recipe": lambda a: apply_recipe(
-        a["patch"], a["recipe"], a.get("load_after", False)),
+        a["patch"], a["recipe"], a.get("load_after", False), a.get("weight", 1.0)),
+    "cardinal_audit": lambda a: cardinal_audit(
+        a["name"], a.get("checks")),
+    "cardinal_deploy": lambda a: cardinal_deploy(
+        a["name"], a.get("load_after", True)),
+    "cardinal_diff": lambda a: cardinal_diff(a["name"]),
+    "cardinal_port_semantics": lambda a: cardinal_port_semantics(
+        a.get("module"), a.get("patch")),
+    # --- OSC read probes (patched build only; see live_modules docstring) ---
+    "cardinal_live_modules": lambda a: live_modules(),
+    "cardinal_get_param": lambda a: get_param(a["module_id"], a["param_id"]),
+    "cardinal_module_ports": lambda a: module_ports(a["module_id"]),
+    "cardinal_scan_signal": lambda a: scan_signal(),
+    "cardinal_get_light": lambda a: get_light(a["module_id"], a["light_id"]),
+    # --- module library browser (reads Cardinal's own PluginManifests) ---
+    "cardinal_module_search": lambda a: modbrowser.search(
+        a.get("query", ""), a.get("tags"), a.get("brand"), a.get("limit", 20)),
+    "cardinal_module_tags": lambda a: modbrowser.list_tags(a.get("limit", 120)),
+    "cardinal_module_brands": lambda a: modbrowser.list_brands(a.get("limit", 120)),
+    "cardinal_module_detail": lambda a: modbrowser.detail(a.get("plugin", ""), a["model"]),
+    "cardinal_topology": lambda a: topology.analyze(a["name"]),
+    # --- sequencer notes (piano-roll equivalent) ---
+    "cardinal_seq_read": lambda a: seq.read_notes(
+        a["patch"], a.get("module"), a.get("pattern", 0), a.get("track", 0)),
+    "cardinal_export_abc": lambda a: abc_export.export_abc(
+        a["patch"], a.get("module"), a.get("pattern", 0),
+        out_path=a.get("out_path")),
+    "cardinal_seq_edit_note": lambda a: seq.edit_note(
+        a["patch"], a["module"], a["measure"], a["step"],
+        a.get("pitch"), a.get("length"), a.get("velocity"), a.get("retrigger"),
+        a.get("active"), a.get("pattern", 0), a.get("track", 0),
+        a.get("clear", False), True, a.get("load_after", False)),
+    "cardinal_seq_set_running": lambda a: seq.set_running(
+        a["patch"], a["module"], a["running"],
+        a.get("pattern", 0), a.get("track", 0), a.get("load_after", False)),
+    # --- sampler slots (equivalent of right-click -> Load sample) ---
+    "cardinal_samples_list": lambda a: samplelib.list_samples(
+        a.get("subdir", ""), a.get("limit", 300)),
+    "cardinal_sample_inspect": lambda a: samplelib.inspect(a["patch"]),
+    "cardinal_sample_load": lambda a: samplelib.load_sample(
+        a["patch"], a["file"], a["slot"], a.get("module"),
+        True, a.get("load_after", False)),
+    "cardinal_sample_clear": lambda a: samplelib.clear_slot(
+        a["patch"], a["slot"], a.get("module")),
+    "cardinal_actions": lambda a: interaction_map.list_actions(
+        a.get("status"),
+    ) if not a.get("id") and not a.get("only_ready") else (
+        interaction_map.detail(a["id"]) if a.get("id")
+        else interaction_map.find_ready()),
 }
 
 
@@ -847,10 +1986,18 @@ def handle(req):
         return {"jsonrpc": "2.0", "id": rid, "result": payload}
 
     if method == "initialize":
+        # Version negotiation (MCP spec): the server answers with the version
+        # it supports; the client may counter-offer an older one it knows.
+        # We implement everything through 2025-06-18 (tool annotations +
+        # structured tool output). Elicitation / tasks / streamable-HTTP are
+        # NOT implemented, so we never claim a newer version than that.
+        client_v = str(params.get("protocolVersion") or "").strip()
+        ours = "2025-06-18"
+        use = ours if (not client_v or client_v > ours) else client_v
         return result({
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": use,
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "cardinal", "version": "0.1.0"},
+            "serverInfo": {"name": "cardinal", "version": "0.2.0"},
         })
     if method in ("notifications/initialized", "initialized"):
         return None
@@ -867,7 +2014,14 @@ def handle(req):
         try:
             data = fn(args)
             text = json.dumps(data, ensure_ascii=False, indent=2)
-            return result({"content": [{"type": "text", "text": text}], "isError": False})
+            payload = {"content": [{"type": "text", "text": text}], "isError": False}
+            # structured tool output (MCP 2025-06-18): a machine-readable twin
+            # of the text content, conforming to the tool's outputSchema.
+            # Guarded by isinstance so the declared schema stays honest even if
+            # a future tool returns a non-object.
+            if isinstance(data, dict):
+                payload["structuredContent"] = data
+            return result(payload)
         except Exception as e:
             return result({"content": [{"type": "text", "text": f"execution failed: {e}"}],
                            "isError": True})

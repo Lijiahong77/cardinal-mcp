@@ -1,4 +1,498 @@
 {
+ "Bogaudio/Bogaudio-ADSR": {
+  "model": "Bogaudio-ADSR",
+  "params": {
+   "0": {
+    "default": 0.141421,
+    "enum": "ATTACK_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Attack",
+    "unit": " s"
+   },
+   "1": {
+    "default": null,
+    "enum": "DECAY_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Decay",
+    "unit": " s"
+   },
+   "2": {
+    "default": 1.0,
+    "enum": "SUSTAIN_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Sustain",
+    "unit": "%"
+   },
+   "3": {
+    "default": null,
+    "enum": "RELEASE_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Release",
+    "unit": " s"
+   },
+   "4": {
+    "default": 0.0,
+    "enum": "LINEAR_PARAM",
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Linear",
+    "options": [
+     "Disabled (logarithmic)"
+    ],
+    "unit": "Disabled (logarithmic)"
+   }
+  },
+  "plugin": "Bogaudio",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "GATE_INPUT",
+     "id": 0,
+     "name": "Gate"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "OUT_OUTPUT",
+     "id": 0,
+     "name": "Envelope"
+    }
+   ]
+  },
+  "source": "src/ADSR.cpp, src/ADSR.hpp"
+ },
+ "Bogaudio/Bogaudio-FMOp": {
+  "model": "Bogaudio-FMOp",
+  "params": {
+   "0": {
+    "default": 0.0,
+    "enum": "RATIO_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": -1.0,
+    "name": "Frequency ratio"
+   },
+   "1": {
+    "default": 0.0,
+    "enum": "FINE_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": -1.0,
+    "name": "Fine tune",
+    "unit": " cents"
+   },
+   "10": {
+    "default": null,
+    "enum": "ENV_TO_FEEDBACK_PARAM",
+    "kind": "button",
+    "max": null,
+    "min": null,
+    "name": "Feedback follows envelope"
+   },
+   "11": {
+    "default": null,
+    "enum": "ENV_TO_DEPTH_PARAM",
+    "kind": "button",
+    "max": null,
+    "min": null,
+    "name": "FM depth follows envelope"
+   },
+   "2": {
+    "default": 0.141421,
+    "enum": "ATTACK_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Attack",
+    "unit": " s"
+   },
+   "3": {
+    "default": null,
+    "enum": "DECAY_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Decay",
+    "unit": " s"
+   },
+   "4": {
+    "default": 1.0,
+    "enum": "SUSTAIN_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Sustain",
+    "unit": "%"
+   },
+   "5": {
+    "default": null,
+    "enum": "RELEASE_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Release",
+    "unit": " s"
+   },
+   "6": {
+    "default": 0.0,
+    "enum": "DEPTH_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "FM depth",
+    "unit": "%"
+   },
+   "7": {
+    "default": 0.0,
+    "enum": "FEEDBACK_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Feedback",
+    "unit": "%"
+   },
+   "8": {
+    "default": 1.0,
+    "enum": "LEVEL_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Level"
+   },
+   "9": {
+    "default": null,
+    "enum": "ENV_TO_LEVEL_PARAM",
+    "kind": "button",
+    "max": null,
+    "min": null,
+    "name": "Level follows envelope"
+   }
+  },
+  "plugin": "Bogaudio",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "SUSTAIN_INPUT",
+     "id": 0,
+     "name": "Sustain CV"
+    },
+    {
+     "enum": "DEPTH_INPUT",
+     "id": 1,
+     "name": "Depth CV"
+    },
+    {
+     "enum": "FEEDBACK_INPUT",
+     "id": 2,
+     "name": "Feedback CV"
+    },
+    {
+     "enum": "LEVEL_INPUT",
+     "id": 3,
+     "name": "Level CV"
+    },
+    {
+     "enum": "PITCH_INPUT",
+     "id": 4,
+     "name": "Pitch (1V/octave)"
+    },
+    {
+     "enum": "GATE_INPUT",
+     "id": 5,
+     "name": "Gate"
+    },
+    {
+     "enum": "FM_INPUT",
+     "id": 6,
+     "name": "Frequency modulation"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "AUDIO_OUTPUT",
+     "id": 0,
+     "name": "Signal"
+    }
+   ]
+  },
+  "source": "src/FMOp.cpp, src/FMOp.hpp"
+ },
+ "Bogaudio/Bogaudio-Unison": {
+  "model": "Bogaudio-Unison",
+  "params": {
+   "0": {
+    "default": 1.0,
+    "enum": "CHANNELS_PARAM",
+    "kind": "knob",
+    "max": 16.0,
+    "min": 1.0,
+    "name": "Channels"
+   },
+   "1": {
+    "default": 0.0,
+    "enum": "DETUNE_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": 0.0,
+    "name": "Detune"
+   }
+  },
+  "plugin": "Bogaudio",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "DETUNE_INPUT",
+     "id": 0,
+     "name": "Detune CV"
+    },
+    {
+     "enum": "PITCH_INPUT",
+     "id": 1,
+     "name": "Pitch (1V/octave)"
+    },
+    {
+     "enum": "GATE_INPUT",
+     "id": 2,
+     "name": "Gate"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "PITCH_OUTPUT",
+     "id": 0,
+     "name": "Pitch (1V/octave)"
+    },
+    {
+     "enum": "GATE_OUTPUT",
+     "id": 1,
+     "name": "Gate"
+    }
+   ]
+  },
+  "source": "src/Unison.cpp, src/Unison.hpp"
+ },
+ "Bogaudio/Bogaudio-VCF": {
+  "model": "Bogaudio-VCF",
+  "params": {
+   "1": {
+    "default": 0.0,
+    "enum": "FREQUENCY_CV_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": -1.0,
+    "name": "Frequency CV attenuation",
+    "unit": "%"
+   },
+   "2": {
+    "default": 0.0,
+    "enum": "FM_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "FM",
+    "unit": "%"
+   },
+   "3": {
+    "default": 0.0,
+    "enum": "Q_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Resonance / bandwidth",
+    "unit": "%"
+   },
+   "4": {
+    "default": 0.0,
+    "enum": "MODE_PARAM",
+    "kind": "switch",
+    "max": 3.0,
+    "min": 0.0,
+    "name": "Mode",
+    "options": [
+     "Lowpass"
+    ],
+    "unit": "Lowpass"
+   },
+   "5": {
+    "default": 0.522233,
+    "enum": "SLOPE_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "Slope",
+    "unit": " poles"
+   }
+  },
+  "plugin": "Bogaudio",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "FREQUENCY_CV_INPUT",
+     "id": 0,
+     "name": "Cutoff CV"
+    },
+    {
+     "enum": "FM_INPUT",
+     "id": 1,
+     "name": "Cutoff FM"
+    },
+    {
+     "enum": "PITCH_INPUT",
+     "id": 2,
+     "name": "Cutoff pitch (1V/octave)"
+    },
+    {
+     "enum": "IN_INPUT",
+     "id": 3,
+     "name": "Signal"
+    },
+    {
+     "enum": "Q_INPUT",
+     "id": 4,
+     "name": "Resonance CV"
+    },
+    {
+     "enum": "SLOPE_INPUT",
+     "id": 5,
+     "name": "Slope CV"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "OUT_OUTPUT",
+     "id": 0,
+     "name": "Signal"
+    }
+   ]
+  },
+  "source": "src/VCF.cpp, src/VCF.hpp"
+ },
+ "Bogaudio/Bogaudio-VCO": {
+  "model": "Bogaudio-VCO",
+  "params": {
+   "0": {
+    "default": 0.0,
+    "enum": "FREQUENCY_PARAM",
+    "kind": "knob",
+    "max": 6.0,
+    "min": -3.0,
+    "name": "Frequency",
+    "unit": " Hz"
+   },
+   "1": {
+    "default": 0.0,
+    "enum": "FINE_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": -1.0,
+    "name": "Fine tune",
+    "unit": " cents"
+   },
+   "2": {
+    "default": null,
+    "enum": "SLOW_PARAM",
+    "kind": "button",
+    "max": null,
+    "min": null,
+    "name": "Slow mode"
+   },
+   "3": {
+    "default": 0.0,
+    "enum": "PW_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": -1.0,
+    "name": "Pulse width",
+    "unit": "%"
+   },
+   "4": {
+    "default": 0.0,
+    "enum": "FM_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "FM depth",
+    "unit": "%"
+   },
+   "5": {
+    "default": 1.0,
+    "enum": "FM_TYPE_PARAM",
+    "kind": "switch",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "FM mode",
+    "options": [
+     "Linear FM"
+    ],
+    "unit": "Linear FM"
+   },
+   "6": {
+    "default": null,
+    "enum": "LINEAR_PARAM",
+    "kind": "button",
+    "max": null,
+    "min": null,
+    "name": "Linear frequency"
+   }
+  },
+  "plugin": "Bogaudio",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "PITCH_INPUT",
+     "id": 0,
+     "name": "Pitch (1V/octave)"
+    },
+    {
+     "enum": "SYNC_INPUT",
+     "id": 1,
+     "name": "Sync"
+    },
+    {
+     "enum": "PW_INPUT",
+     "id": 2,
+     "name": "Pulse width CV"
+    },
+    {
+     "enum": "FM_INPUT",
+     "id": 3,
+     "name": "Frequency modulation"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "SQUARE_OUTPUT",
+     "id": 0,
+     "name": "Square signal"
+    },
+    {
+     "enum": "SAW_OUTPUT",
+     "id": 1,
+     "name": "Saw signal"
+    },
+    {
+     "enum": "TRIANGLE_OUTPUT",
+     "id": 2,
+     "name": "Triangle signal"
+    },
+    {
+     "enum": "SINE_OUTPUT",
+     "id": 3,
+     "name": "Sine signal"
+    }
+   ]
+  },
+  "source": "src/VCO.cpp, src/VCO.hpp, src/vco_base.cpp, src/vco_base.hpp"
+ },
  "Cardinal/HostAudio2": {
   "model": "HostAudio2",
   "params": {
@@ -13,18 +507,152 @@
    }
   },
   "plugin": "Cardinal",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
   "source": "plugins/Cardinal/src/HostAudio.cpp"
  },
  "Cardinal/HostMIDI": {
   "model": "HostMIDI",
   "params": {},
   "plugin": "Cardinal",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "PITCH_INPUT",
+     "id": 0,
+     "name": "1V/octave pitch"
+    },
+    {
+     "enum": "GATE_INPUT",
+     "id": 1,
+     "name": "Gate"
+    },
+    {
+     "enum": "VELOCITY_INPUT",
+     "id": 2,
+     "name": "Velocity"
+    },
+    {
+     "enum": "AFTERTOUCH_INPUT",
+     "id": 3,
+     "name": "Aftertouch"
+    },
+    {
+     "enum": "PITCHBEND_INPUT",
+     "id": 4,
+     "name": "Pitchbend"
+    },
+    {
+     "enum": "MODWHEEL_INPUT",
+     "id": 5,
+     "name": "Mod wheel"
+    },
+    {
+     "enum": "CLK_INPUT",
+     "id": 6,
+     "name": "Clock"
+    },
+    {
+     "enum": "VOL_INPUT",
+     "id": 7,
+     "name": "Volume"
+    },
+    {
+     "enum": "PAN_INPUT",
+     "id": 8,
+     "name": "Pan"
+    },
+    {
+     "enum": "START_INPUT",
+     "id": 9,
+     "name": "Start trigger"
+    },
+    {
+     "enum": "STOP_INPUT",
+     "id": 10,
+     "name": "Stop trigger"
+    },
+    {
+     "enum": "CONTINUE_INPUT",
+     "id": 11,
+     "name": "Continue trigger"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "PITCH_OUTPUT",
+     "id": 0,
+     "name": "1V/octave pitch"
+    },
+    {
+     "enum": "GATE_OUTPUT",
+     "id": 1,
+     "name": "Gate"
+    },
+    {
+     "enum": "VELOCITY_OUTPUT",
+     "id": 2,
+     "name": "Velocity"
+    },
+    {
+     "enum": "AFTERTOUCH_OUTPUT",
+     "id": 3,
+     "name": "Aftertouch"
+    },
+    {
+     "enum": "PITCHBEND_OUTPUT",
+     "id": 4,
+     "name": "Pitchbend"
+    },
+    {
+     "enum": "MODWHEEL_OUTPUT",
+     "id": 5,
+     "name": "Mod wheel"
+    },
+    {
+     "enum": "RETRIGGER_OUTPUT",
+     "id": 6,
+     "name": "Retrigger"
+    },
+    {
+     "enum": "CLOCK_OUTPUT",
+     "id": 7,
+     "name": "Clock"
+    },
+    {
+     "enum": "CLOCK_DIV_OUTPUT",
+     "id": 8,
+     "name": "Clock divider"
+    },
+    {
+     "enum": "START_OUTPUT",
+     "id": 9,
+     "name": "Start trigger"
+    },
+    {
+     "enum": "STOP_OUTPUT",
+     "id": 10,
+     "name": "Stop trigger"
+    },
+    {
+     "enum": "CONTINUE_OUTPUT",
+     "id": 11,
+     "name": "Continue trigger"
+    }
+   ]
+  },
   "source": "plugins/Cardinal/src/HostMIDI.cpp"
  },
  "Cardinal/TextEditor": {
   "model": "TextEditor",
   "params": {},
   "plugin": "Cardinal",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
   "source": "plugins/Cardinal/src/TextEditor.cpp"
  },
  "Fundamental/ADSR": {
@@ -112,6 +740,47 @@
    }
   },
   "plugin": "Fundamental",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "ATTACK_INPUT",
+     "id": 0,
+     "name": "Attack"
+    },
+    {
+     "enum": "DECAY_INPUT",
+     "id": 1,
+     "name": "Decay"
+    },
+    {
+     "enum": "SUSTAIN_INPUT",
+     "id": 2,
+     "name": "Sustain"
+    },
+    {
+     "enum": "RELEASE_INPUT",
+     "id": 3,
+     "name": "Release"
+    },
+    {
+     "enum": "GATE_INPUT",
+     "id": 4,
+     "name": "Gate"
+    },
+    {
+     "enum": "RETRIG_INPUT",
+     "id": 5,
+     "name": "Retrigger"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "ENVELOPE_OUTPUT",
+     "id": 0,
+     "name": "Envelope"
+    }
+   ]
+  },
   "source": "src/ADSR.cpp"
  },
  "Fundamental/Mixer": {
@@ -128,6 +797,16 @@
    }
   },
   "plugin": "Fundamental",
+  "ports": {
+   "inputs": [],
+   "outputs": [
+    {
+     "enum": "OUT_OUTPUT",
+     "id": 0,
+     "name": "Mix"
+    }
+   ]
+  },
   "source": "src/Mixer.cpp"
  },
  "Fundamental/Sum": {
@@ -144,6 +823,22 @@
    }
   },
   "plugin": "Fundamental",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "POLY_INPUT",
+     "id": 0,
+     "name": "Polyphonic"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "MONO_OUTPUT",
+     "id": 0,
+     "name": "Monophonic"
+    }
+   ]
+  },
   "source": "src/Sum.cpp"
  },
  "Fundamental/VCA-1": {
@@ -169,6 +864,52 @@
    }
   },
   "plugin": "Fundamental",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "EXP1_INPUT",
+     "id": 0,
+     "name": "Channel 1 exponential CV"
+    },
+    {
+     "enum": "LIN1_INPUT",
+     "id": 1,
+     "name": "Channel 1 linear CV"
+    },
+    {
+     "enum": "IN1_INPUT",
+     "id": 2,
+     "name": "Channel 1"
+    },
+    {
+     "enum": "EXP2_INPUT",
+     "id": 3,
+     "name": "Channel 2 exponential CV"
+    },
+    {
+     "enum": "LIN2_INPUT",
+     "id": 4,
+     "name": "Channel 2 linear CV"
+    },
+    {
+     "enum": "IN2_INPUT",
+     "id": 5,
+     "name": "Channel 2"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "OUT1_OUTPUT",
+     "id": 0,
+     "name": "Channel 1"
+    },
+    {
+     "enum": "OUT2_OUTPUT",
+     "id": 1,
+     "name": "Channel 2"
+    }
+   ]
+  },
   "source": "src/VCA.cpp"
  },
  "Fundamental/VCF": {
@@ -187,7 +928,7 @@
     "enum": "FINE_PARAM",
     "kind": "reserved",
     "name": null,
-    "note": "枚举占位，无 configParam（废弃或未使用）"
+    "note": "enum placeholder, no configParam (removed/unused)"
    },
    "2": {
     "default": null,
@@ -236,6 +977,42 @@
    }
   },
   "plugin": "Fundamental",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "FREQ_INPUT",
+     "id": 0,
+     "name": "Frequency"
+    },
+    {
+     "enum": "RES_INPUT",
+     "id": 1,
+     "name": "Resonance"
+    },
+    {
+     "enum": "DRIVE_INPUT",
+     "id": 2,
+     "name": "Drive"
+    },
+    {
+     "enum": "IN_INPUT",
+     "id": 3,
+     "name": "Audio"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "LPF_OUTPUT",
+     "id": 0,
+     "name": "Lowpass filter"
+    },
+    {
+     "enum": "HPF_OUTPUT",
+     "id": 1,
+     "name": "Highpass filter"
+    }
+   ]
+  },
   "source": "src/VCF.cpp"
  },
  "Fundamental/VCO": {
@@ -245,7 +1022,7 @@
     "enum": "MODE_PARAM",
     "kind": "reserved",
     "name": null,
-    "note": "枚举占位，无 configParam（废弃或未使用）"
+    "note": "enum placeholder, no configParam (removed/unused)"
    },
    "1": {
     "default": null,
@@ -272,7 +1049,7 @@
     "enum": "FINE_PARAM",
     "kind": "reserved",
     "name": null,
-    "note": "枚举占位，无 configParam（废弃或未使用）"
+    "note": "enum placeholder, no configParam (removed/unused)"
    },
    "4": {
     "default": null,
@@ -315,6 +1092,52 @@
    }
   },
   "plugin": "Fundamental",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "PITCH_INPUT",
+     "id": 0,
+     "name": "1V/octave pitch"
+    },
+    {
+     "enum": "FM_INPUT",
+     "id": 1,
+     "name": "Frequency modulation"
+    },
+    {
+     "enum": "SYNC_INPUT",
+     "id": 2,
+     "name": "Sync"
+    },
+    {
+     "enum": "PW_INPUT",
+     "id": 3,
+     "name": "Pulse width modulation"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "SIN_OUTPUT",
+     "id": 0,
+     "name": "Sine"
+    },
+    {
+     "enum": "TRI_OUTPUT",
+     "id": 1,
+     "name": "Triangle"
+    },
+    {
+     "enum": "SAW_OUTPUT",
+     "id": 2,
+     "name": "Sawtooth"
+    },
+    {
+     "enum": "SQR_OUTPUT",
+     "id": 3,
+     "name": "Square"
+    }
+   ]
+  },
   "source": "src/VCO.cpp"
  },
  "ImpromptuModular/Clocked": {
@@ -373,7 +1196,7 @@
     "enum": "DELAY_PARAMS",
     "kind": "reserved",
     "name": null,
-    "note": "枚举占位，无 configParam（废弃或未使用）"
+    "note": "enum placeholder, no configParam (removed/unused)"
    },
    "15": {
     "default": 0.0,
@@ -481,7 +1304,92 @@
    }
   },
   "plugin": "ImpromptuModular",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "RESET_INPUT",
+     "id": 4,
+     "name": "Reset"
+    },
+    {
+     "enum": "RUN_INPUT",
+     "id": 5,
+     "name": "Run"
+    },
+    {
+     "enum": "BPM_INPUT",
+     "id": 6,
+     "name": "BPM CV / Ext clock"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "CLK_OUTPUTS + 0",
+     "id": 0,
+     "name": "Master clock"
+    },
+    {
+     "enum": "RESET_OUTPUT",
+     "id": 4,
+     "name": "Reset"
+    },
+    {
+     "enum": "RUN_OUTPUT",
+     "id": 5,
+     "name": "Run"
+    },
+    {
+     "enum": "BPM_OUTPUT",
+     "id": 6,
+     "name": "BPM CV / Ext clock thru"
+    }
+   ]
+  },
   "source": "src/Clocked.cpp"
+ },
+ "MindMeldModular/MixMaster": {
+  "model": "MixMaster",
+  "params": {
+   "0": {
+    "default": 0.0,
+    "enum": "MAIN_MUTE_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "MASTER: mute"
+   },
+   "1": {
+    "default": 0.0,
+    "enum": "MAIN_DIM_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "MASTER: dim"
+   },
+   "2": {
+    "default": 0.0,
+    "enum": "MAIN_MONO_PARAM",
+    "kind": "knob",
+    "max": 1.0,
+    "min": 0.0,
+    "name": "MASTER: mono"
+   },
+   "3": {
+    "default": 1.0,
+    "enum": "MAIN_FADER_PARAM",
+    "kind": "knob",
+    "max": null,
+    "min": 0.0,
+    "name": "MASTER: level",
+    "unit": " dB"
+   }
+  },
+  "plugin": "MindMeldModular",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
+  "source": "src/MixMaster/MixMaster.cpp, src/MixMaster/MixMaster.hpp, src/MixMaster/MixMaster.cpp, src/MixMaster/MixMaster.hpp, src/MixMaster/MixMaster.cpp, src/MixMaster/MixMaster.hpp"
  },
  "MindMeldModular/MixMasterJr": {
   "model": "MixMasterJr",
@@ -1033,7 +1941,7 @@
    }
   },
   "plugin": "MindMeldModular",
-  "source": "手工整理（MixMaster.cpp 构造函数循环 + MixMaster.hpp 枚举）"
+  "source": "hand-built (MixMaster.cpp constructor loops + MixMaster.hpp enum)"
  },
  "Valley/Plateau": {
   "model": "Plateau",
@@ -1119,7 +2027,7 @@
     "enum": "CLEAR_TOGGLE_PARAM",
     "kind": "reserved",
     "name": null,
-    "note": "枚举占位，无 configParam（废弃或未使用）"
+    "note": "enum placeholder, no configParam (removed/unused)"
    },
    "17": {
     "default": null,
@@ -1327,6 +2235,107 @@
    }
   },
   "plugin": "Valley",
+  "ports": {
+   "inputs": [
+    {
+     "enum": "Plateau::LEFT_INPUT",
+     "id": 0,
+     "name": "Left"
+    },
+    {
+     "enum": "Plateau::RIGHT_INPUT",
+     "id": 1,
+     "name": "Right"
+    },
+    {
+     "enum": "Plateau::DRY_CV_INPUT",
+     "id": 2,
+     "name": "Dry level CV"
+    },
+    {
+     "enum": "Plateau::WET_CV_INPUT",
+     "id": 3,
+     "name": "Wet level CV"
+    },
+    {
+     "enum": "Plateau::PRE_DELAY_CV_INPUT",
+     "id": 4,
+     "name": "Pre delay CV"
+    },
+    {
+     "enum": "Plateau::INPUT_LOW_DAMP_CV_INPUT",
+     "id": 5,
+     "name": "Input low cut CV"
+    },
+    {
+     "enum": "Plateau::INPUT_HIGH_DAMP_CV_INPUT",
+     "id": 6,
+     "name": "Input high cut CV"
+    },
+    {
+     "enum": "Plateau::SIZE_CV_INPUT",
+     "id": 7,
+     "name": "Size CV"
+    },
+    {
+     "enum": "Plateau::DIFFUSION_CV_INPUT",
+     "id": 8,
+     "name": "Diffusion CV"
+    },
+    {
+     "enum": "Plateau::DECAY_CV_INPUT",
+     "id": 9,
+     "name": "Decay CV"
+    },
+    {
+     "enum": "Plateau::REVERB_HIGH_DAMP_CV_INPUT",
+     "id": 10,
+     "name": "Reverb high cut CV"
+    },
+    {
+     "enum": "Plateau::REVERB_LOW_DAMP_CV_INPUT",
+     "id": 11,
+     "name": "Reverb low cut CV"
+    },
+    {
+     "enum": "Plateau::MOD_SPEED_CV_INPUT",
+     "id": 12,
+     "name": "Mod. speed CV"
+    },
+    {
+     "enum": "Plateau::MOD_SHAPE_CV_INPUT",
+     "id": 13,
+     "name": "Mod. shape CV"
+    },
+    {
+     "enum": "Plateau::MOD_DEPTH_CV_INPUT",
+     "id": 14,
+     "name": "Mod. depth CV"
+    },
+    {
+     "enum": "Plateau::FREEZE_CV_INPUT",
+     "id": 15,
+     "name": "Hold"
+    },
+    {
+     "enum": "Plateau::CLEAR_CV_INPUT",
+     "id": 16,
+     "name": "Clear"
+    }
+   ],
+   "outputs": [
+    {
+     "enum": "Plateau::LEFT_OUTPUT",
+     "id": 0,
+     "name": "Left"
+    },
+    {
+     "enum": "Plateau::RIGHT_OUTPUT",
+     "id": 1,
+     "name": "Right"
+    }
+   ]
+  },
   "source": "src/Plateau/Plateau.cpp, src/Plateau/Plateau.hpp"
  },
  "WSTD-Drums/BassDrum9": {
@@ -1355,7 +2364,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "11": {
     "default": 7.0,
@@ -1364,7 +2373,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "12": {
     "default": 7.0,
@@ -1373,7 +2382,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "13": {
     "default": 7.0,
@@ -1382,7 +2391,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "14": {
     "default": 7.0,
@@ -1391,7 +2400,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "15": {
     "default": 7.0,
@@ -1400,7 +2409,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "16": {
     "default": 1.0,
@@ -1427,7 +2436,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "19": {
@@ -1437,7 +2446,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "2": {
@@ -1447,7 +2456,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "20": {
     "default": 1.0,
@@ -1456,7 +2465,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "21": {
@@ -1466,7 +2475,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "22": {
@@ -1476,7 +2485,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "23": {
@@ -1486,7 +2495,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "24": {
@@ -1496,7 +2505,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "25": {
@@ -1506,7 +2515,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "26": {
@@ -1516,7 +2525,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "27": {
@@ -1526,7 +2535,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "28": {
@@ -1536,7 +2545,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "29": {
@@ -1546,7 +2555,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "3": {
@@ -1556,7 +2565,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "30": {
     "default": 1.0,
@@ -1565,7 +2574,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "31": {
@@ -1575,7 +2584,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "4": {
@@ -1585,7 +2594,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "5": {
     "default": 7.0,
@@ -1594,7 +2603,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "6": {
     "default": 7.0,
@@ -1603,7 +2612,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "7": {
     "default": 7.0,
@@ -1612,7 +2621,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "8": {
     "default": 7.0,
@@ -1621,7 +2630,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "9": {
     "default": 7.0,
@@ -1630,10 +2639,14 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    }
   },
   "plugin": "WSTD-Drums",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
   "source": "src/controller/BD9.cpp, src/controller/BD9.hpp, src/controller/SampleController.hpp"
  },
  "WSTD-Drums/CR78": {
@@ -1662,7 +2675,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "11": {
     "default": 7.0,
@@ -1671,7 +2684,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "12": {
     "default": 7.0,
@@ -1680,7 +2693,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "13": {
     "default": 7.0,
@@ -1689,7 +2702,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "14": {
     "default": 7.0,
@@ -1698,7 +2711,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "15": {
     "default": 7.0,
@@ -1707,7 +2720,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "16": {
     "default": 1.0,
@@ -1734,7 +2747,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "19": {
@@ -1744,7 +2757,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "2": {
@@ -1754,7 +2767,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "20": {
     "default": 1.0,
@@ -1763,7 +2776,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "21": {
@@ -1773,7 +2786,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "22": {
@@ -1783,7 +2796,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "23": {
@@ -1793,7 +2806,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "24": {
@@ -1803,7 +2816,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "25": {
@@ -1813,7 +2826,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "26": {
@@ -1823,7 +2836,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "27": {
@@ -1833,7 +2846,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "28": {
@@ -1843,7 +2856,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "29": {
@@ -1853,7 +2866,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "3": {
@@ -1863,7 +2876,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "30": {
     "default": 1.0,
@@ -1872,7 +2885,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "31": {
@@ -1882,7 +2895,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "4": {
@@ -1892,7 +2905,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "5": {
     "default": 7.0,
@@ -1901,7 +2914,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "6": {
     "default": 7.0,
@@ -1910,7 +2923,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "7": {
     "default": 7.0,
@@ -1919,7 +2932,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "8": {
     "default": 7.0,
@@ -1928,7 +2941,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "9": {
     "default": 7.0,
@@ -1937,10 +2950,14 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    }
   },
   "plugin": "WSTD-Drums",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
   "source": "src/controller/CR78.cpp, src/controller/CR78.hpp, src/controller/SampleController.hpp"
  },
  "WSTD-Drums/ClosedHiHat": {
@@ -1969,7 +2986,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "11": {
     "default": 7.0,
@@ -1978,7 +2995,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "12": {
     "default": 7.0,
@@ -1987,7 +3004,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "13": {
     "default": 7.0,
@@ -1996,7 +3013,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "14": {
     "default": 7.0,
@@ -2005,7 +3022,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "15": {
     "default": 7.0,
@@ -2014,7 +3031,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "16": {
     "default": 1.0,
@@ -2041,7 +3058,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "19": {
@@ -2051,7 +3068,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "2": {
@@ -2061,7 +3078,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "20": {
     "default": 1.0,
@@ -2070,7 +3087,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "21": {
@@ -2080,7 +3097,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "22": {
@@ -2090,7 +3107,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "23": {
@@ -2100,7 +3117,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "24": {
@@ -2110,7 +3127,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "25": {
@@ -2120,7 +3137,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "26": {
@@ -2130,7 +3147,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "27": {
@@ -2140,7 +3157,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "28": {
@@ -2150,7 +3167,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "29": {
@@ -2160,7 +3177,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "3": {
@@ -2170,7 +3187,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "30": {
     "default": 1.0,
@@ -2179,7 +3196,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "31": {
@@ -2189,7 +3206,7 @@
     "max": 1.8,
     "min": 0.2,
     "name": "Playback Speed",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）",
+    "note": "unused slot (only first 2 drum voices enabled)",
     "unit": "x"
    },
    "4": {
@@ -2199,7 +3216,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "5": {
     "default": 7.0,
@@ -2208,7 +3225,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "6": {
     "default": 7.0,
@@ -2217,7 +3234,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "7": {
     "default": 7.0,
@@ -2226,7 +3243,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "8": {
     "default": 7.0,
@@ -2235,7 +3252,7 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    },
    "9": {
     "default": 7.0,
@@ -2244,10 +3261,1561 @@
     "max": 15.0,
     "min": 0.0,
     "name": "Sample",
-    "note": "未使用槽位（本模块只启用前 2 个鼓声）"
+    "note": "unused slot (only first 2 drum voices enabled)"
    }
   },
   "plugin": "WSTD-Drums",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
   "source": "src/controller/ClosedHH.cpp, src/controller/ClosedHH.hpp, src/controller/SampleController.hpp"
+ },
+ "WSTD-Drums/DMX": {
+  "model": "DMX",
+  "params": {
+   "0": {
+    "enum": "DRUM_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "enum placeholder, no configParam (removed/unused)"
+   },
+   "1": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 1",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "10": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 10",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "11": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 11",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "12": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 12",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "13": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 13",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "14": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 14",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "15": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 15",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "16": {
+    "enum": "TUNE_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "enum placeholder, no configParam (removed/unused)"
+   },
+   "17": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 1",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "18": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 2",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "19": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 3",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "2": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 2",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "20": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 4",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "21": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 5",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "22": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 6",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "23": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 7",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "24": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 8",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "25": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 9",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "26": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 10",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "27": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 11",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "28": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 12",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "29": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 13",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "3": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 3",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "30": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 14",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "31": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 15",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "4": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 4",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "5": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 5",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "6": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 6",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "7": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 7",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "8": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 8",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "9": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 9",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   }
+  },
+  "plugin": "WSTD-Drums",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
+  "source": "src/controller/SampleController.hpp"
+ },
+ "WSTD-Drums/OpenHiHat": {
+  "model": "OpenHiHat",
+  "params": {
+   "0": {
+    "enum": "DRUM_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "enum placeholder, no configParam (removed/unused)"
+   },
+   "1": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 1",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "10": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 10",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "11": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 11",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "12": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 12",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "13": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 13",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "14": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 14",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "15": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 15",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "16": {
+    "enum": "TUNE_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "enum placeholder, no configParam (removed/unused)"
+   },
+   "17": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 1",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "18": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 2",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "19": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 3",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "2": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 2",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "20": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 4",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "21": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 5",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "22": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 6",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "23": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 7",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "24": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 8",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "25": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 9",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "26": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 10",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "27": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 11",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "28": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 12",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "29": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 13",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "3": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 3",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "30": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 14",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "31": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 15",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "4": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 4",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "5": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 5",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "6": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 6",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "7": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 7",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "8": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 8",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "9": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 9",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   }
+  },
+  "plugin": "WSTD-Drums",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
+  "source": "src/controller/SampleController.hpp"
+ },
+ "WSTD-Drums/Sequencer": {
+  "model": "Sequencer",
+  "params": {
+   "0": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 0",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "1": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 1",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "10": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 10",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "11": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 11",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "12": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 12",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "13": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 13",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "14": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 14",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "15": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 15",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "16": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 0",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "17": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 1",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "18": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 2",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "19": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 3",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "2": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 2",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "20": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 4",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "21": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 5",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "22": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 6",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "23": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 7",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "24": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 8",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "25": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 9",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "26": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 10",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "27": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 11",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "28": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 12",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "29": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 13",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "3": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 3",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "30": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 14",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "31": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 15",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "4": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 4",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "5": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 5",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "6": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 6",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "7": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 7",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "8": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 8",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "9": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 9",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   }
+  },
+  "plugin": "WSTD-Drums",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
+  "source": "src/controller/Sequencer.cpp"
+ },
+ "WSTD-Drums/SnareDrumN": {
+  "model": "SnareDrumN",
+  "params": {
+   "0": {
+    "enum": "DRUM_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "enum placeholder, no configParam (removed/unused)"
+   },
+   "1": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 1",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "10": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 10",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "11": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 11",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "12": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 12",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "13": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 13",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "14": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 14",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "15": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 15",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "16": {
+    "enum": "TUNE_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "enum placeholder, no configParam (removed/unused)"
+   },
+   "17": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 1",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "18": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 2",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "19": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 3",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "2": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 2",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "20": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 4",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "21": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 5",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "22": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 6",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "23": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 7",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "24": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 8",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "25": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 9",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "26": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 10",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "27": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 11",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "28": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 12",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "29": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 13",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "3": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 3",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "30": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 14",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "31": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 15",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "4": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 4",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "5": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 5",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "6": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 6",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "7": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 7",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "8": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 8",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "9": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 9",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   }
+  },
+  "plugin": "WSTD-Drums",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
+  "source": "src/controller/SampleController.hpp"
+ },
+ "WSTD-Drums/Tomi": {
+  "model": "Tomi",
+  "params": {
+   "0": {
+    "enum": "DRUM_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "enum placeholder, no configParam (removed/unused)"
+   },
+   "1": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 1",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "10": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 10",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "11": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 11",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "12": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 12",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "13": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 13",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "14": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 14",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "15": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 15",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "16": {
+    "enum": "TUNE_PARAM",
+    "kind": "reserved",
+    "name": null,
+    "note": "enum placeholder, no configParam (removed/unused)"
+   },
+   "17": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 1",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "18": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 2",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "19": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 3",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "2": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 2",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "20": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 4",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "21": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 5",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "22": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 6",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "23": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 7",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "24": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 8",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "25": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 9",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "26": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 10",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "27": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 11",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "28": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 12",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "29": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 13",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "3": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 3",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "30": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 14",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "31": {
+    "default": 1.0,
+    "enum": "TUNE_PARAM + 15",
+    "kind": "knob",
+    "max": 1.8,
+    "min": 0.2,
+    "name": "Playback Speed",
+    "note": "unused slot (only first 2 drum voices enabled)",
+    "unit": "x"
+   },
+   "4": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 4",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "5": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 5",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "6": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 6",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "7": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 7",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "8": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 8",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   },
+   "9": {
+    "default": 7.0,
+    "enum": "DRUM_PARAM + 9",
+    "kind": "knob",
+    "max": 15.0,
+    "min": 0.0,
+    "name": "Sample",
+    "note": "unused slot (only first 2 drum voices enabled)"
+   }
+  },
+  "plugin": "WSTD-Drums",
+  "ports": {
+   "inputs": [],
+   "outputs": []
+  },
+  "source": "src/controller/SampleController.hpp"
  }
 }

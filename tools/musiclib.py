@@ -513,11 +513,21 @@ def suggest(text):
 
 # ================================================================ Apply to a patch
 
-def apply_recipe(patch_path, name, dry_run=False):
+def apply_recipe(patch_path, name, dry_run=False, weight=1.0):
     """Write a recipe into a .vcv file.
 
     Param NAME -> number translation is delegated to paramlib; any param we cannot
     find is reported explicitly (never silently skipped).
+
+    ★ A8（2026-10-19）：同型号模块**全部应用**，不再只改第一个。
+      旧版 `mod = mods[0]` 在机架里有 2 个 VCA-1 时会漏改第二台 —— 改错模块
+      比不改更糟（宪法：绝不覆盖李手工调的机架布局）。现在逐实例应用，
+      每条结果带 instance 序号，改了哪几个一目了然。
+
+    ★ A9：weight 0..1 在「当前值 ↔ recipe 目标值」之间插值（0.5=各半，
+      1.0=完全按 recipe）。当前值取 patch 里的现值；patch 没存过该参数时
+      退回字典默认值，再没有就用 recipe 值。越界自动 clamp 到参数的
+      min/max，并报告实际生效值 —— 绝不假装写进了越界值。
     """
     import patchio
     import paramlib as pl
@@ -527,6 +537,7 @@ def apply_recipe(patch_path, name, dry_run=False):
         return {"error": "no such recipe: {}".format(name)}
     if not os.path.exists(patch_path):
         return {"error": "patch file not found: {}".format(patch_path)}
+    weight = min(1.0, max(0.0, float(weight)))
 
     patch = patchio.read_patch(patch_path)
     by_model = {}
@@ -541,8 +552,7 @@ def apply_recipe(patch_path, name, dry_run=False):
             skipped.append({"module": model, "param": s["param"],
                             "why": "patch has no {} module".format(model)})
             continue
-        mod = mods[0]
-        plugin = mod["plugin"]
+        plugin = mods[0]["plugin"]
         entry = pl.lookup(plugin, model)
         if not entry:
             skipped.append({"module": model, "param": s["param"], "why": "module not in dictionary"})
@@ -569,23 +579,57 @@ def apply_recipe(patch_path, name, dry_run=False):
                             "why": "only {} same-name slots, cannot take #{}".format(len(cands), idx)})
             continue
         pid = cands[idx]
+        pinfo = entry["params"].get(str(pid), {})
+        if pinfo.get("kind") == "reserved":
+            skipped.append({"module": model, "param": s["param"],
+                            "why": "param {} is a reserved placeholder ({}), refused".format(
+                                pid, pinfo.get("enum"))})
+            continue
 
-        params = mod.setdefault("params", [])
-        found = False
-        for q in params:
-            if q.get("id") == pid:
-                q["value"] = float(s["value"])
-                found = True
-                break
-        if not found:
-            params.append({"id": pid, "value": float(s["value"])})
-        applied.append({"module": model, "param": s["param"], "param_id": pid,
-                        "value": s["value"], "why": s.get("why", "")})
+        target = float(s["value"])
+        lo, hi = pinfo.get("min"), pinfo.get("max")
+        # ★ A8 核心：逐实例应用，不再 mods[0]。同型号（2 个 VCA-1）每台都改。
+        for inst, mod in enumerate(mods):
+            params = mod.setdefault("params", [])
+            cur = None
+            for q in params:
+                if q.get("id") == pid:
+                    cur = q.get("value")
+                    break
+            if cur is None:
+                cur = pinfo.get("default")
+            if cur is None:
+                effective = target
+                src = "recipe (no current value)"
+            else:
+                effective = float(cur) * (1.0 - weight) + target * weight
+                src = "current {} * {} -> target {}".format(cur, weight, target)
+            clamped = None
+            if lo is not None and hi is not None:
+                c = min(hi, max(lo, effective))
+                if c != effective:
+                    clamped = (lo, hi)
+                    effective = c
+            found = False
+            for q in params:
+                if q.get("id") == pid:
+                    q["value"] = effective
+                    found = True
+                    break
+            if not found:
+                params.append({"id": pid, "value": effective})
+            row = {"module": model, "instance": inst, "module_id": mod["id"],
+                   "param": s["param"], "param_id": pid,
+                   "value": effective, "why": s.get("why", ""), "mix": src}
+            if clamped:
+                row["clamped_to"] = clamped
+            applied.append(row)
 
     if not dry_run and applied:
         patchio.write_patch(patch_path, patch)
     return {"recipe": r["name"], "file": os.path.basename(patch_path),
-            "applied": applied, "skipped": skipped, "written": bool(applied and not dry_run)}
+            "weight": weight, "applied": applied, "skipped": skipped,
+            "written": bool(applied and not dry_run)}
 
 
 def dump():
@@ -649,16 +693,18 @@ def main(argv):
                 s["module"], s["param"], s["value"], s.get("why", "")))
     elif cmd == "apply":
         if len(argv) < 4:
-            print("usage: apply <patch.vcv> <recipe>")
+            print("usage: apply <patch.vcv> <recipe> [weight 0..1, default 1]")
             return 1
-        res = apply_recipe(argv[2], argv[3])
+        w = float(argv[4]) if len(argv) > 4 else 1.0
+        res = apply_recipe(argv[2], argv[3], weight=w)
         if res.get("error"):
             print("error:", res["error"])
             return 1
-        print("{} -> {}".format(res["recipe"], res["file"]))
+        print("{} -> {} (weight {})".format(res["recipe"], res["file"], res["weight"]))
         for a in res["applied"]:
-            print("  set {:<4} {} (param {}) = {}".format(
-                a["module"], a["param"], a["param_id"], a["value"]))
+            print("  set {:<4} inst{} {} (param {}) = {}{}".format(
+                a["module"], a["instance"], a["param"], a["param_id"], a["value"],
+                "" if "clamped_to" not in a else " (clamped to {})".format(a["clamped_to"])))
         for s in res["skipped"]:
             print("  skip {:<4} {} -- {}".format(s["module"], s["param"], s["why"]))
     elif cmd == "suggest":

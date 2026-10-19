@@ -57,7 +57,17 @@ def fetch(url, use_cache=True):
 
     Returns the text, or None on failure. The cache key is a URL-slugged name;
     cached files let `build` run fully offline after the first successful scrape.
+
+    ★ 2026-10-19：**先查本地已下载的源码树**（`tmp/<repo>.src/`），再走网络。
+      原因：本作���机 `raw.githubusercontent.com` 走不通
+      （`schannel: failed to receive handshake, SSL/TLS connection failed`），
+      而 `codeload.github.com/.../tar.gz` **是通的** ——
+      ⇒ 正确姿势 = `curl` 下整包 tar.gz → 本地解压 → 从本地读，
+      不要依赖逐文件 raw 抓取。
     """
+    local = _local_hit(url)
+    if local:
+        return local
     os.makedirs(CACHE_DIR, exist_ok=True)
     key = re.sub(r"[^A-Za-z0-9]+", "_", url)[-140:]
     path = os.path.join(CACHE_DIR, key)
@@ -73,6 +83,28 @@ def fetch(url, use_cache=True):
         with open(path, "w", encoding="utf-8", errors="ignore") as f:
             f.write(text)
     return text
+
+
+def _local_hit(url):
+    """在本机已展开的源码树里找这个 raw URL 对应的文件，返回文本或 None。
+
+    URL 形如 https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>
+    本地目录约定： D:\\Cardinal\\tmp\\<repo>.src\\<path>
+    """
+    try:
+        tail = url.split("raw.githubusercontent.com/", 1)[1]
+        parts = tail.split("/", 3)
+        if len(parts) < 4:
+            return None
+        _owner, repo, _branch, rel = parts
+    except Exception:
+        return None
+    root = os.path.join(os.path.dirname(HERE), "tmp", repo + ".src")
+    p = os.path.join(root, rel.replace("/", os.sep))
+    if os.path.exists(p) and os.path.getsize(p) > 0:
+        with open(p, encoding="utf-8", errors="ignore") as f:
+            return f.read()
+    return None
 
 
 def fetch_many(urls):
@@ -310,6 +342,12 @@ def parse_module(src, env):
     `env` is the cross-file shared symbol table (so a child .cpp sees its parent
     class's enums). Loop-generated params are unrolled by instantiating the loop
     variable over its [lo, hi) range.
+
+    ★ A4（2026-10-19）：同时扫 configInput / configOutput（与 configParam 同一
+      套机制），并收集 InputId*/OutputId* enum 块符号 —— 端口语义表的数据源。
+      返回 (params, syms, ports)；ports = {"inputs": [...], "outputs": [...]}，
+      每项 {id, enum, name}。enum 有、configInput 没有的口 name=None
+      （= 未标注口，别凭感觉猜语义）。
     """
     src = strip_comments(src)
     env = dict(env)
@@ -360,7 +398,40 @@ def parse_module(src, env):
                         if opts:
                             entry["options"] = opts
                 params[pid] = entry
-    return params, local_syms
+
+    # ---- A4: ports ----
+    ports = {"inputs": [], "outputs": []}
+    for fname, key in (("configInput", "inputs"), ("configOutput", "outputs")):
+        for pos, inner in find_calls(src, fname):
+            args = split_args(inner)
+            if len(args) < 2:
+                continue
+            pid = eval_const(args[0], env)
+            if pid is None:
+                continue
+            entry = {"id": int(pid), "enum": args[0].strip(),
+                     "name": label_of(args[1])}
+            rows = ports[key]
+            hit = next((x for x in rows if x["id"] == entry["id"]), None)
+            if hit is None or not hit.get("name"):
+                if hit:
+                    hit["name"] = entry["name"]
+                    hit["enum"] = args[0].strip()
+                else:
+                    entry["enum"] = args[0].strip()
+                    ports[key].append(entry)
+    # enum 块里有、configInput 没标到的口补进来（name=None）
+    for block_kind, key in (("InputId", "inputs"), ("OutputId", "outputs")):
+        for nm, (blk, idx) in local_syms.items():
+            if not blk.startswith(block_kind):
+                continue
+            if re.search(r"_LEN$|_LAST$|^NUM_", nm):
+                continue
+            if not any(x["id"] == idx for x in ports[key]):
+                ports[key].append({"id": idx, "enum": nm, "name": None})
+    for key in ("inputs", "outputs"):
+        ports[key].sort(key=lambda x: x["id"])
+    return params, local_syms, ports
 
 
 # ================================================================ module -> source map
@@ -372,6 +443,16 @@ REPOS = {
     "MindMeldModular": ("MarcBoule/MindMeldModular", "master", "src"),
     "Valley": ("ValleyAudio/ValleyRackFree", "main", "src"),
     "WSTD-Drums": ("Wasted-Audio/WSTD-Drums", "master", "src"),
+    # ★ 2026-10-19 新增。理由：life1 / yorushika 等**已验收机架**大量用
+    #   Bogaudio 的 VCO/VCF/ADSR，而 Bogaudio 的端口编号**与 Fundamental
+    #   同名模块完全不同**（Bogaudio-ADSR 只有 1 个输入 IN0=GATE，
+    #   Fundamental-ADSR 的门在 IN4）⇒ 不抓它的源码就会一直误判。
+    "Bogaudio": ("bogaudio/BogaudioModules", "master", "src"),
+    # 以下为 10-19 补齐：Ports、rcm（pianoroll）、HetrickCV、AudibleInstruments
+    "Ports": ("Slippy-Silk/Ports", "master", "src"),
+    "rcm": ("rcm-repo/rcm-modules", "main", "src"),
+    "HetrickCV": ("HetrickCV/HetrickCV", "main", "src"),
+    "AudibleInstruments": (" AudibleInstruments/AudibleInstruments", "master", "src"),
 }
 
 # Exact (plugin, model) -> list of source-relative paths. Headers (.hpp) are added
@@ -397,6 +478,20 @@ SOURCES = {
     ("WSTD-Drums", "Tomi"): ["src/controller/Tomi.cpp", "src/controller/SampleController.hpp"],
     ("WSTD-Drums", "DMX"): ["src/controller/DMX.cpp", "src/controller/SampleController.hpp"],
     ("WSTD-Drums", "Sequencer"): ["src/controller/Sequencer.cpp"],
+    # ★ 2026-10-19：Bogaudio 的源码文件名是**去掉了 Bogaudio- 前缀**的
+    #   （模块 slug = `Bogaudio-VCO`，文件 = `VCO.cpp`），
+    #   所以 guess_rels 猜 `src/Bogaudio-VCO.cpp` 必然找不到。
+    #   ⚠️ key 必须是 **(plugin, model) 元组**，写成裸字符串永远不命中
+    #     （症状：`build --only Bogaudio` 全部 [miss] source not found）。
+    ("Bogaudio", "Bogaudio-VCO"):  ["src/VCO.cpp", "src/vco_base.cpp"],
+    ("Bogaudio", "Bogaudio-VCF"):  ["src/VCF.cpp"],
+    ("Bogaudio", "Bogaudio-ADSR"): ["src/ADSR.cpp"],
+    ("Bogaudio", "Bogaudio-FMOp"): ["src/FMOp.cpp"],
+    ("Bogaudio", "Bogaudio-Unison"): ["src/Unison.cpp"],
+    ("Bogaudio", "Bogaudio-Mix8"): ["src/Mix8.cpp"],
+    ("Bogaudio", "Bogaudio-SAH"):  ["src/SAH.cpp"],
+    ("Bogaudio", "Bogaudio-Sh"):   ["src/SH.cpp"],
+    ("Bogaudio", "Bogaudio-VUm"):  ["src/VUm.cpp"],
 }
 
 
@@ -548,6 +643,13 @@ def plan_from_patches(patch_dir):
     return sorted(need), size
 
 
+def _merge_port(table, entry):
+    """A4: 按 id 合并端口条目，有 name 的优先于没 name 的。"""
+    k = entry["id"]
+    if k not in table or (not table[k].get("name") and entry.get("name")):
+        table[k] = entry
+
+
 def build(patch_dir=None, only=None, quiet=False):
     """Scrape sources for every module used in the patches and write modules.json."""
     patch_dir = patch_dir or os.path.join(os.path.dirname(HERE), "patches")
@@ -603,16 +705,21 @@ def build(patch_dir=None, only=None, quiet=False):
             env, _ = parse_enums(body, shared)
             shared.update(env)
 
-        # 2) Parse configParam per file, collecting param + enum symbols.
+        # 2) Parse configParam per file, collecting param + enum symbols + ports.
         params = {}
         syms = {}
+        port_in, port_out = {}, {}     # A4: id -> entry（label 优先，enum 补位）
         for _rel, t in files:
-            p, s = parse_module(t, shared)
+            p, s, ports = parse_module(t, shared)
             for k, v in p.items():
                 if k not in params or not params[k].get("name"):
                     params[k] = v
             for k, v in s.items():
                 syms.setdefault(k, v)
+            for x in ports["inputs"]:
+                _merge_port(port_in, x)
+            for x in ports["outputs"]:
+                _merge_port(port_out, x)
 
         # 3) Enum entries with no configParam -> "reserved" (only ParamId* enums;
         #    skip _LEN / _LAST / NUM_ sentinels and anything beyond the module's real size).
@@ -640,7 +747,9 @@ def build(patch_dir=None, only=None, quiet=False):
         lib[key] = {"plugin": plugin, "model": model,
                     "source": ", ".join(r for r, _ in files),
                     "params": {str(k): v for k, v in sorted(params.items(),
-                                                             key=lambda x: int(x[0]))}}
+                                                             key=lambda x: int(x[0]))},
+                    "ports": {"inputs": [port_in[k] for k in sorted(port_in)],
+                              "outputs": [port_out[k] for k in sorted(port_out)]}}
         named = sum(1 for v in params.values() if v.get("name"))
         if not quiet:
             head = [v["name"] for k, v in sorted(params.items(), key=lambda x: int(x[0]))

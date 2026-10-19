@@ -38,16 +38,28 @@ LIMITS = {
     "HostMIDI":     (None, 7),  # OUT0=PITCH 1=GATE 2=VEL 6=RETRIG
     "HostTime":     (None, None),
     "HostMIDIMap":  (None, None),
-    # ---- WSTD-Drums（通用公式：触发 IN(16+i)，音频 OUT(i)）----
-    "BassDrum9":    (17, 1), "SnareDrumN": (17, 1), "ClosedHiHat": (16, 1),
-    "OpenHiHat":    (16, 0), "Tomi": (16, 0),
+    # ---- WSTD-Drums（源码 SampleController.hpp：DRUM_CV=0, GATE_INPUT=16,
+    #      TUNE_CV=32, NUM_INPUTS=48; AUDIO_OUTPUT=0, NUM_OUTPUTS=16。
+    #      第 i 声部：触发 IN(16+i)｜音频 OUT(i)｜采样 param(i)｜速度 param(16+i)
+    #      ⇒ 输入上限 48（第二声部触发 IN17 合法, 李 0039 版鼓垫就走 IN17）----
+    "BassDrum9":    (48, 16), "SnareDrumN": (48, 16), "ClosedHiHat": (48, 16),
+    "OpenHiHat":    (48, 16), "Tomi": (48, 16), "CR78": (48, 16),
+    "DMX":          (48, 16),
+    "SyntheticBassDrum": (48, 16),
     "Sequencer":    (5, 7),
     "Gnome":        (None, 6),
     "Clocked":      (None, 6),  # PORTS.md §2: OUT0主时钟 1/2/3子时钟 4=Reset 5=Run 6=BPM
     # ---- 其他（从成功机架反推）----
     "Rings":        (6, 0), "Plateau": (16, 1),   # PORTS.md §8: IN0/1=Left/Right, 2..16 是 CV/开关；OUT0/1
     "samplerx8":   (7, 17),   # OUT16/17 = 混音左右声道（PORTS.md §10 + 项目 memory）
-    "rcm-pianoroll": (8, 7), "MixMaster": (13, 4), "MixMasterJr": (5, 3),
+    "rcm-pianoroll": (8, 7), "MixMaster": (13, 4),
+    # 🔴 2026-10-18 修正：MixMaster<8,2> 按源码有 43 入 7 出（PORTS.md §7：
+    #   IN0-15 轨立体声 / IN16-23 轨音量CV / IN24-25 组音量 / IN26-33 轨pan /
+    #   IN34-35 组pan / IN36-37 chain / IN38-39 insert / IN40-42 mute-solo;
+    #   OUT0-1 direct / OUT2-3 main / OUT4-5 insert / OUT6 fade）。
+    #   旧表 (5,3) 是 6 轨时代的遗留，会把 IN6-13 的正常接线误报越界
+    #   （life1_wdtg 的 Feline 湿声就走 IN6/IN7，已验收）。
+    "MixMasterJr": (43, 7),
 }
 
 

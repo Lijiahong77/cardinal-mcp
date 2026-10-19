@@ -46,37 +46,5 @@
   "vca.bass": [
     17,
     1
-  ],
-  "pr.lead": [
-    86,
-    0
-  ],
-  "voice.lead": [
-    20,
-    1
-  ],
-  "adsr.lead": [
-    34,
-    1
-  ],
-  "vca.lead": [
-    43,
-    1
-  ],
-  "pr.decor": [
-    60,
-    1
-  ],
-  "voice.decor": [
-    100,
-    1
-  ],
-  "adsr.decor": [
-    109,
-    1
-  ],
-  "vca.decor": [
-    118,
-    1
   ]
 }

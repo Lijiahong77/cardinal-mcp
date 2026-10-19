@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Cardinal module picker.
+"""Cardinal module picker.（2026-10-19 E10 裁决：本脚本降级为速查表 CLI。
+
+主检索入口 = modbrowser.py（MCP 工具 cardinal_module_search），检索本体只走英文，
+中文口语靠其内置词表翻译。本脚本的 `find` 中文匹配已被取代；`routes` 子命令
+的音色速查表仍是有效资产，继续保留。
 
 Builds a searchable index of every module bundled with Cardinal (1400+) and
 lets you query it by keyword, manifest tag or package slug.

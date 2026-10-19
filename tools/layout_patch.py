@@ -155,6 +155,7 @@ WIDTH_BY_PLUGIN_MODEL = {
     "Starsea/MiniArrangerExpander": 24,
     # ---- Fundamental ----
     "Fundamental/VCO": 9,
+    "Fundamental/SEQ3": 22,   # 330px / 15 (measured from SEQ3.svg)
     "Fundamental/WTVCO": 7,
     "Fundamental/VCF": 7,
     "Fundamental/ADSR": 9,
@@ -232,6 +233,9 @@ WIDTH_BY_PLUGIN_MODEL = {
     # SurgeXTRack panels are code-drawn (no SVG) -> width inferred from
     # Final Patch Work.vcv coordinates (Distortion x=171 -> next x=183).
     "SurgeXTRack/SurgeXTFXDistortion": 12,
+    # 2026-10-18: Surge XT FX 全家同面板尺寸（Distortion=12 已实测登记）；
+    # Reverb2 = 12HP 由李的 Final Patch Work.vcv 中 Chorus→Reverb2 无缝相邻 gap=12 印证。
+    "SurgeXTRack/SurgeXTFXReverb2": 12,
 }
 
 # When a panel file name differs from the model name (used by `widths` check).
@@ -337,9 +341,112 @@ WDTG_LAYOUT = [
     ("9000000000000043",   1, 5),    # Split       5HP
 ]
 
+    # ---------------- yorushika (shura / hana) ----------------
+#   TWO rows, zoom 0.7 (209 cells visible at 1.0 -> ~298 at 0.7).
+#     row 0 = transport/control/arranger      (~200 cells)
+#     row 1 = voice chains + drums + master   (~273 cells)
+#   🔴 MiniArranger MUST be immediately left of the Expander (Rack rightExpander
+#      only recognises physical adjacency; wrong placement = LINK dark + no rec).
+#   2026-10-18 鼓组重选型：BassDrum9(909 电子底鼓)/DMX(Oberheim 电子鼓机) →
+#   CR78(Roland CompuRhythm 1978 模拟电路鼓, 温暖圆润更贴修羅的原声鼓组);
+#   混响 Plateau → SurgeXTFXReverb2（李自己 Final Patch Work 在用的 Surge XT 系）。
+YORUSHIKA_LAYOUT = [
+    # ---------------- row 0: clock + MIDI in + arranger ----------------
+    ("7200000000000001",   0, 20),   # Clocked     20HP — RUN key on panel
+    ("7200000000000002",   0, 9),    # HostMIDI     9HP — keys, OMNI, 8-voice
+    ("7200000000000003",   0, 11),   # HostMIDIMap 11HP — CC20-27 + CC1
+    ("7200000000000004",   0, 14),   # HostMIDIGate 14HP — pads 48-55 + transport 93-95
+    ("7200000000000005",   0, 40),   # MiniArranger 40HP — 4-track chord recorder
+    ("7200000000000006",   0, 24),   # Expander    24HP — MUST sit right of MiniArranger
+    ("7200000000000007",   0, 32),   # Sequencer   32HP — style drum pattern
+    ("7200000000000008",   0, 26),   # TextEditor  26HP — instructions
+    ("7200000000000041",   0, 8),    # HostAudio2   8HP — main output (kept on row0 so
+                                     #   row1 stays under the 3000px view limit)
+    # ---------------- row 1: voice chains + drums + master ----------------
+    ("7200000000000009",   1, 9),    # EP VCO       9HP — live key voice (saw)
+    ("7200000000000010",   1, 10),   # EP VCF      10HP — Bogaudio width (NOT 7=Fundamental)
+    ("7200000000000011",   1, 3),    # EP ADSR      3HP
+    ("7200000000000012",   1, 3),    # EP VCA-1     3HP
+    ("7200000000000013",   1, 3),    # EP Sum       3HP — poly -> mono (0.5)
+    ("7200000000000014",   1, 9),    # bass VCO     9HP — track1
+    ("7200000000000015",   1, 3),    # bass ADSR    3HP
+    ("7200000000000016",   1, 3),    # bass VCA-1   3HP
+    ("7200000000000017",   1, 3),    # bass Sum     3HP
+    ("7200000000000018",   1, 9),    # pad VCO      9HP — track2
+    ("7200000000000019",   1, 10),   # pad VCF     10HP — Bogaudio width
+    ("7200000000000020",   1, 3),    # pad ADSR     3HP
+    ("7200000000000021",   1, 3),    # pad VCA-1    3HP
+    ("7200000000000022",   1, 3),    # pad Sum      3HP
+    ("7200000000000023",   1, 12),   # Plaits      12HP — arp track3 (PLUCK)
+    ("7200000000000024",   1, 3),    # arp ADSR     3HP
+    ("7200000000000025",   1, 3),    # arp VCA-1    3HP
+    ("7200000000000026",   1, 3),    # arp Sum      3HP
+    ("7200000000000027",   1, 9),    # lead VCO     9HP — track4
+    ("7200000000000028",   1, 3),    # lead ADSR    3HP
+    ("7200000000000029",   1, 3),    # lead VCA-1   3HP
+    ("7200000000000030",   1, 3),    # lead Sum     3HP
+    ("7200000000000031",   1, 6),    # CR78         6HP — kick(auto trk1) + latin perc(pad)
+    ("7200000000000032",   1, 6),    # SnareDrumN   6HP — snare (sequencer)
+    ("7200000000000033",   1, 6),    # ClosedHiHat  6HP — closed hat (sequencer)
+    ("7200000000000034",   1, 9),    # OpenHiHat    9HP — pad 3
+    ("7200000000000035",   1, 6),    # Tomi         6HP — pad 2
+    ("7200000000000036",   1, 3),    # Mixer        3HP — drum bus
+    ("7200000000000037",   1, 3),    # drum Sum     3HP
+    ("7200000000000038",   1, 3),    # send Mixer   3HP — reverb sends (EP+pad+arp)
+    ("7200000000000039",   1, 12),   # SurgeXTReverb2 12HP — send reverb
+    ("7200000000000040",   1, 36),   # MixMasterJr 36HP — 8-track master
+]
+
+# ---------------- Charli XCX / A.G. Cook trio (2026-10-18) ----------------
+#   Shared by all three patches (identical module ids by design, only BPM /
+#   harmony / timbre differ). TWO rows, total 323 cells:
+#     row 0 = transport + arranger + drums + master ................ 149
+#     row 1 = voices + hand-play control .......................... 174
+#   🔴 MiniArranger (40) and Expander (24) MUST stay adjacent, gap exactly 2:
+#      Rack's rightExpander only recognises physical adjacency, and the
+#      generator asserts gap == 42 (40 + GAP).
+BRAT_LAYOUT = [
+    # ---------------- row 0: transport / arranger / drums / master ----------------
+    ("8400000000000001",   0, 20),   # Clocked       20HP — RUN key here
+    ("8400000000000002",   0, 40),   # MiniArranger  40HP — 4 tracks
+    ("8400000000000003",   0, 24),   # Expander      24HP — MUST be adjacent
+    ("8400000000000004",   0, 6),    # BassDrum9
+    ("8400000000000005",   0, 6),    # SnareDrumN
+    ("8400000000000006",   0, 6),    # ClosedHiHat
+    ("8400000000000023",   0, 36),   # MixMasterJr   36HP
+    ("8400000000000024",   0, 12),   # Plateau       12HP
+    ("8400000000000025",   0, 8),    # HostAudio2     8HP
+    ("8400000000000029",   0, 26),   # TextEditor    26HP
+    # ---------------- row 1: voices + hand-play ----------------
+    ("8400000000000007",   1, 10),   # bass VCO
+    ("8400000000000008",   1, 10),   # bass VCF
+    ("8400000000000009",   1, 3),    # bass ADSR
+    ("8400000000000010",   1, 3),    # bass VCA
+    ("8400000000000011",   1, 10),   # chord VCO 1
+    ("8400000000000012",   1, 10),   # chord VCO 2
+    ("8400000000000013",   1, 10),   # chord VCO 3
+    ("8400000000000014",   1, 3),    # chord Mix
+    ("8400000000000015",   1, 10),   # chord VCF
+    ("8400000000000016",   1, 3),    # chord ADSR
+    ("8400000000000017",   1, 3),    # chord VCA
+    ("8400000000000018",   1, 10),   # lead VCO
+    ("8400000000000019",   1, 10),   # lead VCF
+    ("8400000000000020",   1, 3),    # lead ADSR
+    ("8400000000000021",   1, 3),    # lead VCA
+    ("8400000000000022",   1, 3),    # manual drum bus
+    ("8400000000000026",   1, 9),    # HostMIDI
+    ("8400000000000027",   1, 14),   # HostMIDIGate
+    ("8400000000000028",   1, 11),   # HostMIDIMap
+]
+
 # Which layout table applies to which patch (basename match).
 LAYOUT_FOR_PATCH = {
     "quadeca_life1_wdtg.vcv": WDTG_LAYOUT,
+    "yorushika_shura.vcv": YORUSHIKA_LAYOUT,
+    "yorushika_hana.vcv": YORUSHIKA_LAYOUT,
+    "charli_360.vcv": BRAT_LAYOUT,
+    "charli_party4u.vcv": BRAT_LAYOUT,
+    "charli_wytam.vcv": BRAT_LAYOUT,
 }
 
 # The label-panel text (written into TextEditor's data.etext). Width 26 cells ≈ 65
@@ -523,14 +630,21 @@ def check_overlap(pos, widths, tol=0):
     return hard, soft
 
 
-def check_view(pos):
-    """Check whether any module is off the default view. Returns (hard, soft)."""
+def check_view(pos, zoom=1.0):
+    """Check whether any module is off the default view. Returns (hard, soft).
+
+    🔴 2026-10-18: the 200-cell limit is a *physical* 3000px budget (window is
+    ~3129px wide on 李's machine). It was calibrated at zoom=1; a zoomed-out
+    patch legitimately fits more cells. The limit is now divided by zoom so the
+   判据回归本意: |x| beyond 3000px of visible width.
+    """
     hard, soft = [], []
+    limit = VIEW_LIMIT / max(float(zoom or 1.0), 0.01)
     for mid, (x, y) in pos.items():
-        if abs(x) > VIEW_LIMIT or abs(y) > VIEW_LIMIT:
-            hard.append("%s pos=(%.0f, %.0f) outside default view (|coord|>%d cells ≈ %dpx) "
+        if abs(x) > limit or abs(y) > limit:
+            hard.append("%s pos=(%.0f, %.0f) outside default view (|coord|>%.0f cells at zoom %.2f ≈ %dpx) "
                         "— module not visible"
-                        % (mid, x, y, VIEW_LIMIT, VIEW_LIMIT * 15))
+                        % (mid, x, y, limit, zoom, VIEW_LIMIT * 15))
         elif x < -NEG_X_TOL:
             hard.append("%s x=%.0f is %.0f px left of the view's left edge" % (mid, x, -x * 15))
         elif x < 0 or y < 0:
@@ -585,7 +699,7 @@ def analyze(d, strict=False, layout=None):
 
     hard, soft = [], []
 
-    vh, vs = check_view(pos)
+    vh, vs = check_view(pos, zoom=d.get("zoom", 1.0))
     hard += vh
     soft += vs
 
