@@ -1,5 +1,10 @@
 # 歌 / 音色 → Patch 复刻工作流
 
+> ⚠️ **2026-10-19：本文档已并入 `TODO-BACKLOG.md`（批次 C 创作能力线），不再单独维护。**
+> 流程本身（你说元素 → 搜配方 → 翻译接线 → 你听）继续有效，后续修订只改 TODO-BACKLOG。
+> 检索裁决（E10）：选型主入口 = `modbrowser.py`（MCP 工具 `cardinal_module_search`），
+> 只走英文；中文口语靠其内置词表翻译。`modsearch.py` 降级为速查表 CLI（`routes` 保留）。
+
 > 2026-09-14 修订。核心路线：**你说元素 → 我搜配方教程 → 翻译成 Cardinal 接线 → 你听**。
 > 相关技能：`cardinal-patch-authoring`。选型工具：`D:\Cardinal\tools\modsearch.py`。
 
@@ -73,19 +78,24 @@
 
 Cardinal 本机装了 **1422 个模块**（85 个插件包）。选型不靠印象，靠一张**可查询的索引**。
 
-### 工具
+### 工具（2026-10-19 更新：主入口 modbrowser，只走英文）
 
 ```bash
 PY="<USERPROFILE>/.workbuddy/binaries/python/envs/music-ai/Scripts/python.exe"
 cd /d/Cardinal/tools
 
-python modsearch.py routes              # 音色 → 模块 速查表（带 ✓ 校验）
-python modsearch.py find 古筝            # 关键词搜索（中文口语词也行）
-python modsearch.py tag "Physical modeling"
-python modsearch.py pkg AudibleInstruments
+python modbrowser.py search "warm pad"   # 主检索（英文关键词；中文词见下）
+python modbrowser.py tags                # 官方标签列表
+python modbrowser.py brands              # 品牌列表
+python modbrowser.py detail <plugin> <model>   # 单模块端口/参数详情
+python modsearch.py routes               # 音色 → 模块 速查表（仍有效，带 ✓ 校验）
 ```
 
-索引缓存在 `params/module_index.json`。**Cardinal 升级后跑一次 `modsearch.py index` 重建。**
+⚠️ 旧写法 `python modsearch.py find 古筝`（中文口语搜索）**已废弃**：实测「金属打击」
+会误中 noise 发生器。现在中文口语统一走 `cardinal_module_search` 的内置词表
+（modbrowser.ZH_VOCAB，词表外中文会明确报告 untranslated 而不是乱猜）。
+索引缓存在 `params/module_index.json`（modbrowser 读取的是 PluginManifests，无需重建；
+modsearch 的缓存仅在用 `routes` 时需要，Cardinal 升级后跑一次 `modsearch.py index`）。
 
 ### 六条路线（按"这个音色是怎么发出来的"分）
 
