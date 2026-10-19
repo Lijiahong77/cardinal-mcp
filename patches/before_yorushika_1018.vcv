@@ -1,0 +1,62 @@
+{
+  "version": "2.4.1",
+  "zoom": 0.7,
+  "modules": [
+    {
+      "id": 9730000000000001,
+      "plugin": "Cardinal",
+      "model": "HostAudio2",
+      "version": "2.0.0",
+      "params": [
+        {
+          "value": 0.7943282127380371,
+          "id": 0
+        }
+      ],
+      "data": {
+        "dcFilter": true
+      },
+      "pos": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": 9730000000000002,
+      "plugin": "Fundamental",
+      "model": "Mixer",
+      "version": "2.0",
+      "params": [
+        {
+          "value": 1.0,
+          "id": 0
+        }
+      ],
+      "data": {
+        "average": false,
+        "invert": false
+      },
+      "pos": [
+        10,
+        0
+      ]
+    }
+  ],
+  "cables": [
+    {
+      "id": 1,
+      "outputModuleId": 9730000000000002,
+      "outputId": 0,
+      "inputModuleId": 9730000000000001,
+      "inputId": 0
+    },
+    {
+      "id": 2,
+      "outputModuleId": 9730000000000002,
+      "outputId": 1,
+      "inputModuleId": 9730000000000001,
+      "inputId": 1
+    }
+  ],
+  "path": "D:/Cardinal/patches\\zz_Q1.vcv"
+}
