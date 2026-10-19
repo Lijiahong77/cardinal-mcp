@@ -2,8 +2,9 @@
 
 > A lightweight shell that lets an AI agent drive [Cardinal](https://github.com/DISTRHO/Cardinal)
 > (a modular synth) directly.
-> 12 MCP tools + 24 zero-dependency Python utilities = a version-controllable,
-> automatable, remotely-controllable synth workflow.
+> **36 MCP tools** (MCP protocol 2025-06-18: tool annotations + structured output)
+> + ~40 zero-dependency Python utilities = a version-controllable, automatable,
+> remotely-controllable synth workflow.
 
 ---
 
@@ -30,21 +31,34 @@ tone" *and* keep a code-level copy an AI can edit, it's a black box — no MCP i
 no structured output, module positions are all drag-and-drop in the GUI.
 
 `cardinal-mcp` wraps a layer around it:
-- Uses Cardinal's **OSC (4 messages)** + **Windows screenshots** + **live autosave
-  read-back** to assemble **12 semantic MCP tools** (`cardinal_load_patch` /
-  `cardinal_set_param` / `cardinal_read_live`, etc.).
-- Ships a set of **zero-dependency probe tools**: DPI probe, MIDI sniffer, GDI
-  screenshot, live-autosave read-back, layout gate.
-- A `params/modules.json`: **15 modules / 248 named params**, scraped from Cardinal's
-  bundled modules' C++ source.
-- A `music/knowledge.json`: 9 drum patterns / 10 chord progressions / 8 tone recipes.
-- A **layout gate**: every time you add a module or rewire, you must pass
-  `layout_patch.py guard` before pushing.
+- **Drive**: Cardinal's **OSC** (stock build: 4 write-only handlers) + **live autosave
+  read-back** assemble **36 semantic MCP tools** (`cardinal_load_patch` /
+  `cardinal_set_param` / `cardinal_read_live`, …).
+- **See** (the part stock Cardinal cannot do): `tools/osc_patch/` is an idempotent
+  source patch + WSL2 cross-build recipe that injects **5 read-only OSC probes**
+  (`/modules` `/param-get` `/ports` `/signal` `/light`) into Cardinal — so the AI can
+  finally *read* what the engine is doing: which modules loaded, a knob's real display
+  value, per-port voltages (is this rack actually making sound?), LED states. The
+  author's patched build is deployed and verified (see "Probes" below); on a stock
+  build every probe tool degrades gracefully to `probe_not_supported`.
+- **Validate before you load**: a 5-stage audit chain (`validate` → `ports` → `chain` →
+  `values` → `flow`) aggregated into one `cardinal_audit` tool — catches the crash-on-load
+  and never-makes-a-sound classes *before* pushing a rack into Cardinal.
+- **Patches as code**: generators (`tools/make_*.py`, DSL in `tools/rackgen.py`) + a
+  layout gate (`layout_patch.py`) — racks are plain text you can `git diff`.
+- **Score export**: sequencer notes → editable `.abc` text score
+  (`tools/abc_export.py` + `cardinal_export_abc`), both sequencer families supported.
+- **Knowledge**: `params/modules.json` (param dictionary scraped from module C++ source,
+  data-driven coverage) + 112 port-semantics entries extracted from real source enums +
+  `music/knowledge.json` (9 drum patterns / 10 chord progressions / 8 tone recipes) +
+  a style schema (`docs/STYLE-SCHEMA.md`) with real-rack-verified samples.
 
 **What it is NOT**
 
-- **Not a Cardinal plugin** — it does not modify Cardinal itself; it only drives it
-  externally via OSC + the file layer.
+- **Not a Cardinal plugin on the main path** — the 36 tools drive Cardinal externally
+  via OSC + the file layer and work with a stock Cardinal. The optional `tools/osc_patch/`
+  source patch *does* modify Cardinal (that is the only way to get read-back; Cardinal's
+  OSC is write-only by design) — it is opt-in, idempotent, and ships a rollback.
 - **Not a music-teaching project** — it only solves "engineering + remote control";
   the music knowledge base is incidental scaffolding.
 - **Ships no third-party works** — Cardinal's official example patches, MidiSuite
@@ -56,13 +70,11 @@ no structured output, module positions are all drag-and-drop in the GUI.
 ## Who it's for
 
 - Anyone with Cardinal standalone + a MIDI keyboard who wants an MCP-aware AI
-  (Cursor / WorkBuddy) to tweak params, swap tones, and rewire directly.
+  (Cursor / WorkBuddy / Claude Desktop) to tweak params, swap tones, and rewire directly.
 - Anyone who wants to turn a "mouse-built synth rack" into plain text they can `git diff`.
 - Anyone who wants to pre-generate and pre-validate racks in a headless / CI environment.
 
 ### Using this on your own machine
-
-The tools are meant to be reused, so a few things worth knowing up front:
 
 - **No personal paths are baked in.** `tools/cardinal_mcp.py` locates the repository from its
   own file location, and `CARDINAL_IP` / `CARDINAL_PORT` / `CARDINAL_PATCH_DIR` are all
@@ -78,6 +90,8 @@ The tools are meant to be reused, so a few things worth knowing up front:
 - **Windows is the tested platform.** `winmidi.py` / `winprobe.py` use Win32 APIs and the
   screenshot tools assume a Windows desktop. The patch-authoring tools themselves are
   cross-platform, but MIDI input has only been exercised on Windows.
+- **Any MCP client can connect.** The server is a spec-compliant MCP server
+  (stdio + JSON-RPC 2.0, version-negotiated up to 2025-06-18) — not tied to WorkBuddy.
 
 ---
 
@@ -95,18 +109,20 @@ pip install -r requirements.txt
 Few dependencies because most tools use the standard library only
 (`win32gui` / `ctypes` / `socket` / `tarfile` / `json`).
 
-### 2. Launch Cardinal and enable OSC
+### 2. Launch Cardinal
 
 ```text
 Open CardinalNative.exe
-Menu: Engine → Enable OSC remote control   (top menu; ⚠️ click it again every launch)
+OSC remote control auto-starts by default (CARDINAL_OSC_AUTOSTART=1).
+On a stock build you can also enable it manually:
+Menu: Engine → Enable OSC remote control
 ```
 
 Verify OSC is up:
 
 ```bash
 python tools/cardinal_mcp.py --selftest
-# last line should read: OK: All 12 tools reachable
+# last line should read: OK: All 36 tools reachable
 ```
 
 If it doesn't connect, first check in PowerShell:
@@ -146,22 +162,88 @@ Behind the scenes it calls `cardinal_list_patches` + `cardinal_patch_info`.
 
 ---
 
-## What it can do — the 12 MCP tools
+## What it can do — the 36 MCP tools
+
+### Drive (write into running Cardinal)
 
 | Tool | Does | Common use |
 |---|---|---|
 | `cardinal_ping` | send `/hello` to check Cardinal's OSC response | connectivity troubleshooting |
-| `cardinal_list_patches` | list all .vcv patches in `patches/` | pick a rack to load |
-| `cardinal_patch_info` | inspect a patch's module list (need moduleId to set params) | required lookup before tweaking |
 | `cardinal_load_patch` | push a .vcv into running Cardinal (incl. zoom + gridOffset) | let the AI switch tones |
 | `cardinal_set_param` | turn any module's knob: `moduleId + paramId + value` | change cutoff / release / etc. |
+| `cardinal_set_param_by_name` | set one knob by param NAME, refuses reserved/removed slots, multi-instance aware | "set the VCF cutoff" without looking up ids |
 | `cardinal_set_host_param` | change one of Cardinal's 24 host params | audio device / sample rate / etc. |
-| `cardinal_read_live` | read the rack Cardinal is currently running (via live autosave) | see what the user changed in the GUI |
 | `cardinal_save_live` | persist current GUI state to a .vcv | user's manual changes vanish on close otherwise |
+
+### Inspect (read patches & the running rack)
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_patch_info` | inspect a patch's module list (need moduleId to set params) | required lookup before tweaking |
+| `cardinal_list_patches` | list all .vcv patches in `patches/` | pick a rack to load |
+| `cardinal_read_live` | read the rack Cardinal is currently running (via live autosave; `stale` flag included) | see what the user changed in the GUI |
 | `cardinal_module_params` | list a module's params (name → number) | find a param number |
 | `cardinal_find_param` | translate plain language to a param number ("brighter" → Cutoff) | let the AI speak naturally |
-| `cardinal_music` | query drum patterns / chord progressions / tone recipes | let the AI answer from the knowledge base |
-| `cardinal_apply_recipe` | write a tone recipe into the current rack | one-click tone swap |
+| `cardinal_topology` | wiring + per-module roles + signal-reachability to HostAudio2 | "what is this rack actually doing" |
+
+### Audit & deploy (the "never load a broken rack" chain)
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_audit` | run ALL five pre-load audits in one call, verdict FAIL/WARN/PASS | gate before every `/load` |
+| `cardinal_deploy` | backup → audit → load → read-back structure diff, refuses on FAIL | one-click safe deploy |
+| `cardinal_diff` | on-disk .vcv vs. what the engine actually instantiated | catch silently dropped modules |
+
+### Live read probes (need the patched Cardinal build; degrade gracefully without it)
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_live_modules` | every module the engine actually instantiated | ground truth after a load |
+| `cardinal_get_param` | one knob's real DISPLAY value (275 ms, not 0.275) | verify a `set_param` actually landed |
+| `cardinal_module_ports` | per-port wired state + live voltage | "is this input connected / silent / signaling" |
+| `cardinal_scan_signal` | whole-rack scan: which modules emit non-zero voltage right now | the direct answer to "is it sounding?" |
+| `cardinal_get_light` | LED brightness (e.g. Clocked's RUN lamp) | is the transport actually running |
+
+### Module library browser (reads Cardinal's own PluginManifests — 1407 modules / 85 brands / 104 tags)
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_module_search` | search the installed library by English keywords / tags / brand | pick modules from reality, not memory |
+| `cardinal_module_tags` | all official tags + counts | when a search returns nothing useful |
+| `cardinal_module_brands` | all brands + module counts | browse by maker |
+| `cardinal_module_detail` | full manifest record for one module | manual URL, description, siblings |
+| `cardinal_port_semantics` | per-socket pitch/gate/audio/cv semantics from real source | route cables by table, not by guessing |
+
+### Sequencer & score (piano-roll equivalents)
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_seq_read` | read sequencer notes as measures/note names (both families) | see the music as text |
+| `cardinal_seq_edit_note` | edit ONE note (pitch / rest / velocity), refuses corrupt writes | click a piano-roll cell, remotely |
+| `cardinal_seq_set_running` | start/stop a sequencer's transport (the RUN button) | start playback |
+| `cardinal_export_abc` | export sequencer notes to an editable `.abc` text score | edit music outside the GUI |
+
+### Sampler slots (right-click → "Load sample" equivalents)
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_samples_list` | browse the sample library | pick from what exists, don't guess filenames |
+| `cardinal_sample_inspect` | which sample each slot holds + flags dead files | find silently dead samplers |
+| `cardinal_sample_load` | load a wav into a slot (path-style aware, backs up) | remote sample swapping |
+| `cardinal_sample_clear` | empty one slot | clean up |
+
+### Music & style knowledge
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_music` | drum patterns / chord progressions / tone recipes | let the AI answer from the knowledge base |
+| `cardinal_apply_recipe` | write a tone recipe into a rack; `weight` 0..1 blends current ↔ target | one-click tone swap, or a gentle nudge |
+
+### Human-interaction index
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_actions` | 23 human UI operations: where the code lives, which tool covers it, status | before writing any script+reload, check what the human's button maps to |
 
 ---
 
@@ -176,35 +258,50 @@ cardinal-mcp/
 ├── mcp.example.json                ← MCP config example
 ├── AI-DISCLOSURE.md                ← AI-generation notice (READ BEFORE USE)
 │
-├── tools/                          ← 24 Python utilities
-│   ├── cardinal_mcp.py             ← MCP entry point (the 12 tools)
+├── tools/                          ← ~40 Python utilities
+│   ├── cardinal_mcp.py             ← MCP entry point (the 36 tools)
+│   ├── osc_patch/                  ← Cardinal source patch: 5 read-only OSC probes
+│   │                               ← + idempotent injector (backup/verify/rollback)
 │   ├── patchio.py                  ← read/write .vcv in both formats (JSON / tar+zstd)
 │   ├── layout_patch.py             ← layout gate + auto re-layout
 │   ├── paramlib.py                 ← scrape the param dictionary from source
 │   ├── musiclib.py                 ← tone recipes / chord progressions / drum patterns
-│   ├── make_full.py                ← generate the "full keyboard controls" rack
-│   ├── make_knobs.py               ← write HostMIDIMap mappings
-│   ├── fix_drum_bus.py             ← drum-bus fix + input-port self-check
+│   ├── modbrowser.py               ← module library search (reads PluginManifests)
+│   ├── topology.py                 ← rack wiring / roles / reachability
+│   ├── seq.py                      ← sequencer notes (piano-roll equivalent)
+│   ├── abc_export.py               ← sequencer notes → .abc text score
+│   ├── samplelib.py                ← sampler slots (right-click 'Load sample' equivalent)
+│   ├── interaction_map.py          ← human UI operation → source code index
+│   ├── style_schema.py             ← style schema validation + rack sample filling
+│   ├── rackgen.py                  ← rack-generation DSL (blood-lessons preserved)
+│   ├── audit_{ports,values,flow,chain}.py + validate.py  ← the audit chain
+│   ├── cross_build_cardinal.sh     ← WSL2 cross-build recipe (win64)
+│   ├── wslrun.py / wslout.py       ← WSL2 helpers (UTF-16 decoding, path safety)
 │   ├── winprobe.py                 ← DPI / window probe
 │   ├── winmidi.py + midiprobe.py   ← native Windows MIDI tools
 │   ├── shot.py                     ← GDI screenshot (zero-dependency)
-│   └── ... more helper scripts
+│   └── make_*.py                   ← per-rack generators (quadeca / yorushika / …)
 │
 ├── params/
-│   └── modules.json                ← 15 modules / 248 named params
+│   └── modules.json                ← param dictionary (data-driven coverage)
 │
 ├── music/
 │   └── knowledge.json              ← patterns / progressions / recipes
 │
 ├── patches/
 │   ├── helm_full.vcv               ← main rack: keys + knobs + touch + pads, all wired
-│   ├── helm_keys.vcv               ← synth-only rack
-│   ├── helm_drums.vcv              ← drum rack
+│   ├── quadeca_life1_wdtg.vcv      ← the flagship musical rack (ear-verified)
+│   ├── yorushika_shura/hana.vcv    ← style-driven racks (awaiting acceptance)
 │   └── ... (personal backups excluded by .gitignore)
 │
 └── docs/
     ├── DESIGN-NOTES.md             ← tech archive: how the whole thing was built
     ├── CARDINAL-REPO-NOTES.md      ← key findings from the upstream Cardinal repo
+    ├── TODO-BACKLOG.md             ← the single backlog (batch A done, B/C pending)
+    ├── CARDINAL-MCP-SPEC.md        ← protocol spec + source-verified facts
+    ├── CARDINAL-MCP-CAPABILITY-MAP.md ← what the engine can/can't do, with source lines
+    ├── HUMAN-INTERACTION-MAP.md    ← human UI operations → source functions
+    ├── STYLE-SCHEMA.md             ← style-as-data, with real-rack samples
     ├── SMK25-midi-map.md           ← M-VAVE SMK25 keyboard MIDI measurement notes
     └── ATTRIBUTION.md              ← third-party resource attribution
 ```
@@ -213,7 +310,7 @@ cardinal-mcp/
 
 ## Workflow examples
 
-> The three snippets below are **illustrations of how you would talk to the AI** — they show
+> The snippets below are **illustrations of how you would talk to the AI** — they show
 > the intended conversation, not a transcript of a verified run.
 >
 > **What has actually been run on hardware** is recorded separately:
@@ -224,7 +321,8 @@ cardinal-mcp/
 > | `quadeca_life1_wdtg.vcv` | confirmed audible by ear |
 > | `mini_arranger_expanded.vcv` | the MiniArranger package with its expander, accepted |
 > | `mini_arranger_8voice*.vcv` | generated, **awaiting hardware acceptance** (`docs/8VOICE-PATCH-ACCEPTANCE.md`) |
-> | All 52 patches | parse cleanly under static audit |
+> | All patches | parse cleanly under static audit |
+> | OSC read probes | compiled (WSL2 cross-build) + deployed; verified by live OSC interrogation of the running engine (e.g. default rack's VCO reads 4.977 V on `/signal`) |
 
 ### "Make the synth brighter"
 
@@ -233,8 +331,19 @@ You:  Raise the filter brightness of the current patch a bit
 AI:   → cardinal_patch_info  (get the VCF moduleId)
      → cardinal_find_param (plain language → "Cutoff")
      → cardinal_set_param (Cutoff value = 0.75)
-     → screenshot the knob (tools/shot.py) to confirm it actually moved
+     → cardinal_get_param (patched build: read back the DISPLAY value to confirm it landed)
      → tells you in plain words: cutoff 0.5 → 0.75, sounds brighter
+```
+
+### "Does this rack actually make sound?"
+
+```
+You:  I loaded the new patch but hear nothing — is it broken?
+AI:   → cardinal_audit (static: ports/values/flow/chain/validate — FAIL = do not load)
+     → cardinal_live_modules (did every module survive the load?)
+     → cardinal_scan_signal (which modules emit non-zero voltage right now)
+     → cardinal_module_ports on the suspect module (not wired / silent / signaling)
+     → answers with the actual cause, not a guess
 ```
 
 ### "Swap in a chord progression"
@@ -247,15 +356,29 @@ AI:   → cardinal_music (progressions) to get ii–V–I voicings
      → you press one key and hear ii–V–I
 ```
 
-### "Change pad 3's sound to a short snare"
+---
+
+## Probes: how the read-only OSC layer works
+
+Stock Cardinal's OSC server is **write-only** (4 handlers, none replies with data) — that
+is a hard design fact of the upstream project, not a bug. `tools/osc_patch/` closes it:
 
 ```
-You:  I want pad #3 to be a shorter snare
-AI:   → cardinal_patch_info to find SnareDrumN
-     → see that voice i's sample is controlled by param(i)
-     → cardinal_set_param to set SnareDrumN param(2) to a "shorter" sample number
-     → ask you to hit the pad to verify
+tools/osc_patch/
+├── osc_read_handlers.cpp.inc   ← 5 handlers (/modules /param-get /ports /signal /light)
+├── inject_osc_read.py          ← idempotent injector: backup → inject → verify → (--rollback)
+└── ...
 ```
+
+- The injector patches `src/CardinalCommon.cpp` (both the thread and non-thread
+  registration sites), backs up first, and verifies 5 implementations × 2 registrations.
+- Build it with the WSL2 cross-compile recipe: `bash tools/cross_build_cardinal.sh 8 true`
+  followed by `make -C CardinalNative` (see `skills`-equivalent notes in
+  `docs/TODO-BACKLOG.md`, batch B).
+- On an unpatched build every probe tool returns `probe_not_supported` — the other
+  31 tools keep working unchanged.
+- Verified live: `/modules` returns the engine's real module list, `/signal` reports
+  per-module peak voltage (the default rack's VCO reads 4.977 V).
 
 ---
 
@@ -266,11 +389,12 @@ AI:   → cardinal_patch_info to find SnareDrumN
 ### Software
 
 - **OS**: Windows 11 (10.0.26200, 64-bit)
-- **Cardinal**: 26.02 ([DISTRHO/Cardinal](https://github.com/DISTRHO/Cardinal) 26.02
-  standalone release, installed at `C:\Program Files\Cardinal-win64-26.02\`)
+- **Cardinal**: 26.02 ([DISTRHO/Cardinal](https://github.com/DISTRHO/Cardinal))
   - 4 variants: DISTRHO core / FX / Mini / Synth
   - launch with `CardinalNative.exe` (~100 MB, main standalone)
   - bundled module library (VCV Rack Fundamental + AudibleInstruments + community plugins)
+  - the author additionally runs a **self-built patched CardinalNative** (WSL2 cross-compile,
+    OSC probes injected) deployed at `D:/Cardinal/win64/` — build recipe in `tools/`
 - **Python**: 3.13.12 (managed interpreter, in an isolated venv under the user dir)
 - **AI client**: WorkBuddy (via its MCP config) — Cursor / Claude Desktop work with the
   same `mcp.example.json`
@@ -302,11 +426,11 @@ AI:   → cardinal_patch_info to find SnareDrumN
 
 | Not supported | Why |
 |---|---|
-| Live MIDI/CV injection | Cardinal OSC only has 4 messages: `/load /param /host-param /hello`; no MIDI injection |
-| Auto read-back of param changes | The live autosave is only flushed on `/load` or an explicit GUI save — **not** on `/param` changes and **not** on a timer (measured on 26.02). After a `set_param`, verify by looking at the GUI, not by re-reading. See `docs/DESIGN-NOTES.md` 坑 8. |
-| Trusting `read_live` blindly | If several Cardinal sessions leave autosaves behind, the newest file may belong to a *previous* session. `read_live` / `save_live` now return `stale` / `age_seconds` / `note`; check them. See 坑 8b. |
-| Unattended (headless) runs | Cardinal standalone has no headless build (VCV Rack Pro does; Cardinal doesn't) |
-| Linux/macOS testing | Only verified on Windows; the Python tools are cross-platform, but `winmidi.py` / `winprobe.py` use the Win32 API |
+| Live MIDI/CV injection into the engine | OSC still has no MIDI-injection message (stock: 4 write handlers; patched: +5 read probes). The route exists in source (`CardinalPluginContext::writeMidiMessage`) — tracked as C9 in `docs/TODO-BACKLOG.md`, batch B |
+| Auto read-back of param changes on a **stock** build | The live autosave is only flushed on `/load` or an explicit GUI save — **not** on `/param` changes and **not** on a timer (measured on 26.02). With the **patched** build, `cardinal_get_param` reads the real display value via `/param-get` instead. See `docs/DESIGN-NOTES.md` 坑 8 |
+| Trusting `read_live` blindly | If several Cardinal sessions leave autosaves behind, the newest file may belong to a *previous* session. `read_live` / `save_live` now return `stale` / `age_seconds` / `note`; check them. See 坑 8b |
+| Audio in WSL2 | A WSL2 build can create windows (software GL) and answer OSC, but JACK audio does not work there — WSL is for build/verify, not for playing |
+| Linux/macOS testing of the Windows-specific tools | Only verified on Windows; the Python tools are cross-platform, but `winmidi.py` / `winprobe.py` use the Win32 API |
 | LMMS / DAW recording loop | That's a separate project (Cardinal.vst into a DAW); this repo stops at standalone + OSC |
 
 ---
@@ -317,8 +441,13 @@ AI:   → cardinal_patch_info to find SnareDrumN
 |---|---|
 | `README.md` | Should I install this? How do I run it? |
 | `README.zh-CN.md` | Chinese version of this README |
-| `docs/DESIGN-NOTES.md` | How was it built? All 24 tools explained, 12 pitfalls, 5 reusable principles |
+| `docs/DESIGN-NOTES.md` | How was it built? All the tools explained, pitfalls, reusable principles |
 | `docs/CARDINAL-REPO-NOTES.md` | What's worth borrowing from upstream Cardinal? OSC boundaries / module list / non-existent features |
+| `docs/TODO-BACKLOG.md` | What's done, what's next (batch A complete; B/C pending) |
+| `docs/CARDINAL-MCP-SPEC.md` | The protocol spec + source-verified facts |
+| `docs/CARDINAL-MCP-CAPABILITY-MAP.md` | Engine capabilities with exact source line references |
+| `docs/HUMAN-INTERACTION-MAP.md` | Human UI operations → source functions |
+| `docs/STYLE-SCHEMA.md` | Style-as-data with real-rack-verified samples |
 | `docs/SMK25-midi-map.md` | M-VAVE SMK25 MIDI measurements: what control sends what message, what channel, what gotcha |
 | `docs/ATTRIBUTION.md` | Which third-party resources are used, and how to get them |
 | `AI-DISCLOSURE.md` | **This project was generated by an AI Agent — verify before use** (bilingual notice) |

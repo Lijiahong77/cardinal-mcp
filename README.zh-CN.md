@@ -1,7 +1,8 @@
 # cardinal-mcp
 
 > 一个让 AI 能直接操作 [Cardinal](https://github.com/DISTRHO/Cardinal) 模块化合成器的轻量外壳。
-> 12 个 MCP 工具 + 24 个零依赖 Python 小工具 = 一个能版本管理、自动化、远程控制的合成器工作流。
+> **36 个 MCP 工具**（MCP 协议 2025-06-18：tool annotations + structured output）
+> + 约 40 个零依赖 Python 小工具 = 一个能版本管理、自动化、远程控制的合成器工作流。
 
 ---
 
@@ -31,16 +32,32 @@ Cardinal 是 VCV Rack 的硬分叉（DISTRHO 出品），本身是为了拿来�
 模块位置参数全是 GUI 拖拽出来的。
 
 `cardinal-mcp` 在它外面套了一层：
-- 用 **Cardinal 的 OSC（4 条消息）** + **Windows 屏幕截图** + **实时自动存档读回** 拼出一套
-  **12 个语义化 MCP 工具**（`cardinal_load_patch` / `cardinal_set_param` / `cardinal_read_live` 等等）。
-- 配套一组**零依赖的探测工具**：DPI 探测、MIDI 抓包、GDI 截屏、实时存档读回、布局门禁。
-- 一本 `params/modules.json`：**15 模块 / 248 命名参数**，从 Cardinal 自带模块的 C++ 源码里抽取。
-- 一本 `music/knowledge.json`：9 套节奏型 / 10 套和弦进行 / 8 套音色配方。
-- 一套**排班门禁**：每次加新模块、重新接线，必须过一次 `layout_patch.py guard` 才准推送。
+- **驱动**：Cardinal 的 **OSC**（原版 4 个只写 handler）+ **实时自动存档读回**，拼出
+  **36 个语义化 MCP 工具**（`cardinal_load_patch` / `cardinal_set_param` / `cardinal_read_live` 等）。
+- **看见**（原版 Cardinal 做不到的部分）：`tools/osc_patch/` 是一份幂等的 Cardinal
+  源码补丁 + WSL2 交叉编译配方，给 Cardinal 注入 **5 个 OSC 只读探针**
+  （`/modules` `/param-get` `/ports` `/signal` `/light`）——AI 终于能**读**引擎状态：
+  哪些模块真加载了、旋钮的真实显示值、每个口的电压（这机架到底在不在出声）、LED 亮没亮。
+  作者的 patched 构建已部署并实测（见下文「探针」一节）；没打补丁的原版构建上，
+  探针类工具全部优雅降级为 `probe_not_supported`，其余工具照常工作。
+- **先审计再加载**：五道审计链（`validate` → `ports` → `chain` → `values` → `flow`）
+  聚合成一个 `cardinal_audit` 工具——把「一加载就崩」和「加载了但不出声」两类问题
+  拦在 `/load` 之前。
+- **机架即代码**：生成器（`tools/make_*.py`，DSL 在 `tools/rackgen.py`）+ 排班门禁
+  （`layout_patch.py`）——机架是可以 `git diff` 的纯文本。
+- **乐谱导出**：序列器音符 → 可编辑的 `.abc` 文本谱（`tools/abc_export.py` +
+  `cardinal_export_abc`），两大序列器家族都支持。
+- **知识层**：`params/modules.json`（从模块 C++ 源码抽取的参数字典，数据驱动覆盖）
+  + 112 条从真实源码 enum 抽出的端口语义 + `music/knowledge.json`
+  （9 套节奏型 / 10 套和弦进行 / 8 套音色配方）+ 风格 schema
+  （`docs/STYLE-SCHEMA.md`，样板用真机架实测回填）。
 
 **不是什么**
 
-- **不是 Cardinal 插件**——不修改 Cardinal 本身，仅在外部通过 OSC + 文件层操控。
+- **主路径不是 Cardinal 插件**——36 个工具全部通过 OSC + 文件层在外部驱动 Cardinal，
+  原版 Cardinal 上就能用。可选的 `tools/osc_patch/` 源码补丁**确实会改 Cardinal**
+  （这是拿到「读回」能力的唯一出路——Cardinal 的 OSC 设计上就是只写的），
+  但它 opt-in、幂等、自带 `--rollback`。
 - **不是音乐教学项目**——只解决"工程化与可遥控"，音乐知识库是顺带的脚手架。
 - **不带第三方作品**——把 Cardinal 官方示例机架、MidiSuite 配置截图、源码缓存都从仓库里排除掉了，
   这些是别人的资产，使用 `docs/ATTRIBUTION.md` 标注来源，需要的自己去下。
@@ -49,7 +66,7 @@ Cardinal 是 VCV Rack 的硬分叉（DISTRHO 出品），本身是为了拿来�
 
 ## 适合谁
 
-- 已经装了 Cardinal standalone + MIDI 键盘，想用 Cursor / WorkBuddy 这类 MCP-aware AI 直接调参数、换音色、改连线的人。
+- 已经装了 Cardinal standalone + MIDI 键盘，想用 Cursor / WorkBuddy / Claude Desktop 这类 MCP-aware AI 直接调参数、换音色、改连线的人。
 - 想把"手点鼠标搭的合成器机架"变成可以 `git diff` 的纯文本的人。
 - 想要在没有 GUI 的环境（远程、CI）里预生成、预校验机架的人。
 
@@ -69,6 +86,8 @@ Cardinal 是 VCV Rack 的硬分叉（DISTRHO 出品），本身是为了拿来�
   `requirements.txt` 里。
 - **只在 Windows 上完整测过。** `winmidi.py` / `winprobe.py` 用 Win32 API，截图工具假定
   Windows 桌面。机架生成那套工具本身跨平台，但 **MIDI 输入只在 Windows 上验证过**。
+- **任何 MCP 客户端都能连。** 本 server 是规范实现的 MCP server
+  （stdio + JSON-RPC 2.0，版本协商至 2025-06-18），不绑 WorkBuddy。
 
 ---
 
@@ -85,18 +104,20 @@ pip install -r requirements.txt
 
 依赖少是因为绝大多数工具都用标准库（`win32gui` / `ctypes` / `socket` / `tarfile` / `json`）。
 
-### 2. 启动 Cardinal 并打开 OSC 通道
+### 2. 启动 Cardinal
 
 ```text
 打开 CardinalNative.exe
-菜单：Engine → Enable OSC remote control   （顶部菜单，⚠️ 每次启动都要重新点）
+OSC 远程控制默认自动开启（CARDINAL_OSC_AUTOSTART=1）。
+原版构建也可以手动开：
+菜单：Engine → Enable OSC remote control
 ```
 
 验证 OSC 通了：
 
 ```bash
 python tools/cardinal_mcp.py --selftest
-# 期望最后一行：OK: All 12 tools reachable
+# 期望最后一行：OK: All 36 tools reachable
 ```
 
 如果不通，先用 PowerShell 跑：
@@ -135,22 +156,88 @@ Get-NetUDPEndpoint -LocalPort 2228 -ErrorAction SilentlyContinue
 
 ---
 
-## 它能做什么 —— 12 个 MCP 工具一览
+## 它能做什么 —— 36 个 MCP 工具一览
+
+### 驱动（写进运行中的 Cardinal）
 
 | 工具 | 做什么 | 常用场景 |
 |---|---|---|
 | `cardinal_ping` | 发 `/hello` 检查 Cardinal 是否响应 OSC | 排查连通性 |
-| `cardinal_list_patches` | 列 `patches/` 目录下所有 .vcv 机架 | 选要加载的机架 |
-| `cardinal_patch_info` | 看某个机架的模块清单（拿到 moduleId 才好调参） | 改参数前的必备查询 |
 | `cardinal_load_patch` | 把某个 .vcv 推给 Cardinal（含 zoom + gridOffset） | 让 AI 切音色 |
 | `cardinal_set_param` | 拧任意模块的旋钮：`moduleId + paramId + value` | 改 cutoff / release / 等 |
+| `cardinal_set_param_by_name` | 按参数名设值，拒绝废弃槽，多实例精准分流 | 「设 VCF cutoff」不用先查编号 |
 | `cardinal_set_host_param` | 改 Cardinal 内置的 24 个宿主参数 | 调音频接口/采样率等 |
-| `cardinal_read_live` | 读 Cardinal 正在运行的机架（走实时自动存档读回；返回里带 `stale` 新鲜度标记） | 想看用户在 GUI 里改了啥 |
-| `cardinal_save_live` | 把当前 GUI 状态落盘成 .vcv（同样带 `stale` 标记） | 用户手动改完不存档就丢 |
+| `cardinal_save_live` | 把当前 GUI 状态落盘成 .vcv | 用户手动改完不存档就丢 |
+
+### 检查（读机架与运行状态）
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_patch_info` | 看某个机架的模块清单（拿到 moduleId 才好调参） | 改参数前的必备查询 |
+| `cardinal_list_patches` | 列 `patches/` 目录下所有 .vcv 机架 | 选要加载的机架 |
+| `cardinal_read_live` | 读 Cardinal 正在运行的机架（走实时自动存档读回；带 `stale` 新鲜度标记） | 想看用户在 GUI 里改了啥 |
 | `cardinal_module_params` | 列某模块的参数清单（名 → 编号） | 找参数编号 |
 | `cardinal_find_param` | 把口语翻成参数编号（"亮一点"→Cutoff） | 让 AI 用自然语说话 |
+| `cardinal_topology` | 接线 + 每模块角色 + 信号能否到达 HostAudio2 | 「这机架到底在干什么」 |
+
+### 审计与部署（「永不加载坏机架」链）
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_audit` | 一次调用跑完五道审计，给 FAIL/WARN/PASS 裁决 | 每次 `/load` 前的门禁 |
+| `cardinal_deploy` | 备份 → 审计 → 加载 → 读回结构比对，FAIL 拒绝加载 | 一键安全部署 |
+| `cardinal_diff` | 磁盘 .vcv vs 引擎实际实例化的模块 | 抓被静默丢弃的模块 |
+
+### 实时只读探针（需 patched 构建；没有则优雅降级）
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_live_modules` | 引擎实际加载的所有模块 | 加载后的 ground truth |
+| `cardinal_get_param` | 某旋钮的真实**显示值**（275 ms，不是 0.275） | 验证 `set_param` 真的生效了 |
+| `cardinal_module_ports` | 每个口的接线状态 + 实时电压 | 「没接线 / 接了没声 / 有声」三态 |
+| `cardinal_scan_signal` | 全机架扫描：哪些模块此刻真的在输出电压 | 「到底响没响」的直接答案 |
+| `cardinal_get_light` | LED 亮度（如 Clocked 的 RUN 灯） | 走带到底跑没跑 |
+
+### 模块库浏览器（读 Cardinal 自己的 PluginManifests——1407 模块 / 85 品牌 / 104 标签）
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_module_search` | 按英文关键词 / 官方标签 / 品牌搜模块库 | 从现实里选模块，不靠记忆 |
+| `cardinal_module_tags` | 全部官方标签 + 计数 | 搜索没结果时来这挑标签 |
+| `cardinal_module_brands` | 全部品牌 + 模块数 | 按厂商浏览 |
+| `cardinal_module_detail` | 单模块完整 manifest 记录 | 说明书 URL、描述、同门模块 |
+| `cardinal_port_semantics` | 每个口是 pitch/gate/audio/cv 的语义表（来自真实源码） | 照表接线，不靠猜 |
+
+### 序列器与乐谱（钢琴卷帘等价物）
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_seq_read` | 按小节/音名读序列器音符（两大家族都支持） | 把音乐看成文本 |
+| `cardinal_seq_edit_note` | 改一个音符（音高/休止/力度），拒绝写坏数据 | 远程点一格钢琴卷帘 |
+| `cardinal_seq_set_running` | 开/关序列器走带（RUN 键） | 开始播放 |
+| `cardinal_export_abc` | 导出序列器音符为可编辑 `.abc` 文本谱 | 在 GUI 外编辑音乐 |
+
+### 采样槽（右键「Load sample」等价物）
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_samples_list` | 浏览采样库 | 从真实存在的文件里挑，不猜文件名 |
+| `cardinal_sample_inspect` | 每槽当前采样 + 标记失效文件 | 找静默哑掉的采样器 |
+| `cardinal_sample_load` | 把 wav 装进槽（路径风格感知，先备份） | 远程换采样 |
+| `cardinal_sample_clear` | 清空一个槽 | 清理 |
+
+### 音乐与风格知识
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
 | `cardinal_music` | 节奏型 / 和弦进行 / 音色配方查询 | 让 AI 用知识库回答 |
-| `cardinal_apply_recipe` | 把音色配方写进当前机架 | 让 AI 一键换音色 |
+| `cardinal_apply_recipe` | 把音色配方写进机架；`weight` 0..1 在当前值↔目标值间插值 | 一键换音色，或轻微推动 |
+
+### 人类操作索引
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_actions` | 23 条人类 UI 操作：代码在哪、哪个工具已覆盖、什么状态 | 写任何脚本+重载之前，先查人类按钮对应什么 |
 
 ---
 
@@ -158,40 +245,56 @@ Get-NetUDPEndpoint -LocalPort 2228 -ErrorAction SilentlyContinue
 
 ```
 cardinal-mcp/
-├── README.md                       ← 本文件
+├── README.md                       ← 英文版（本文件是中文版）
+├── README.zh-CN.md                 ← 本文件
 ├── LICENSE                         ← MIT
 ├── requirements.txt                ← python-osc + zstandard
 ├── mcp.example.json                ← MCP 配置示例
 │
-├── tools/                          ← 24 个 Python 工具
-│   ├── cardinal_mcp.py             ← MCP 主入口（1200 行）
+├── tools/                          ← 约 40 个 Python 工具
+│   ├── cardinal_mcp.py             ← MCP 主入口（36 个工具）
+│   ├── osc_patch/                  ← Cardinal 源码补丁：5 个 OSC 只读探针
+│   │                               ← + 幂等注入器（备份/校验/回滚）
 │   ├── patchio.py                  ← 双格式读写 .vcv（JSON / tar+zstd）
 │   ├── layout_patch.py             ← 排班门禁 + 自动重排
 │   ├── paramlib.py                 ← 从源码抓参数字典
 │   ├── musiclib.py                 ← 音色配方 / 和弦进行 / 节奏型
-│   ├── make_full.py                ← 生成"键盘全控件"机架
-│   ├── make_knobs.py               ← 写 HostMIDIMap 映射
-│   ├── fix_drum_bus.py             ← 鼓总线修复 + 输入口自查
+│   ├── modbrowser.py               ← 模块库检索（读 PluginManifests）
+│   ├── topology.py                 ← 机架接线 / 角色 / 可达性
+│   ├── seq.py                      ← 序列器音符（钢琴卷帘等价物）
+│   ├── abc_export.py               ← 序列器音符 → .abc 文本谱
+│   ├── samplelib.py                ← 采样槽（右键「Load sample」等价物）
+│   ├── interaction_map.py          ← 人类 UI 操作 → 源码索引
+│   ├── style_schema.py             ← 风格 schema 校验 + 机架回填
+│   ├── rackgen.py                  ← 机架生成 DSL（血泪注释逐字保留）
+│   ├── audit_{ports,values,flow,chain}.py + validate.py  ← 审计链
+│   ├── cross_build_cardinal.sh     ← WSL2 交叉编译配方（win64）
+│   ├── wslrun.py / wslout.py       ← WSL2 助手（UTF-16 解码、路径安全）
 │   ├── winprobe.py                 ← DPI / 窗口探测
 │   ├── winmidi.py + midiprobe.py   ← Windows 原生 MIDI 工具
 │   ├── shot.py                     ← GDI 截屏（零依赖）
-│   └── ... 更多辅助脚本
+│   └── make_*.py                   ← 各机架生成器（quadeca / yorushika / …）
 │
 ├── params/
-│   └── modules.json                ← 15 模块 / 248 命名参数
+│   └── modules.json                ← 参数字典（数据驱动覆盖）
 │
 ├── music/
 │   └── knowledge.json              ← 节奏型 / 进行 / 配方
 │
 ├── patches/
 │   ├── helm_full.vcv               ← 主机架：琴键+旋钮+触控+鼓垫全套
-│   ├── helm_keys.vcv               ← 纯合成器机架
-│   ├── helm_drums.vcv              ← 鼓机架
+│   ├── quadeca_life1_wdtg.vcv      ← 旗舰音乐机架（人耳验证有声）
+│   ├── yorushika_shura/hana.vcv    ← 风格驱动机架（待验收）
 │   └── ... （.gitignore 排除了个人备份）
 │
 └── docs/
     ├── DESIGN-NOTES.md             ← 技术档案：完整解释整套东西怎么搭起来的
     ├── CARDINAL-REPO-NOTES.md      ← 上游 Cardinal 仓库的关键发现
+    ├── TODO-BACKLOG.md             ← 唯一待办总表（批次 A 已完成，B/C 待定）
+    ├── CARDINAL-MCP-SPEC.md        ← 协议规格 + 源码核实事实
+    ├── CARDINAL-MCP-CAPABILITY-MAP.md ← 引擎能/不能做什么，附源码行号
+    ├── HUMAN-INTERACTION-MAP.md    ← 人类 UI 操作 → 源码函数映射
+    ├── STYLE-SCHEMA.md             ← 风格数据化，样板用真机架实测
     ├── SMK25-midi-map.md           ← M-VAVE SMK25 键盘 MIDI 实测档案
     └── ATTRIBUTION.md              ← 第三方资源来源标注
 ```
@@ -200,7 +303,7 @@ cardinal-mcp/
 
 ## 工作流示例
 
-> 下面三段是**「你可以怎么跟 AI 说话」的演示**，展示的是预期对话，不是验证过的执行记录。
+> 下面几段是**「你可以怎么跟 AI 说话」的演示**，展示的是预期对话，不是验证过的执行记录。
 >
 > **实际在真机上跑过的东西**单独列在这里：
 >
@@ -210,7 +313,8 @@ cardinal-mcp/
 > | `quadeca_life1_wdtg.vcv` | 已确认有声音（人耳确认） |
 > | `mini_arranger_expanded.vcv` | MiniArranger 主模块 + 扩展器，已验收 |
 > | `mini_arranger_8voice*.vcv` | 已生成，**待实机验收**（`docs/8VOICE-PATCH-ACCEPTANCE.md`） |
-> | 全部 52 个机架 | 静态审计全部解析通过 |
+> | 全部机架 | 静态审计全部解析通过 |
+> | OSC 只读探针 | 已交叉编译 + 部署；用 OSC 实测 interrogate 运行中的引擎验证过（如默认机架 VCO 在 `/signal` 上读数为 4.977 V） |
 
 ### "把合成器变亮一点"
 
@@ -219,7 +323,19 @@ cardinal-mcp/
 AI: → cardinal_patch_info  (拿到 VCF moduleId)
    → cardinal_find_param (口语 → "Cutoff")
    → cardinal_set_param (Cutoff value = 0.75)
+   → cardinal_get_param (patched 构建：读回真实显示值，确认真的落了)
    → 告诉你人话：把 cutoff 从默认 0.5 提到 0.75，听感会更亮
+```
+
+### "这机架到底响没响"
+
+```
+你: 我加载了新 patch 但没声音，是不是坏了？
+AI: → cardinal_audit (静态：ports/values/flow/chain/validate，FAIL 就不许加载)
+   → cardinal_live_modules (每个模块都活着加载了吗)
+   → cardinal_scan_signal (哪些模块此刻真的在输出电压)
+   → cardinal_module_ports 查可疑模块 (没接线 / 接了没声 / 有声)
+   → 给出真实原因，不是猜
 ```
 
 ### "换一首和弦进行"
@@ -232,15 +348,27 @@ AI: → cardinal_music (progressions) 拿 ii-V-I 的 voicings
    → 你按一个键就能听到 ii-V-I 了
 ```
 
-### "把鼓垫 3 的音色换成 Snare-B"
+---
+
+## 探针：只读 OSC 层怎么工作
+
+原版 Cardinal 的 OSC server 是**只写的**（4 个 handler，没有一个回数据）——这是上游
+项目的硬设计事实，不是 bug。`tools/osc_patch/` 补上这一层：
 
 ```
-你: 第三号鼓垫想换成短一点的军鼓
-AI: → cardinal_patch_info 找 SnareDrumN
-   → 看到第 i 个声部的采样由 param(i) 控制
-   → cardinal_set_param 把 SnareDrumN 的 param(2) 改成更"短"的采样编号
-   → 让你敲一下键盘验证
+tools/osc_patch/
+├── osc_read_handlers.cpp.inc   ← 5 个 handler（/modules /param-get /ports /signal /light）
+├── inject_osc_read.py          ← 幂等注入器：备份 → 注入 → 校验 →（--rollback）
+└── ...
 ```
+
+- 注入器改 `src/CardinalCommon.cpp`（thread 与非 thread 两处注册点都改），
+  改前备份，改后校验「5 实现 × 2 注册」。
+- 用 WSL2 交叉编译配方构建：`bash tools/cross_build_cardinal.sh 8 true`
+  然后 `make -C CardinalNative`（详见 `docs/TODO-BACKLOG.md` 批次 B）。
+- 没打补丁的构建上，探针类工具返回 `probe_not_supported`，其余 31 个工具不受影响。
+- 已实测：`/modules` 回引擎真实模块清单；`/signal` 报每模块峰值电压
+  （默认机架的 VCO 读数 4.977 V）。
 
 ---
 
@@ -251,10 +379,12 @@ AI: → cardinal_patch_info 找 SnareDrumN
 ### 软件
 
 - **OS**：Windows 11（10.0.26200，64-bit）
-- **Cardinal**：26.02（[DISTRHO/Cardinal](https://github.com/DISTRHO/Cardinal) 26.02 发行版 standalone，安装在 `C:\Program Files\Cardinal-win64-26.02\`）
+- **Cardinal**：26.02（[DISTRHO/Cardinal](https://github.com/DISTRHO/Cardinal)）
   - 共 4 个变体：DISTRHO 本体 / FX / Mini / Synth
   - 启动用 `CardinalNative.exe`（≈100 MB，主 standalone）
   - 自带模块库（VCV Rack Fundamental + AudibleInstruments + 一众社区插件）
+  - 作者另外跑一份**自编译的 patched CardinalNative**（WSL2 交叉编译 + OSC 探针注入），
+    部署在 `D:/Cardinal/win64/`——构建配方在 `tools/`
 - **Python**：3.13.12（managed 解释器，装在用户目录的隔离 venv 里）
 - **AI 客户端**：WorkBuddy（用其 MCP 配置）——同理 Cursor / Claude Desktop 也可以用同一份 `mcp.example.json`
 - **MIDI 配套软件**（用户私有，不随附）：M-VAVE MidiSuite，配 M-VAVE SMK25 时有用
@@ -281,10 +411,10 @@ AI: → cardinal_patch_info 找 SnareDrumN
 
 | 不支持 | 原因 |
 |---|---|
-| 实时 MIDI/CV 注入 | Cardinal OSC 只有 `/load /param /host-param /hello` 四条消息，没有 MIDI 注入 |
-| 参数变化自动回读 | 实时自动存档只在 `/load` 或 GUI 显式保存时写盘 —— **`/param` 改参数不写，也没有定时器**（26.02 实测）。改完参数要验证只能看 GUI。详见 `docs/DESIGN-NOTES.md` 坑 8 |
+| 实时 MIDI/CV 注入引擎 | OSC 仍然没有 MIDI 注入消息（原版 4 个写 handler；patched +5 个读探针）。源码里的路是通的（`CardinalPluginContext::writeMidiMessage`）——记为 `docs/TODO-BACKLOG.md` 批次 B 的 C9 |
+| **原版**构建上参数变化自动回读 | 实时自动存档只在 `/load` 或 GUI 显式保存时写盘 —— **`/param` 改参数不写，也没有定时器**（26.02 实测）。用 **patched** 构建时，`cardinal_get_param` 走 `/param-get` 读真实显示值。详见 `docs/DESIGN-NOTES.md` 坑 8 |
 | 直接信任 `read_live` 的结果 | 如果留下过多次会话的存档，最新那个文件可能属于**上一次**会话。`read_live` / `save_live` 现在会返回 `stale` / `age_seconds` / `note`，用之前先看这三个字段。详见 坑 8b |
-| 无人值守（headless）运行 | Cardinal standalone 没有 headless 版本（VCV Rack Pro 才有，Cardinal 不带）|
+| WSL2 里出声 | WSL2 构建能建窗口（软件 GL）也能应答 OSC，但 JACK 音频在 WSL 里不工作——WSL 只用于编译/验证，不用于演奏 |
 | Linux/macOS 测试 | 本仓库只在 Windows 上跑通过；Python 工具都是跨平台的，但 `winmidi.py` / `winprobe.py` 用 Win32 API |
 | LMMS / DAW 录音闭环 | 那是另一个项目（Cardinal.vst 装到 DAW 里），本仓库只到 standalone + OSC |
 
@@ -294,9 +424,14 @@ AI: → cardinal_patch_info 找 SnareDrumN
 
 | 文档 | 解决什么问题 |
 |---|---|
-| `README.md` | 我该不该装这个？装完怎么跑？ |
-| `docs/DESIGN-NOTES.md` | 它是怎么搭起来的？24 个工具逐个解释、12 个踩坑、五条可复用原则 |
+| `README.md` | 我该不该装这个？装完怎么跑？（英文版） |
+| `docs/DESIGN-NOTES.md` | 它是怎么搭起来的？全部工具逐个解释、踩坑记录、可复用原则 |
 | `docs/CARDINAL-REPO-NOTES.md` | Cardinal 上游有什么值得抄的？OSC 边界 / 模块清单 / 不存在的功能 |
+| `docs/TODO-BACKLOG.md` | 什么做完了、什么接着做（批次 A 已完成；B/C 待拍板） |
+| `docs/CARDINAL-MCP-SPEC.md` | 协议规格 + 源码核实过的事实 |
+| `docs/CARDINAL-MCP-CAPABILITY-MAP.md` | 引擎能力地图，附精确源码行号 |
+| `docs/HUMAN-INTERACTION-MAP.md` | 人类 UI 操作 → 源码函数映射 |
+| `docs/STYLE-SCHEMA.md` | 风格数据化，样板用真机架实测回填 |
 | `docs/SMK25-midi-map.md` | M-VAVE SMK25 的 MIDI 实测数据：什么控件发什么消息、什么通道、什么坑 |
 | `docs/ATTRIBUTION.md` | 用到了哪些第三方资源、怎么拿 |
 | `AI-DISCLOSURE.md` | **本项目由 AI Agent 生成，使用前请务必甄别**（中英双语声明） |
