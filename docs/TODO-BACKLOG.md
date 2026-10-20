@@ -93,8 +93,8 @@
 
 | # | handler | 说明 |
 |---|---|---|
-| D1 | `/screenshot` | 调 `rack::window::generateScreenshot()`（声明 `CardinalCommon.hpp:26`，**不在** Rack 的 Window.hpp 里；实现 `override/Window.cpp:906-910`）。GUI-only、异步约 4 帧、base64 必超 MTU 须分块 |
-| D2 | `/load` 回 warningLog | 「加载诊断 → 静音诊断」闭环的源头修复。⚠️ 见 A5，改的是**两处**不是三处 |
+| D1 | `/screenshot` | ✅ 2026-10-20 完工并 WINE 运行级实测。**改法与原设想不同**：不走「base64 分块回传」，而是**落盘 + 回传路径**——① `CardinalCommon.hpp` 加 `generateScreenshotToFile(path)` 声明；② `CardinalNative/Window.cpp` 加 `g_screenshotFilePath` 全局 + `Window__writePngDump`（`fwrite` 回调，用 `<cstdio>` 避开 `<fstream>` 的 ios_base 坑）+ 保存分支改成「落盘请求时走**全尺寸** dump，否则维持原 340x210 remote 预览」；③ `osc_screenshot_handler` 重写为**无参**触发（`/screenshot ""`），回 `["screenshot", "<绝对路径>"]`；④ 非 thread 注册区补 `/screenshot`、thread 版签名 `"b"`→`""`。**MCP 侧**新增 `cardinal_screenshot` 工具（53 个）：OSC 触发 → **轮询等文件落盘**（渲染异步，回复先给的是目标路径）→ 读 PNG 头取宽高 → 可选 `save_to` 拷贝。🔴 **WINE 下画面全黑是环境限制不是代码 bug**：同一时刻 X11 抓屏有 22.76% 非黑像素（完整 Cardinal 界面），而 `glReadPixels(GL_FRONT)` 读回 0% ⇒ **llvmpipe 软渲染的 GL 前缓冲读回限制**（读像素那段是上游原有代码，D1 没碰）。真机（硬件 GL）需李验收画面内容 |
+| D2 | `/load` 回 warningLog | ✅ 2026-10-20 完工并 WINE 运行级实测。**四处改动**：① `settings.hpp/.cpp` 加 `oscLoadActive` 开关（不进 settings.json）；② `patch.cpp fromJson` 末尾弹窗+清空改条件化（OSC 模式保留 warningLog 不弹窗）；③ `override/Engine.cpp:1260/:1289` 取消两处 `APP->patch->log(e.what())` 注释（A5 实锤的「两处」——模块级异常原本被静默）；④ `osc_load_handler` 置位开关 + 回 `ok`/`warn <文本>`/`fail <文本>`，回完清空。回包契约：`ok` / `warn <文本>` / `fail <文本>`（截断 400B）。MCP 侧 `load_patch` 已同步解析 `warnings` 字段。⚠️ 只改了 `src/CardinalNative/CardinalCommon.cpp` 一份，其余两份 CardinalCommon.cpp 待 E 组注册表抽函数时收敛 |
 
 **E 组 · 协议级（编完再改要 C++ + Python 双返工，必须一次定死）**
 - 统一三段式响应 `/resp "tag" "ok"|"err" "<code>|<msg>"`，8 个固定小写错误码。⚠️ 会改动现有 5 探针行为（`/param-get` 对不存在 module 回空串，无法区分「没这个参数」与「值就是空」）

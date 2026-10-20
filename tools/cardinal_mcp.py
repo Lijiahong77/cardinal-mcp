@@ -48,6 +48,7 @@ import os
 import re
 import shutil
 import socket
+import struct
 import sys
 import time
 
@@ -254,8 +255,17 @@ def load_patch(name):
         return {"ok": False, "sent": os.path.basename(p), **extra,
                 "note": "sent but no reply (Cardinal OSC off? wrong port?)"}
     reply = [str(x) for x in res]
-    # Cardinal answers ["load", "ok"] on success.
-    return {"ok": bool(reply and reply[-1] == "ok"),
+    # D2: Cardinal answers ["load", "ok"|"warn <text>"|"fail <text>"].
+    # "warn" = loaded but with diagnostics (fromJson/unarchive warnings),
+    # now surfaced here instead of only popping a GUI dialog (or vanishing).
+    last = reply[-1] if reply else ""
+    if last == "ok":
+        ok, warnings = True, []
+    elif last.startswith("warn "):
+        ok, warnings = True, [last[5:].strip()]
+    else:
+        ok, warnings = False, [last[5:] if last.startswith("fail ") else last]
+    return {"ok": ok, "warnings": warnings,
             "sent": os.path.basename(p), "reply": reply, **extra}
 
 
@@ -1438,6 +1448,125 @@ def save_live(name, overwrite=True):
             "stale": stale}
 
 
+# ================================================================ Screenshot
+
+def _wine_candidates(win_path):
+    """Map a Windows path that Cardinal reported to paths we can actually open.
+
+    Cardinal always reports a Windows-style path (C:/Users/...). Normally the
+    MCP server runs on the same machine and can open it directly. But when
+    Cardinal lives in WSL (cross-build smoke tests) the same path exists under
+    the WINE prefix instead, and MCP on Windows cannot see it. So we offer both
+    spellings and let the caller pick the one that exists.
+    """
+    cands = [win_path]
+    p = win_path.replace("\\", "/")
+    if len(p) > 2 and p[1] == ":":
+        rest = p[2:].lstrip("/")
+        # WINE prefixes, most common first.
+        for prefix in (os.path.expanduser("~/.wine/drive_c"),
+                       os.path.expanduser("~/.wine/dosdevices/c")):
+            cands.append(os.path.join(prefix, rest))
+        # WSL can also reach the Windows side: /mnt/c/...
+        cands.append("/mnt/" + p[0].lower() + "/" + rest)
+        # Windows reaching INTO WSL: \\wsl$\<distro>\... (cross-build tests
+        # where Cardinal runs in WSL but the MCP server runs on Windows).
+        for distro in ("Ubuntu-26.04", "Ubuntu", "Ubuntu-24.04", "Debian"):
+            cands.append(r"\\wsl$\%s\home\lijia\.wine\drive_c\%s"
+                         % (distro, rest.replace("/", "\\")))
+    return cands
+
+
+def screenshot(save_to=None, timeout=8.0):
+    """Capture the running Cardinal's window as a PNG.
+
+    How it works: OSC `/screenshot` (no args) makes Cardinal render one extra
+    frame and write a FULL-SIZE PNG into its own temp dir, then reply with
+    the absolute path. The write is ASYNC (the render happens a few frames
+    later), so the reply carries the *destination* — we poll until the file
+    actually appears.
+
+    Why a file and not base64 over OSC: a full-size PNG is megabytes, which
+    would have to be chunked across many OSC packets (and liblo cannot carry
+    string args reliably — see the js-run endpoint). A file sidesteps both.
+
+    The file lands in Cardinal's temp dir (`%TEMP%\\Cardinal.XXXX\\`), which
+    disappears when Cardinal exits. Pass `save_to` to keep a copy somewhere
+    stable.
+
+    NOTE: the capture reads the GL front buffer. Under software rendering
+    (WINE/llvmpipe) that read comes back empty and the PNG is all black —
+    on a real GPU it is fine. If you get an all-black PNG, check the renderer
+    before assuming the patch is wrong.
+    """
+    res = link().ask("/screenshot", [], timeout=timeout)
+    if res is None:
+        return {"ok": False,
+                "note": "sent but no reply (Cardinal OSC off? wrong port? "
+                        "is this a build with the /screenshot endpoint?)"}
+    reply = [str(x) for x in res]
+    if len(reply) < 2:
+        return {"ok": False, "reply": reply, "note": "unexpected reply shape"}
+    # Cardinal answers ["screenshot", "<absolute path>"] (or "fail").
+    target = reply[-1]
+    if target == "fail" or not target:
+        return {"ok": False, "reply": reply, "note": "Cardinal could not capture"}
+
+    cands = _wine_candidates(target)
+
+    # The render is async: poll until the file lands and stops growing.
+    deadline = time.time() + timeout
+    last_size = -1
+    found = None
+    while time.time() < deadline:
+        for c in cands:
+            if os.path.isfile(c):
+                size = os.path.getsize(c)
+                if size > 0 and size == last_size:
+                    found = c
+                    break
+                last_size = size
+        if found:
+            break
+        time.sleep(0.15)
+
+    if not found:
+        return {"ok": False, "reply": reply, "path": target,
+                "tried": cands,
+                "note": f"no PNG at the reported path within {timeout}s "
+                        f"(Cardinal not rendering? OSC-driven load needed?)"}
+
+    out = {"ok": True, "path": found, "bytes": os.path.getsize(found),
+           "reply": reply}
+    if found != target:
+        out["reported_path"] = target
+
+    # PNG header sanity: 8-byte magic + IHDR width/height.
+    try:
+        with open(found, "rb") as f:
+            head = f.read(24)
+        if head[:8] == b"\x89PNG\r\n\x1a\n":
+            out["format"] = "png"
+            out["width"] = struct.unpack(">I", head[16:20])[0]
+            out["height"] = struct.unpack(">I", head[20:24])[0]
+        else:
+            out["format"] = "unknown"
+    except OSError as e:
+        out["header_error"] = str(e)
+
+    if save_to:
+        dst = os.path.abspath(save_to)
+        if not dst.lower().endswith(".png"):
+            dst += ".png"
+        try:
+            os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
+            shutil.copyfile(found, dst)
+            out["saved_to"] = dst
+        except OSError as e:
+            out["copy_error"] = str(e)
+    return out
+
+
 # ================================================================ Param queries
 
 def module_params(patch=None, module=None, module_id=None, keyword=None):
@@ -1736,6 +1865,29 @@ TOOLS = [
         "outputSchema": {"type": "object"},
         "annotations": {"readOnlyHint": False, "destructiveHint": True,
                         "idempotentHint": False, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_screenshot",
+        "description": "Capture the running Cardinal's window as a PNG. This is the only way "
+                       "to SEE the rack: OSC parameter writes are never reflected in the "
+                       "autosave file, so read_live cannot confirm a knob move — this can. "
+                       "The capture is async (Cardinal renders an extra frame) and lands in "
+                       "Cardinal's temp dir, which is deleted when Cardinal exits — pass "
+                       "`save_to` to keep a copy. Returns the PNG path plus width/height. "
+                       "If the PNG comes back all black, the GL front-buffer read failed "
+                       "(happens under software rendering); the patch itself may be fine.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "save_to": {"type": "string",
+                            "description": "optional path to copy the PNG to (e.g. D:/Cardinal/tmp/shot.png)"},
+                "timeout": {"type": "number", "default": 8.0,
+                            "description": "seconds to wait for the PNG to be written"},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
         "name": "cardinal_module_params",
@@ -2543,6 +2695,7 @@ DISPATCH = {
     "cardinal_set_host_param": lambda a: set_host_param(a["port"], a["value"]),
     "cardinal_read_live": lambda a: read_live(),
     "cardinal_save_live": lambda a: save_live(a["name"], a.get("overwrite", True)),
+    "cardinal_screenshot": lambda a: screenshot(a.get("save_to"), a.get("timeout", 8.0)),
     "cardinal_module_params": lambda a: module_params(
         a.get("patch"), a.get("module"), a.get("module_id"), a.get("keyword")),
     "cardinal_find_param": lambda a: find_param(a["module"], a["human"]),
