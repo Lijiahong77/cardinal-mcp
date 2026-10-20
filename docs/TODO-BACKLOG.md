@@ -58,16 +58,20 @@
 
 > **合并编译的理由**：探针是**一次性能力清单**（做完定稿），JS 绑定是**无上限能力**。分两次编则第一次编完到第二次编之间 MCP 侧全部不可用。合并后边际成本只有几十行，却**永久消除「补任何 handler」的需求**。
 > 编译脚本：`bash tools/cross_build_cardinal.sh`（重编全量 102MB）
+> **进度：B1-B5 已于 2026-10-20 第一批完工并运行级验证**（WINE+OSC 9/9 端点实测，
+> 含 A 组 3 个带参端点首次验证）。C 组（模拟人类操作）与 QuickJS 绑定待李拍板后
+> 同批编译。⚠️ 坑 D 仍在：主构建断在 CardinalMini_dsp.dll，须单独补
+> `make -C CardinalNative`（既有问题，2026-09-20 起）。
 
 **B 组 · 零 hook 读数（数据全现成，只差 OSC 入口）**
 
 | # | handler | 源码依据 |
 |---|---|---|
-| B1 | `/build-info` | 版本/变体/是否 thread/编译时间/**caps 清单**。**P0**：OSC 开不开由**运行期 getenv** 决定（`MenuBar.cpp:741`），没开则所有工具超时，现象上与「Cardinal 崩了」无法区分 |
-| B2 | `/cables` | `Cable` 四字段全 public（`Cable.hpp:15-19`）+ `Engine::getCableIds()`（`:163`） |
-| B3 | `/transport` | `plugincontext.hpp:82-90` 已有 `playing/bar/beat/bpm/tick/tickClock` ⇒ 零 hook |
-| B4 | `/engine-info` | `getSampleRate`/`getMeterAverage`/`getMeterMax`。⚠️ CPU 值**每 1 秒才刷新**（`Engine.cpp:576`）⇒ 必须带 `cpuAgeMs` |
-| B5 | `/plugins` | 「我拼写的 plugin 存不存在」的权威答案。⚠️ **必须同时暴露 `settings::safeMode`** —— 为 true 时 `plugin::init()`（`plugin.cpp:273-275`）直接 return，**零插件加载** |
+| B1 | ✅ `/build-info`（variant/mode/build/safeMode/caps；WINE+OSC 实测） | 版本/变体/是否 thread/编译时间/**caps 清单**。**P0**：OSC 开不开由**运行期 getenv** 决定（`MenuBar.cpp:741`），没开则所有工具超时，现象上与「Cardinal 崩了」无法区分 |
+| B2 | ✅ `/cables`（全量+单模块双模式；默认机架实测 6 条线） | `Cable` 四字段全 public（`Cable.hpp:15-19`）+ `Engine::getCableIds()`（`:163`） |
+| B3 | ✅ `/transport`（零 hook；playing/bar/beat/bpm/tick/bypassed 实测） | `plugincontext.hpp:82-90` 已有 `playing/bar/beat/bpm/tick/tickClock` ⇒ 零 hook |
+| B4 | ✅ `/engine-info`（带 cpuRefreshMs=1000 诚实标注，age 不假装知道） | `getSampleRate`/`getMeterAverage`/`getMeterMax`。⚠️ CPU 值**每 1 秒才刷新**（`Engine.cpp:576`）⇒ 必须带 `cpuAgeMs` |
+| B5 | ✅ `/plugins`（运行列表+safeMode；单查移师 MCP 侧 PluginManifests——liblo string 接收不可靠，10-20 决策） | 「我拼写的 plugin 存不存在」的权威答案。⚠️ **必须同时暴露 `settings::safeMode`** —— 为 true 时 `plugin::init()`（`plugin.cpp:273-275`）直接 return，**零插件加载** |
 
 **C 组 · 模拟人类操作（李定的核心方向）**
 

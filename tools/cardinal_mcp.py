@@ -867,6 +867,147 @@ def get_light(module_id, light_id):
                 "raw": payload}
 
 
+# ============================================================ B 组读数（2026-10-20）
+# 第二批注入的只读端点（源码依据见 tools/osc_patch/osc_read_b_handlers.cpp.inc，
+# 构建与验收见 docs/TODO-BACKLOG.md 批次 B）：/build-info /cables /transport
+# /engine-info /plugins。同样依赖打过补丁的 Cardinal，未打补丁时优雅降级。
+
+def _parse_kv(payload):
+    """Parse a "k=v|k=v" payload into a dict (values stay strings)."""
+    out = {}
+    for part in payload.split("|"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def build_info():
+    """Build fingerprint of the RUNNING Cardinal (TODO-BACKLOG P0).
+
+    variant/mode/build/safeMode/caps. `caps` lists every read endpoint this
+    build actually serves. Combined with a process check on the MCP side, a
+    timeout becomes diagnosable: process gone = crashed; process alive but no
+    reply = OSC not started (they look identical from the client alone).
+    """
+    payload = _ask("build-info", "/build-info")
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    info = _parse_kv(payload)
+    caps = [c for c in info.pop("caps", "").split(",") if c]
+    return {"ok": True, "variant": info.get("variant"), "mode": info.get("mode"),
+            "build": info.get("build"),
+            "safe_mode": info.get("safeMode") == "1", "caps": caps, **info}
+
+
+def cables(module_id=None):
+    """Every cable in the running rack: id, input (module,port), output (module,port).
+
+    Pass module_id to filter to just that module's cables. This is the wiring
+    ground truth — the same connections a human sees dragged on screen.
+    """
+    args = () if module_id is None else [("h", int(module_id))]
+    payload = _ask("cables", "/cables", args)
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    if payload == "none":
+        return {"ok": True, "count": 0, "cables": []}
+    out = []
+    for item in payload.split(","):
+        f = item.split(":")
+        if len(f) != 5:
+            continue
+        try:
+            cid, im, ip, om, op = (int(x) for x in f)
+        except ValueError:
+            continue
+        out.append({"cable_id": cid, "input_module": im, "input_port": ip,
+                    "output_module": om, "output_port": op})
+    return {"ok": True, "count": len(out), "cables": out}
+
+
+def transport():
+    """Transport state: playing / bar / beat / bpm / tick / bypassed.
+
+    Zero-hook — CardinalPluginContext already carries all of it.
+    """
+    payload = _ask("transport", "/transport")
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    info = _parse_kv(payload)
+    return {"ok": True,
+            "playing": info.get("playing") == "1",
+            "bar": int(info.get("bar", 0)), "beat": int(info.get("beat", 0)),
+            "beats_per_bar": int(info.get("bpb", 0)),
+            "beat_type": int(info.get("beatType", 0)),
+            "bpm": float(info.get("bpm", 0) or 0),
+            "tick": float(info.get("tick", 0) or 0),
+            "ticks_per_beat": float(info.get("ticksPerBeat", 0) or 0),
+            "bypassed": info.get("bypassed") == "1"}
+
+
+def engine_info():
+    """Engine facts: sample rate, buffer size, CPU load average/max.
+
+    ⚠️ CPU meters refresh only once per second (Engine.cpp:576). The reply
+    carries cpuRefreshMs=1000 so callers know the data can be up to 1 s old —
+    the exact age is private engine state we refuse to fake.
+    """
+    payload = _ask("engine-info", "/engine-info")
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    info = _parse_kv(payload)
+    try:
+        return {"ok": True,
+                "sample_rate": float(info.get("sampleRate", 0) or 0),
+                "buffer_size": int(info.get("bufferSize", 0) or 0),
+                "cpu_avg": float(info.get("cpuAvg", 0) or 0),
+                "cpu_max": float(info.get("cpuMax", 0) or 0),
+                "cpu_refresh_ms": int(info.get("cpuRefreshMs", 1000) or 1000)}
+    except ValueError:
+        return {"ok": False, "raw": info}
+
+
+def plugins(plugin=None):
+    """Plugin facts, split by layer (B5):
+    - runtime: which plugin slugs appear in the CURRENT rack (engine truth)
+    - disk: is a given slug installed at all (PluginManifests — the layer that
+      answers 'my spelling looks right but it won't load')
+    - safeMode: when true, NO plugin loaded at all — first suspect for that case
+    """
+    payload = _ask("plugins", "/plugins")
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    info = _parse_kv(payload)
+    slugs = [s for s in info.get("plugins", "").split(",") if s and s != "none"]
+    out = {"ok": True, "safe_mode": info.get("safeMode") == "1",
+           "rack_plugins": slugs}
+    if plugin:
+        p = str(plugin)
+        out["query"] = p
+        out["in_rack"] = p in slugs
+        hit = None
+        d = modbrowser._manifest_dir()
+        if d:
+            for fn in sorted(os.listdir(d)):
+                if not fn.endswith(".json"):
+                    continue
+                try:
+                    with open(os.path.join(d, fn), "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                except Exception:
+                    continue
+                if (data.get("slug") or "").lower() == p.lower():
+                    hit = {"slug": data.get("slug"),
+                           "brand": data.get("brand"),
+                           "version": data.get("version"),
+                           "modules": len(data.get("modules") or [])}
+                    break
+        out["installed"] = hit is not None
+        out["manifest"] = hit
+    return out
+
+
 # ================================================================ Live autosave
 # Cardinal mirrors its running patch to %TEMP%\Cardinal.XXXX\patch.json, and THIS
 # is the only way to "read" live state — OSC can only WRITE, never read.
@@ -1874,6 +2015,74 @@ TOOLS = [
         "annotations": {"readOnlyHint": False, "destructiveHint": True,
                         "idempotentHint": True, "openWorldHint": False},
     },
+    # ---------------- B 组读数（第二批注入的只读端点，2026-10-20）----------
+    {
+        "name": "cardinal_build_info",
+        "description": "★ Build fingerprint of the RUNNING Cardinal: variant / mode "
+                       "(gui or thread) / build timestamp / safeMode / the full caps list "
+                       "of read endpoints this build serves. P0 diagnostic: with a process "
+                       "check it separates 'OSC never started' from 'Cardinal crashed' — "
+                       "from the client alone a timeout looks identical.",
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_cables",
+        "description": "★ READ the running rack's wiring: every cable as "
+                       "id:input(module,port):output(module,port) — the same connections a "
+                       "human sees dragged on screen. Pass module_id to filter to one "
+                       "module's cables. Ground truth for 'is it actually wired'.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "module_id": {"type": "integer", "minimum": 0,
+                              "description": "optional: only cables touching this module"},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_transport",
+        "description": "★ READ the transport: playing / bar / beat / beats-per-bar / bpm / "
+                       "tick / bypassed. Zero-hook — the data is already in the plugin "
+                       "context. Answers 'is the sequencer transport actually running'.",
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_engine_info",
+        "description": "★ READ engine facts: sample rate, buffer size, CPU load "
+                       "average/max. ⚠️ CPU meters refresh only once per second — the "
+                       "reply carries cpuRefreshMs so you know the data's age.",
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_plugins",
+        "description": "★ Plugin facts by layer: which plugin slugs the CURRENT rack "
+                       "actually uses (engine truth) + safeMode flag. Pass plugin=<slug> "
+                       "to also check whether that plugin is INSTALLED at all (reads "
+                       "PluginManifests — the disk layer). safeMode=true means NO plugin "
+                       "loaded: the first suspect when a correct-looking slug won't load.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "plugin": {"type": "string",
+                           "description": "optional slug, e.g. Bogaudio — adds the installed check"},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
     {
         "name": "cardinal_actions",
         "description": "List every operation the human can perform in Cardinal's UI, and for each: "
@@ -1963,6 +2172,12 @@ DISPATCH = {
         True, a.get("load_after", False)),
     "cardinal_sample_clear": lambda a: samplelib.clear_slot(
         a["patch"], a["slot"], a.get("module")),
+    # ---------------- B 组读数（第二批注入的只读端点，2026-10-20）----------
+    "cardinal_build_info": lambda a: build_info(),
+    "cardinal_cables": lambda a: cables(a.get("module_id")),
+    "cardinal_transport": lambda a: transport(),
+    "cardinal_engine_info": lambda a: engine_info(),
+    "cardinal_plugins": lambda a: plugins(a.get("plugin")),
     "cardinal_actions": lambda a: interaction_map.list_actions(
         a.get("status"),
     ) if not a.get("id") and not a.get("only_ready") else (

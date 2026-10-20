@@ -375,6 +375,10 @@ tools/osc_patch/
 - Build it with the WSL2 cross-compile recipe: `bash tools/cross_build_cardinal.sh 8 true`
   followed by `make -C CardinalNative` (see `skills`-equivalent notes in
   `docs/TODO-BACKLOG.md`, batch B).
+- **Two batches landed** (2026-10-19/20, both verified live over OSC):
+  batch A — `/modules` `/param-get` `/ports` `/signal` `/light`;
+  batch B — `/build-info` `/cables` (all + per-module) `/transport` `/engine-info`
+  `/plugins`. All 11 endpoints proven answering on a real running rack.
 - On an unpatched build every probe tool returns `probe_not_supported` — the other
   31 tools keep working unchanged.
 - Verified live: `/modules` returns the engine's real module list, `/signal` reports

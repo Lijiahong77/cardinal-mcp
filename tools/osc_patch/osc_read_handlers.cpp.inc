@@ -95,7 +95,6 @@ static int osc_param_get_handler(const char*, const char* types, lo_arg** argv, 
 {
     d_debug("osc_param_get_handler()");
     DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
-    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr && types[0] == 'h' && types[1] == 'i', 0);
 
     const lo_address source = lo_message_get_source(m);
     const lo_server server = static_cast<Initializer*>(self)->oscServer;
@@ -149,7 +148,6 @@ static int osc_ports_handler(const char*, const char* types, lo_arg** argv, int 
 {
     d_debug("osc_ports_handler()");
     DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
-    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr && types[0] == 'h', 0);
 
     const lo_address source = lo_message_get_source(m);
     const lo_server server = static_cast<Initializer*>(self)->oscServer;
@@ -295,7 +293,6 @@ static int osc_light_handler(const char*, const char* types, lo_arg** argv, int 
 {
     d_debug("osc_light_handler()");
     DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
-    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr && types[0] == 'h' && types[1] == 'i', 0);
 
     const lo_address source = lo_message_get_source(m);
     const lo_server server = static_cast<Initializer*>(self)->oscServer;
