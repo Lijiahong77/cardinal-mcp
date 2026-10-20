@@ -1008,6 +1008,213 @@ def plugins(plugin=None):
     return out
 
 
+# ================================================================ C 组：模拟人类操作
+# 这些端点对应李在 GUI 里真实会做的动作（拖模块、连线、拧旋钮、Ctrl+Z），
+# 与 A/B 组的区别：前两组只读，C 组**改状态**。全部走 history API ⇒ 可 undo。
+#
+# ⚠️ 为什么 module-add 之类「需要任意字符串参数」的操作只有 JS 路径：
+# 本 Cardinal 版的 liblo **接收 string 参数确认不通**（2026-10-20 实测：echo /
+# module-add / js-eval 三个 string 输入端点全部无应答，两种偏移读法都试过）。
+# liblo 的「发送 string」正常（所有 /resp 都是字符串）⇒ 只接收坏了。
+# 所以：数值参数类操作走下面的 OSC 端点；需要自由文本/JSON 的走 JS 脚本。
+
+def _hist(what):
+    """Wrap a history-mutating probe result into the common shape."""
+    if what is None:
+        return dict(PROBE_UNSUPPORTED)
+    return {"ok": True, "result": what}
+
+
+def set_param_by_display(module_id, param, value):
+    """Set a knob the way a HUMAN sets it — by its DISPLAYED value.
+
+    This is the crucial difference from set_param (which writes the raw 0..1
+    normalized storage value). A knob's display domain is module-specific and
+    often non-linear or non-0..1: a VCO frequency shows Hz, an ADSR attack
+    shows seconds, and the frequency scale is exponential. Writing 0.8 "as a
+    display value" and getting back 11.56 Hz is CORRECT behaviour — the engine
+    converts it. So verify with get_param, not by comparing to the input.
+
+    Returns the old/new storage values (a human sees the display value move).
+    """
+    payload = _ask("param-set", "/param-set-by-display",
+                   (("h", int(module_id)), ("i", int(param)), ("f", float(value))))
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    if not payload.startswith("ok"):
+        return {"ok": False, "raw": payload}
+    m = re.match(r"ok old=(\S+) new=(\S+)", payload)
+    if not m:
+        return {"ok": True, "raw": payload}
+    return {"ok": True, "module_id": int(module_id), "param": int(param),
+            "display_value": float(value),
+            "old_storage": float(m.group(1)), "new_storage": float(m.group(2)),
+            "history": "change parameter"}
+
+
+def cable_add(module_id, input_port, target_module_id, output_port):
+    """Drag a cable: connect output (module, port) -> input (module, port).
+
+    The reverse of what a human does (they pull from a widget port to a widget
+    port) but the same wire. Goes through history, so /undo removes it.
+
+    ⚠️ One input accepts ONE cable — a second connection on the same input
+    displaces the first. That is a hard engine rule, not a tool choice.
+    """
+    payload = _ask("cable-add", "/cable-add",
+                   (("h", int(module_id)), ("i", int(input_port)),
+                    ("h", int(target_module_id)), ("i", int(output_port))))
+    return _hist(payload)
+
+
+def cable_remove(cable_id):
+    """Right-click a cable -> Disconnect."""
+    payload = _ask("cable-remove", "/cable-remove", (("h", int(cable_id)),))
+    return _hist(payload)
+
+
+def undo():
+    """Ctrl+Z on the running rack. Returns the name of the action undone."""
+    payload = _ask("undo", "/undo")
+    return _hist(payload)
+
+
+def redo():
+    """Ctrl+Shift+Z on the running rack."""
+    payload = _ask("redo", "/redo")
+    return _hist(payload)
+
+
+def module_json(module_id):
+    """Read one live module's full .vcv JSON (params, data, slots, version).
+
+    The live counterpart of patch_info's per-module view, and the ground truth
+    for editing a module properly: hand the JSON to module_from_json (JS API) or
+    edit it and deploy the patch.
+    """
+    payload = _ask("module-json", "/module-json", (("h", int(module_id)),))
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    try:
+        data = json.loads(payload)
+    except ValueError:
+        return {"ok": False, "raw": payload[:400]}
+    return {"ok": True, "module_id": int(module_id), "module": data}
+
+
+def module_remove(module_id):
+    """Select a module and press Delete — removes it and its cables."""
+    payload = _ask("module-remove", "/module-remove", (("h", int(module_id)),))
+    return _hist(payload)
+
+
+def module_move(module_id, x, y):
+    """Drag a module to grid position (x, y).
+
+    ⚠️ Units follow the .vcv file: x is in GRID cells, y is a ROW INDEX
+    (VCV stores pos[0] as cell x and pos[1] as row y). Same as the file format.
+    """
+    payload = _ask("module-move", "/module-move",
+                   (("h", int(module_id)), ("i", int(x)), ("i", int(y))))
+    return _hist(payload)
+
+
+def midi_out(port, status, data1, data2=0, frame=-1):
+    """Inject a MIDI message into the running rack (what a hardware keyboard sends).
+
+    ⚠️ port must be 0..15 (DPF MIDI channel) and status 0x80..0xEF. frame=-1
+    means "send now"; a real frame number is honoured too. If the sequencer
+    transport is bypassed, the reply reports skipped:bypassed — the message was
+    accepted but NOT delivered, and we say so rather than pretending it worked.
+    """
+    payload = _ask("midi-out", "/midi-out",
+                   (("i", int(port)), ("i", int(status)),
+                    ("i", int(data1)), ("i", int(data2)), ("i", int(frame))))
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    out = {"ok": True, "port": int(port), "status": int(status),
+           "data1": int(data1), "data2": int(data2), "frame": int(frame),
+           "reply": payload}
+    if payload.startswith("skipped"):
+        out["delivered"] = False
+        out["reason"] = payload
+    else:
+        out["delivered"] = True
+    return out
+
+
+# ------------------------------------------------------------ QuickJS 绑定
+# 进程内 JS 执行 —— 对标 blender/godot/UE MCP 的「宿主内执行代码」，是这批
+# 唯一能自由表达复杂操作的通路。
+#
+# 安全模型（三重门，缺一不可）：
+#   1. **默认关闭**：CARDINAL_JS_MODE 未设或非 read/write ⇒ /osc-js-run 直接
+#      回 disabled。李必须显式 export 才生效。
+#   2. **不初始化 libc**：只 JS_NewRuntime + JS_NewContext，绝不
+#      addQuickJSModule / JS_AddIntrinsic* 的 std/os ⇒ 没有 std、没有 require、
+#      没有 exec 任意命令。（lethal trifecta：外发能力直接砍掉）
+#   3. **墙钟预算**：执行超 2000ms（CARDINAL_JS_BUDGET_MS 可覆盖）即被 quickjs
+#      中断，回 budget-exceeded。死循环脚本实测 2001ms 准点打断、进程存活。
+#
+# 脚本契约：被包成 globalThis.result = (function(){ <脚本> })(); 所以用
+# `return` 交结果。脚本目录 CARDINAL_JS_DIR（默认 D:/Cardinal/js，可 git
+# 管理——比每次传字符串更工程化）。
+
+JS_DEFAULT_DIR = r"D:/Cardinal/js"
+
+
+def js_list():
+    """List the JS scripts available to /osc-js-run (1-based indexes)."""
+    payload = _ask("js-list", "/osc-js-list")
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    items = []
+    for entry in payload.split(","):
+        if ":" in entry:
+            i, name = entry.split(":", 1)
+            items.append({"index": int(i), "name": name})
+    return {"ok": True, "count": len(items), "scripts": items,
+            "script_dir": JS_DEFAULT_DIR}
+
+
+def js_run(index):
+    """Execute a JS script by index (from js_list) inside the RUNNING Cardinal.
+
+    The script runs synchronously on Cardinal's UI thread with a wall-clock
+    budget. Available API:
+
+      read  (CARDINAL_JS_MODE=read or write): cardinal.modules() / getParam(id, n)
+            / ports(id) / cables() / transport() / moduleJson(id)
+      write (CARDINAL_JS_MODE=write only):       cardinal.setDisplayValue(id, n, v)
+            / moduleFromJson(id, json) / addModule(slug, x, y)
+            / cableAdd(...) / undo() / redo()
+
+    Return contract: the script is wrapped in an IIFE — use `return "..."`.
+    Over budget returns {"budget_exceeded_ms": N}; a JS error returns
+    {"error": "..."}. Write-mode failures are reported, never swallowed.
+    """
+    payload = _ask("js", "/osc-js-run", (("i", int(index)),))
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    out = {"ok": True, "script_index": int(index), "result": payload}
+    if payload.startswith("disabled"):
+        out["ok"] = False
+        out["enabled"] = False
+        out["hint"] = ("JS is disabled by default (safety). Set CARDINAL_JS_MODE=read "
+                       "or =write in Cardinal's environment, then restart it.")
+    elif payload.startswith("budget-exceeded"):
+        out["ok"] = False
+        out["budget_exceeded_ms"] = int(payload.split("ms=")[-1])
+        out["hint"] = "The script ran past its wall-clock budget and was interrupted."
+    elif payload.startswith("error"):
+        out["ok"] = False
+        out["error"] = payload[6:].strip()
+    elif payload.startswith("no-script"):
+        out["ok"] = False
+        out["error"] = payload
+    return out
+
+
 # ================================================================ Live autosave
 # Cardinal mirrors its running patch to %TEMP%\Cardinal.XXXX\patch.json, and THIS
 # is the only way to "read" live state — OSC can only WRITE, never read.
@@ -2083,6 +2290,219 @@ TOOLS = [
         "outputSchema": {"type": "object"},
         "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
+    # ---------------- C 组：模拟人类操作（改状态，全部可 undo）---------------
+    {
+        "name": "cardinal_set_param_by_display",
+        "description": "★ Set a knob BY ITS DISPLAYED VALUE — the way a human turns it. "
+                       "set_param writes raw normalized 0..1 storage; this writes what "
+                       "the panel shows (Hz, seconds, semitones) and lets the engine "
+                       "convert. A knob's display domain is module-specific and often "
+                       "exponential: setDisplayValue(id,2,0.8) reading back as 11.56 Hz "
+                       "on a VCO is CORRECT. Verify with cardinal_get_param, not by "
+                       "comparing the number to the input. Undoable.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "module_id": {"type": "integer", "description": "live module id"},
+                "param": {"type": "integer", "minimum": 0, "description": "param index"},
+                "value": {"type": "number", "description": "value in the knob's DISPLAY domain"},
+            },
+            "required": ["module_id", "param", "value"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_cable_add",
+        "description": "★ Drag a cable in the live rack: connect "
+                       "input(module_id, input_port) <- output(target_module_id, "
+                       "output_port). Goes through engine history so cardinal_undo "
+                       "removes it. ⚠️ ONE cable per input port — a second connection "
+                       "on the same input displaces the first (engine rule, not a "
+                       "tool limitation).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "module_id": {"type": "integer", "description": "module owning the INPUT port"},
+                "input_port": {"type": "integer", "minimum": 0, "maximum": 23,
+                               "description": "port index on the INPUT module"},
+                "target_module_id": {"type": "integer", "description": "module owning the OUTPUT port"},
+                "output_port": {"type": "integer", "minimum": 0, "maximum": 23,
+                                "description": "port index on the OUTPUT module"},
+            },
+            "required": ["module_id", "input_port", "target_module_id", "output_port"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_cable_remove",
+        "description": "★ Right-click a cable -> Disconnect, in the live rack. "
+                       "Get the cable id from cardinal_cables first. Undoable.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"cable_id": {"type": "integer",
+                                  "description": "from cardinal_cables"}},
+            "required": ["cable_id"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_undo",
+        "description": "★ Ctrl+Z on the running rack. Returns the name of the action "
+                       "undone ('change parameter', 'add cable', 'add module', "
+                       "'move module'...). Undo actions are themselves re-doable, so "
+                       "check the returned name before assuming what changed.",
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_redo",
+        "description": "★ Ctrl+Shift+Z on the running rack. Returns the name of the "
+                       "action redone.",
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_module_json",
+        "description": "★ Read one LIVE module's complete .vcv JSON — params, data, "
+                       "slots, version, leftModuleId/rightModuleId. This is the "
+                       "authoritative shape for editing a module: use it to build a "
+                       "correct replacement and hand it to the JS moduleFromJson API. "
+                       "⚠️ Audit the neighbours: a dangling leftModuleId/rightModuleId "
+                       "is THE crash cause on load.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"module_id": {"type": "integer", "description": "live module id"}},
+            "required": ["module_id"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_module_remove",
+        "description": "★ Select a module in the live rack and press Delete — the "
+                       "module AND its cables are removed. Undoable, but prefer "
+                       "editing a saved .vcv copy first: this mutates what is on "
+                       "screen right now.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"module_id": {"type": "integer",
+                                   "description": "live module to delete"}},
+            "required": ["module_id"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_module_move",
+        "description": "★ Drag a live module to a grid position. ⚠️ UNITS: x is in "
+                       "GRID CELLS, y is a ROW INDEX — the .vcv file stores pos[0] "
+                       "as cell x and pos[1] as row y. Undoable. Remember the project "
+                       "rule: never regenerate a layout wholesale; move only what was "
+                       "asked.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "module_id": {"type": "integer", "description": "live module to drag"},
+                "x": {"type": "integer", "description": "grid cell x"},
+                "y": {"type": "integer", "description": "row index y"},
+            },
+            "required": ["module_id", "x", "y"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_midi_out",
+        "description": "★ Inject a raw MIDI message into the live rack — what a "
+                       "hardware keyboard sends, without needing the keyboard. "
+                       "status is the status byte (0x90 note-on, 0x80 note-off, "
+                       "0xB0 CC, ...). ⚠️ If the sequencer transport is bypassed the "
+                       "reply reports skipped:bypassed: the message was accepted but "
+                       "NOT delivered, and we say so instead of pretending.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "port": {"type": "integer", "minimum": 0, "maximum": 15,
+                         "description": "DPF MIDI channel"},
+                "status": {"type": "integer", "minimum": 128, "maximum": 239,
+                           "description": "status byte, e.g. 144 for 0x90"},
+                "data1": {"type": "integer", "minimum": 0, "maximum": 127,
+                         "description": "first data byte, e.g. note number"},
+                "data2": {"type": "integer", "minimum": 0, "maximum": 127,
+                          "description": "second data byte, e.g. velocity"},
+                "frame": {"type": "integer", "minimum": -1,
+                          "description": "-1 = send now; a real frame number defers it"},
+            },
+            "required": ["port", "status", "data1"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_js_list",
+        "description": "List the JS scripts available to cardinal_js_run, with their "
+                       "1-based indexes. Scripts live in Cardinal's script dir "
+                       "(CARDINAL_JS_DIR, default D:/Cardinal/js) — files are "
+                       "git-tracked, which suits a workflow where the rack recipes "
+                       "are versioned assets rather than ad-hoc strings.",
+        "inputSchema": {"type": "object", "properties": {},
+                        "additionalProperties": False},
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_js_run",
+        "description": "★ Run JS INSIDE the running Cardinal (the host-code-execution "
+                       "capability blender/godot/UE MCPs have). This is the only path "
+                       "for operations needing free text or JSON, because this build's "
+                       "liblo cannot RECEIVE string OSC arguments (verified 2026-10-20: "
+                       "all string-input endpoints are dead; sending strings still "
+                       "works). API: read — cardinal.modules()/getParam(id,n)/ports(id)/"
+                       "cables()/transport()/moduleJson(id); write (CARDINAL_JS_MODE=write "
+                       "only) — cardinal.setDisplayValue(id,n,v)/moduleFromJson(id,json)/"
+                       "addModule(slug,x,y)/cableAdd(...)/undo()/redo(). CONTRACT: the "
+                       "script is wrapped in an IIFE, so RETURN your result; assigning "
+                       "globalThis.result does not work. SAFETY: disabled unless "
+                       "CARDINAL_JS_MODE is read/write, libc is never initialized (no "
+                       "std, no require, no exec), and a 2000ms wall-clock budget "
+                       "interrupts runaway scripts (replies budget-exceeded ms=N).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "index": {"type": "integer", "minimum": 1,
+                          "description": "1-based script index from cardinal_js_list"},
+            },
+            "required": ["index"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
     {
         "name": "cardinal_actions",
         "description": "List every operation the human can perform in Cardinal's UI, and for each: "
@@ -2178,6 +2598,24 @@ DISPATCH = {
     "cardinal_transport": lambda a: transport(),
     "cardinal_engine_info": lambda a: engine_info(),
     "cardinal_plugins": lambda a: plugins(a.get("plugin")),
+    # ---- C 组：模拟人类操作（改状态）----
+    "cardinal_set_param_by_display": lambda a: set_param_by_display(
+        a["module_id"], a["param"], a["value"]),
+    "cardinal_cable_add": lambda a: cable_add(
+        a["module_id"], a["input_port"], a["target_module_id"], a["output_port"]),
+    "cardinal_cable_remove": lambda a: cable_remove(a["cable_id"]),
+    "cardinal_undo": lambda a: undo(),
+    "cardinal_redo": lambda a: redo(),
+    "cardinal_module_json": lambda a: module_json(a["module_id"]),
+    "cardinal_module_remove": lambda a: module_remove(a["module_id"]),
+    "cardinal_module_move": lambda a: module_move(
+        a["module_id"], a["x"], a["y"]),
+    "cardinal_midi_out": lambda a: midi_out(
+        a["port"], a["status"], a["data1"],
+        a.get("data2", 0), a.get("frame", -1)),
+    # ---- QuickJS 绑定 ----
+    "cardinal_js_list": lambda a: js_list(),
+    "cardinal_js_run": lambda a: js_run(a["index"]),
     "cardinal_actions": lambda a: interaction_map.list_actions(
         a.get("status"),
     ) if not a.get("id") and not a.get("only_ready") else (
