@@ -1,7 +1,7 @@
 # cardinal-mcp
 
 > 一个让 AI 能直接操作 [Cardinal](https://github.com/DISTRHO/Cardinal) 模块化合成器的轻量外壳。
-> **36 个 MCP 工具**（MCP 协议 2025-06-18：tool annotations + structured output）
+> **52 个 MCP 工具**（MCP 协议 2025-06-18：tool annotations + structured output）
 > + 约 40 个零依赖 Python 小工具 = 一个能版本管理、自动化、远程控制的合成器工作流。
 
 ---
@@ -33,13 +33,17 @@ Cardinal 是 VCV Rack 的硬分叉（DISTRHO 出品），本身是为了拿来�
 
 `cardinal-mcp` 在它外面套了一层：
 - **驱动**：Cardinal 的 **OSC**（原版 4 个只写 handler）+ **实时自动存档读回**，拼出
-  **36 个语义化 MCP 工具**（`cardinal_load_patch` / `cardinal_set_param` / `cardinal_read_live` 等）。
+  **52 个语义化 MCP 工具**（`cardinal_load_patch` / `cardinal_set_param` / `cardinal_read_live` 等）。
 - **看见**（原版 Cardinal 做不到的部分）：`tools/osc_patch/` 是一份幂等的 Cardinal
-  源码补丁 + WSL2 交叉编译配方，给 Cardinal 注入 **5 个 OSC 只读探针**
-  （`/modules` `/param-get` `/ports` `/signal` `/light`）——AI 终于能**读**引擎状态：
-  哪些模块真加载了、旋钮的真实显示值、每个口的电压（这机架到底在不在出声）、LED 亮没亮。
-  作者的 patched 构建已部署并实测（见下文「探针」一节）；没打补丁的原版构建上，
-  探针类工具全部优雅降级为 `probe_not_supported`，其余工具照常工作。
+  源码补丁 + WSL2 交叉编译配方，给 Cardinal 注入 **22 个 OSC 端点**——5 个只读探针
+  （`/modules` `/param-get` `/ports` `/signal` `/light`）+ 6 个运行期事实读取 + 10 个
+  「模拟人类操作」端点 + QuickJS 绑定。AI 终于能**读**引擎状态（哪些模块真加载了、
+  旋钮的真实显示值、每个口的电压——这机架到底在不在出声），也能像人一样**动手**（拧旋钮、
+  拖接线、撤销、发 MIDI）。作者的 patched 构建已部署并实测；没打补丁的原版构建上，
+  这类工具全部优雅降级为 `probe_not_supported`，其余工具照常工作。
+- **在宿主里执行代码**：`cardinal_js_run` 让 JS（QuickJS）在 Cardinal 进程内跑——
+  和 blender / godot / UE MCP 的「在宿主里执行代码」是同一件事。默认关闭、
+  永不初始化 libc、2000ms 墙钟预算。
 - **先审计再加载**：五道审计链（`validate` → `ports` → `chain` → `values` → `flow`）
   聚合成一个 `cardinal_audit` 工具——把「一加载就崩」和「加载了但不出声」两类问题
   拦在 `/load` 之前。
@@ -54,7 +58,7 @@ Cardinal 是 VCV Rack 的硬分叉（DISTRHO 出品），本身是为了拿来�
 
 **不是什么**
 
-- **主路径不是 Cardinal 插件**——36 个工具全部通过 OSC + 文件层在外部驱动 Cardinal，
+- **主路径不是 Cardinal 插件**——52 个工具全部通过 OSC + 文件层在外部驱动 Cardinal，
   原版 Cardinal 上就能用。可选的 `tools/osc_patch/` 源码补丁**确实会改 Cardinal**
   （这是拿到「读回」能力的唯一出路——Cardinal 的 OSC 设计上就是只写的），
   但它 opt-in、幂等、自带 `--rollback`。
@@ -117,7 +121,7 @@ OSC 远程控制默认自动开启（CARDINAL_OSC_AUTOSTART=1）。
 
 ```bash
 python tools/cardinal_mcp.py --selftest
-# 期望最后一行：OK: All 36 tools reachable
+# 期望最后一行：OK: All 52 tools reachable
 ```
 
 如果不通，先用 PowerShell 跑：
@@ -156,7 +160,7 @@ Get-NetUDPEndpoint -LocalPort 2228 -ErrorAction SilentlyContinue
 
 ---
 
-## 它能做什么 —— 36 个 MCP 工具一览
+## 它能做什么 —— 52 个 MCP 工具一览
 
 ### 驱动（写进运行中的 Cardinal）
 
@@ -233,6 +237,54 @@ Get-NetUDPEndpoint -LocalPort 2228 -ErrorAction SilentlyContinue
 | `cardinal_music` | 节奏型 / 和弦进行 / 音色配方查询 | 让 AI 用知识库回答 |
 | `cardinal_apply_recipe` | 把音色配方写进机架；`weight` 0..1 在当前值↔目标值间插值 | 一键换音色，或轻微推动 |
 
+### 运行期事实读取（批次 B · 需要 patched 构建，原版优雅降级）
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_build_info` | 变体 / GUI 版还是 thread 版 / 编译时间 / safeMode / 完整端点清单 | P0 诊断：把「OSC 根本没开」和「Cardinal 崩了」分开——只从客户端看，两者的表现都是超时 |
+| `cardinal_cables` | 全机架接线：`id:输入(模块,口)←输出(模块,口)`，可按模块过滤 | 「到底接上了没」的权威答案 |
+| `cardinal_transport` | playing / bar / beat / bpm / tick / bypassed（零 hook） | 音序器走带是不是真在跑 |
+| `cardinal_engine_info` | 采样率 / buffer / CPU 平均与峰值，带 `cpu_refresh_ms` | CPU 表每秒才刷一次，回包自带数据年龄 |
+| `cardinal_plugins` | 当前机架实际用了哪些 plugin slug + safeMode；可逐个查磁盘层装没装 | 「我拼写明明对却加载不上」——safeMode 为真意味着**一个插件都没加载** |
+
+### 模拟人类操作（批次 C · 这些会**改**当前机架，但全部可 undo）
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_set_param_by_display` | 按**显示值**写旋钮（写「275ms」而不是 0.275） | 像人一样输入，引擎负责换算 |
+| `cardinal_cable_add` / `cardinal_cable_remove` | 拖一条线 / 右键断开 | 不重新生成机架就能改接线。⚠️ 同一输入口只能接一根线 |
+| `cardinal_module_move` | 拖动模块；`x` 是格、`y` 是行号 | 精准挪位，绝不整版重排 |
+| `cardinal_module_remove` | 选中 + Delete（模块连同它的线） | 可撤销，但更稳妥是先改保存好的副本 |
+| `cardinal_undo` / `cardinal_redo` | Ctrl+Z / Ctrl+Shift+Z，返回被撤销动作的名字 | 别假定「撤销了什么」，先看返回的名字 |
+| `cardinal_module_json` | 活的单个模块的完整 .vcv JSON | 改模块数据时的权威形状 |
+| `cardinal_midi_out` | 注入原始 MIDI 消息（不用硬件键盘） | 让 agent 直接弹琴。bypassed 时如实回 `skipped:bypassed` |
+
+### 进程内 JS（QuickJS · 和 blender/godot/UE MCP 同款的「宿主内执行代码」）
+
+| 工具 | 做什么 | 常用场景 |
+|---|---|---|
+| `cardinal_js_list` | 列出可执行的 JS 脚本及 1-based 索引 | 脚本放 `js/` 目录，可 git 管理 |
+| `cardinal_js_run` | 在**正在运行的** Cardinal 里执行脚本 | 需要自由文本 / JSON 的操作只能走这条路 |
+
+**为什么需要 JS 这条路**：这个 Cardinal 版的 liblo **收不了** string 类型的 OSC 参数
+（2026-10-20 实测：所有 string 输入端点全哑；**发**字符串正常）。所以要传任意文本的
+操作改成「脚本文件 + 索引」——索引是纯数值。反倒更合李的工作流：机架配方是
+git 可管的资产，不是一堆临时字符串。
+
+**安全模型，三道独立闸门**：
+1. **默认关闭**——`CARDINAL_JS_MODE` 不是 `read` / `write` 就回 `disabled`。
+2. **永不初始化 libc**——没有 `std`、没有 `require`、没有 `exec`。runtime 就是裸的
+   `JS_NewRuntime` + `JS_NewContext`，不存在任何外发执行路径。
+3. **墙钟预算**——默认 2000ms（`CARDINAL_JS_BUDGET_MS` 可改）。死循环脚本被打断后
+   回 `budget-exceeded ms=2001`，进程存活（用 `while (true)` 实测过）。
+
+脚本契约：脚本被包在 IIFE 里，所以**用 `return` 交结果**——自己写
+`globalThis.result = ...` 会被覆盖成 `undefined`。
+
+| API（只读，read 和 write 模式都有） | API（写，需 `CARDINAL_JS_MODE=write`） |
+|---|---|
+| `cardinal.modules()` / `getParam(id, n)` / `ports(id)` / `cables()` / `transport()` / `moduleJson(id)` | `cardinal.setDisplayValue(id, n, v)` / `moduleFromJson(id, json)` / `addModule(slug, x, y)` / `cableAdd(...)` / `undo()` / `redo()` |
+
 ### 人类操作索引
 
 | 工具 | 做什么 | 常用场景 |
@@ -252,8 +304,8 @@ cardinal-mcp/
 ├── mcp.example.json                ← MCP 配置示例
 │
 ├── tools/                          ← 约 40 个 Python 工具
-│   ├── cardinal_mcp.py             ← MCP 主入口（36 个工具）
-│   ├── osc_patch/                  ← Cardinal 源码补丁：5 个 OSC 只读探针
+│   ├── cardinal_mcp.py             ← MCP 主入口（52 个工具）
+│   ├── osc_patch/                  ← 3 套注入器，22 个 OSC 端点（读 + 操作 + JS）
 │   │                               ← + 幂等注入器（备份/校验/回滚）
 │   ├── patchio.py                  ← 双格式读写 .vcv（JSON / tar+zstd）
 │   ├── layout_patch.py             ← 排班门禁 + 自动重排
@@ -350,25 +402,53 @@ AI: → cardinal_music (progressions) 拿 ii-V-I 的 voicings
 
 ---
 
-## 探针：只读 OSC 层怎么工作
+## OSC 层：22 个端点是怎么进到 Cardinal 里的
 
 原版 Cardinal 的 OSC server 是**只写的**（4 个 handler，没有一个回数据）——这是上游
 项目的硬设计事实，不是 bug。`tools/osc_patch/` 补上这一层：
 
 ```
 tools/osc_patch/
-├── osc_read_handlers.cpp.inc   ← 5 个 handler（/modules /param-get /ports /signal /light）
-├── inject_osc_read.py          ← 幂等注入器：备份 → 注入 → 校验 →（--rollback）
-└── ...
+├── osc_read_handlers.cpp.inc    ← 批次 A：5 个只读探针
+├── inject_osc_read.py           ← 幂等注入器：备份 → 注入 → 校验 →（--rollback）
+├── osc_read_b_handlers.cpp.inc  ← 批次 B：6 个运行期事实读取
+├── inject_osc_b.py              ← 同样四件套，锚点挂在批次 A 的标记上
+├── osc_ops_c_handlers.cpp.inc   ← 批次 C：9 个模拟人类操作端点
+├── osc_js_handlers.cpp.inc      ← QuickJS 绑定（进程内 JS）
+└── inject_osc_c.py              ← 同样四件套，锚点挂在批次 A 的标记上
 ```
 
-- 注入器改 `src/CardinalCommon.cpp`（thread 与非 thread 两处注册点都改），
-  改前备份，改后校验「5 实现 × 2 注册」。
+- 每个注入器都改 `src/CardinalCommon.cpp`（**thread 与非 thread 两处**注册点都改——
+  只改一处会静默失效），改前备份，改后校验「实现数 × 注册数」。三个都支持
+  `--check` 与 `--rollback`。
 - 用 WSL2 交叉编译配方构建：`bash tools/cross_build_cardinal.sh 8 true`
-  然后 `make -C CardinalNative`（详见 `docs/TODO-BACKLOG.md` 批次 B）。
-- 没打补丁的构建上，探针类工具返回 `probe_not_supported`，其余 31 个工具不受影响。
+  然后 `make -C CardinalNative`（第二条命令是绕开一个既有的 `CardinalMini_dsp.dll`
+  链接失败所必需的补丁动作，详见 `docs/TODO-BACKLOG.md`）。
+- **三批全部已落地并运行级实测**（2026-10-19/20）：
+  - 批次 A — `/modules` `/param-get` `/ports` `/signal` `/light`
+  - 批次 B — `/build-info` `/cables`（全量 + 单模块）`/transport` `/engine-info` `/plugins`
+  - 批次 C — `/param-set-by-display` `/cable-add` `/cable-remove` `/undo` `/redo`
+    `/module-json` `/module-remove` `/module-move` `/midi-out` + `/osc-js-run` `/osc-js-list`
+
+  验收一律是**运行级**、绝不是文件级：真实进程在真实机架上回真实 OSC 消息。
+  （文件级证据会骗人——exe 是 stripped to external PDB，`nm` 完全没用，
+  连短路径串都会被 GCC 内联掉。）
+- 没打补丁的构建上，这批工具返回 `probe_not_supported`，其余 52 个工具不受影响。
 - 已实测：`/modules` 回引擎真实模块清单；`/signal` 报每模块峰值电压
-  （默认机架的 VCO 读数 4.977 V）。
+  （默认机架的 VCO 读数 4.977 V）；C 组 undo 回来的动作名正确
+  （`change parameter` / `add cable` / `move module`）；JS 预算把 `while (true)`
+  脚本在 2001ms 打断且进程存活。
+
+### 这一层的已知限制（是设计事实，不是 bug）
+
+- **这个版本的 liblo 收不了 string 类型的 OSC 参数。** 2026-10-20 实测：所有
+  string 输入端点全哑；**发**字符串正常（`/resp` 的内容全是字符串）。所以需要
+  自由文本或 JSON 的操作改走「JS 脚本文件 + 数值索引」——见上面的 `cardinal_js_run`。
+- **旋钮显示值域因模块而异，且常为非线性。** 显示值写 `0.8`、在 VCO 上回读
+  `11.56 Hz` 是**正确换算**而不是 bug。要用 `cardinal_get_param` 验证，
+  不要拿数字直接比。
+- **CPU 表每秒才刷新一次**（`/engine-info` 自带 `cpuRefreshMs` 说明数据年龄），
+  `/modules` 还没有分页——200 模块的机架会一个数据报回来，体积大但仍在 UDP 上限内。
 
 ---
 
@@ -411,7 +491,8 @@ tools/osc_patch/
 
 | 不支持 | 原因 |
 |---|---|
-| 实时 MIDI/CV 注入引擎 | OSC 仍然没有 MIDI 注入消息（原版 4 个写 handler；patched +5 个读探针）。源码里的路是通的（`CardinalPluginContext::writeMidiMessage`）——记为 `docs/TODO-BACKLOG.md` 批次 B 的 C9 |
+| 批量操作要原子生效 | OSC 没有 `/batch` 端点。`ComplexAction` 引擎里有，但 C 组各端点本身就走 history ⇒「做 N 步、一次 undo」已经能拼出来。真需要单端点批量时再补 C5 |
+| 用 OSC 按 slug 加模块 | **这个版本的 liblo 收不了 string 参数**（2026-10-20 实测）。加模块要 `plugin\|model` slug，所以走 `cardinal_js_run` → `cardinal.addModule(slug, x, y)`，而不是普通 OSC 端点 |
 | **原版**构建上参数变化自动回读 | 实时自动存档只在 `/load` 或 GUI 显式保存时写盘 —— **`/param` 改参数不写，也没有定时器**（26.02 实测）。用 **patched** 构建时，`cardinal_get_param` 走 `/param-get` 读真实显示值。详见 `docs/DESIGN-NOTES.md` 坑 8 |
 | 直接信任 `read_live` 的结果 | 如果留下过多次会话的存档，最新那个文件可能属于**上一次**会话。`read_live` / `save_live` 现在会返回 `stale` / `age_seconds` / `note`，用之前先看这三个字段。详见 坑 8b |
 | WSL2 里出声 | WSL2 构建能建窗口（软件 GL）也能应答 OSC，但 JACK 音频在 WSL 里不工作——WSL 只用于编译/验证，不用于演奏 |

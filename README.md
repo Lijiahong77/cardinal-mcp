@@ -2,7 +2,7 @@
 
 > A lightweight shell that lets an AI agent drive [Cardinal](https://github.com/DISTRHO/Cardinal)
 > (a modular synth) directly.
-> **36 MCP tools** (MCP protocol 2025-06-18: tool annotations + structured output)
+> **52 MCP tools** (MCP protocol 2025-06-18: tool annotations + structured output)
 > + ~40 zero-dependency Python utilities = a version-controllable, automatable,
 > remotely-controllable synth workflow.
 
@@ -32,15 +32,20 @@ no structured output, module positions are all drag-and-drop in the GUI.
 
 `cardinal-mcp` wraps a layer around it:
 - **Drive**: Cardinal's **OSC** (stock build: 4 write-only handlers) + **live autosave
-  read-back** assemble **36 semantic MCP tools** (`cardinal_load_patch` /
+  read-back** assemble **52 semantic MCP tools** (`cardinal_load_patch` /
   `cardinal_set_param` / `cardinal_read_live`, …).
 - **See** (the part stock Cardinal cannot do): `tools/osc_patch/` is an idempotent
-  source patch + WSL2 cross-build recipe that injects **5 read-only OSC probes**
-  (`/modules` `/param-get` `/ports` `/signal` `/light`) into Cardinal — so the AI can
-  finally *read* what the engine is doing: which modules loaded, a knob's real display
-  value, per-port voltages (is this rack actually making sound?), LED states. The
-  author's patched build is deployed and verified (see "Probes" below); on a stock
-  build every probe tool degrades gracefully to `probe_not_supported`.
+  source patch + WSL2 cross-build recipe that injects **22 OSC endpoints** into
+  Cardinal — 5 read-only probes (`/modules` `/param-get` `/ports` `/signal` `/light`),
+  6 runtime-fact readers, 10 simulated-human-operation endpoints, and the QuickJS
+  binding. So the AI can finally *read* what the engine is doing (which modules
+  loaded, a knob's real display value, per-port voltages — is this rack actually
+  making sound?), and *act* on the running rack the way a human would (turn a knob,
+  drag a wire, undo, send MIDI). The author's patched build is deployed and verified;
+  on a stock build every such tool degrades gracefully to `probe_not_supported`.
+- **Compute inside the host**: `cardinal_js_run` executes JavaScript in-process
+  (QuickJS) — the same "run code inside the app" capability the blender / godot / UE
+  MCPs have. Disabled by default, libc never initialized, 2000 ms wall-clock budget.
 - **Validate before you load**: a 5-stage audit chain (`validate` → `ports` → `chain` →
   `values` → `flow`) aggregated into one `cardinal_audit` tool — catches the crash-on-load
   and never-makes-a-sound classes *before* pushing a rack into Cardinal.
@@ -55,7 +60,7 @@ no structured output, module positions are all drag-and-drop in the GUI.
 
 **What it is NOT**
 
-- **Not a Cardinal plugin on the main path** — the 36 tools drive Cardinal externally
+- **Not a Cardinal plugin on the main path** — the 52 tools drive Cardinal externally
   via OSC + the file layer and work with a stock Cardinal. The optional `tools/osc_patch/`
   source patch *does* modify Cardinal (that is the only way to get read-back; Cardinal's
   OSC is write-only by design) — it is opt-in, idempotent, and ships a rollback.
@@ -122,7 +127,7 @@ Verify OSC is up:
 
 ```bash
 python tools/cardinal_mcp.py --selftest
-# last line should read: OK: All 36 tools reachable
+# last line should read: OK: All 52 tools reachable
 ```
 
 If it doesn't connect, first check in PowerShell:
@@ -162,7 +167,7 @@ Behind the scenes it calls `cardinal_list_patches` + `cardinal_patch_info`.
 
 ---
 
-## What it can do — the 36 MCP tools
+## What it can do — the 52 MCP tools
 
 ### Drive (write into running Cardinal)
 
@@ -239,6 +244,57 @@ Behind the scenes it calls `cardinal_list_patches` + `cardinal_patch_info`.
 | `cardinal_music` | drum patterns / chord progressions / tone recipes | let the AI answer from the knowledge base |
 | `cardinal_apply_recipe` | write a tone recipe into a rack; `weight` 0..1 blends current ↔ target | one-click tone swap, or a gentle nudge |
 
+### Runtime facts (batch B — need the patched build; degrade gracefully without it)
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_build_info` | variant / gui-vs-thread / build stamp / safeMode / full endpoint list | P0: separates "OSC never started" from "Cardinal crashed" — from the client a timeout looks identical |
+| `cardinal_cables` | the wiring as `id:input(mod,port)←output(mod,port)`, optionally one module | ground truth for "is it actually wired" |
+| `cardinal_transport` | playing / bar / beat / bpm / tick / bypassed (zero hook) | is the sequencer transport actually running |
+| `cardinal_engine_info` | sample rate / buffer size / CPU avg+max, with `cpu_refresh_ms` | CPU meters only refresh once per second — the reply says how old the data is |
+| `cardinal_plugins` | which plugin slugs the CURRENT rack uses + safeMode; disk-layer check per slug | "my spelling looks right but it won't load" — safeMode means NO plugin loaded |
+
+### Simulated human operations (batch C — these MUTATE the live rack, all undoable)
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_set_param_by_display` | set a knob BY ITS DISPLAYED VALUE ("275 ms", not 0.275) | type what a human would type; the engine converts |
+| `cardinal_cable_add` / `cardinal_cable_remove` | drag a wire / right-click → Disconnect | rewire without regenerating a patch. ⚠️ one cable per input port |
+| `cardinal_module_move` | drag a module; `x` = grid cell, `y` = row index | fix layout surgically, never regenerate it wholesale |
+| `cardinal_module_remove` | select + Delete (module and its cables) | undoable, but prefer editing a saved copy first |
+| `cardinal_undo` / `cardinal_redo` | Ctrl+Z / Ctrl+Shift+Z, returns the action name | check the returned name before assuming what changed |
+| `cardinal_module_json` | one live module's complete .vcv JSON | the authoritative shape for editing a module |
+| `cardinal_midi_out` | inject a raw MIDI message (no hardware keyboard needed) | drive the rack from an agent. Reports `skipped:bypassed` rather than pretending |
+
+### In-process JS (QuickJS — the host-code-execution capability blender/godot/UE MCPs have)
+
+| Tool | Does | Common use |
+|---|---|---|
+| `cardinal_js_list` | list runnable JS scripts with their 1-based indexes | scripts live in `js/`, git-tracked |
+| `cardinal_js_run` | execute a script inside the RUNNING Cardinal | the only path for operations needing free text or JSON |
+
+**Why the JS route exists:** this build's liblo cannot *receive* string OSC arguments
+(verified 2026-10-20 — every string-input endpoint is dead; *sending* strings still
+works). Operations needing arbitrary text therefore go through a script file plus an
+index argument, which is pure numeric. That also suits a workflow where rack recipes
+are versioned assets rather than ad-hoc strings.
+
+**Safety, three independent gates:**
+1. **Disabled by default** — replies `disabled` unless `CARDINAL_JS_MODE` is `read`
+   or `write` in Cardinal's own environment.
+2. **libc is never initialized** — no `std`, no `require`, no `exec`. The runtime is
+   bare `JS_NewRuntime` + `JS_NewContext`, so there is no outbound-execution path.
+3. **Wall-clock budget** — 2000 ms by default (`CARDINAL_JS_BUDGET_MS` to change).
+   A runaway script is interrupted and answers `budget-exceeded ms=2001`; the process
+   survives (verified with a `while (true)` script).
+
+Script contract: the script is wrapped in an IIFE, so **`return` your result** —
+assigning `globalThis.result` gets overwritten with `undefined`.
+
+| API (read, any enabled mode) | API (write, `CARDINAL_JS_MODE=write` only) |
+|---|---|
+| `cardinal.modules()` / `getParam(id, n)` / `ports(id)` / `cables()` / `transport()` / `moduleJson(id)` | `cardinal.setDisplayValue(id, n, v)` / `moduleFromJson(id, json)` / `addModule(slug, x, y)` / `cableAdd(...)` / `undo()` / `redo()` |
+
 ### Human-interaction index
 
 | Tool | Does | Common use |
@@ -259,8 +315,8 @@ cardinal-mcp/
 ├── AI-DISCLOSURE.md                ← AI-generation notice (READ BEFORE USE)
 │
 ├── tools/                          ← ~40 Python utilities
-│   ├── cardinal_mcp.py             ← MCP entry point (the 36 tools)
-│   ├── osc_patch/                  ← Cardinal source patch: 5 read-only OSC probes
+│   ├── cardinal_mcp.py             ← MCP entry point (the 52 tools)
+│   ├── osc_patch/                  ← 3 injector sets, 22 OSC endpoints (read + act + JS)
 │   │                               ← + idempotent injector (backup/verify/rollback)
 │   ├── patchio.py                  ← read/write .vcv in both formats (JSON / tar+zstd)
 │   ├── layout_patch.py             ← layout gate + auto re-layout
@@ -358,31 +414,56 @@ AI:   → cardinal_music (progressions) to get ii–V–I voicings
 
 ---
 
-## Probes: how the read-only OSC layer works
+## The OSC layer: how 22 endpoints get into Cardinal
 
 Stock Cardinal's OSC server is **write-only** (4 handlers, none replies with data) — that
 is a hard design fact of the upstream project, not a bug. `tools/osc_patch/` closes it:
 
 ```
 tools/osc_patch/
-├── osc_read_handlers.cpp.inc   ← 5 handlers (/modules /param-get /ports /signal /light)
-├── inject_osc_read.py          ← idempotent injector: backup → inject → verify → (--rollback)
-└── ...
+├── osc_read_handlers.cpp.inc    <- batch A: 5 read probes
+├── inject_osc_read.py           <- idempotent injector: backup -> inject -> verify -> (--rollback)
+├── osc_read_b_handlers.cpp.inc  <- batch B: 6 runtime-fact readers
+├── inject_osc_b.py              <- same four guarantees, anchors on batch A's markers
+├── osc_ops_c_handlers.cpp.inc   <- batch C: 9 simulated-human-operation endpoints
+├── osc_js_handlers.cpp.inc      <- QuickJS binding (in-process JS)
+└── inject_osc_c.py              <- same four guarantees, anchors on batch A's markers
 ```
 
-- The injector patches `src/CardinalCommon.cpp` (both the thread and non-thread
-  registration sites), backs up first, and verifies 5 implementations × 2 registrations.
-- Build it with the WSL2 cross-compile recipe: `bash tools/cross_build_cardinal.sh 8 true`
-  followed by `make -C CardinalNative` (see `skills`-equivalent notes in
-  `docs/TODO-BACKLOG.md`, batch B).
-- **Two batches landed** (2026-10-19/20, both verified live over OSC):
-  batch A — `/modules` `/param-get` `/ports` `/signal` `/light`;
-  batch B — `/build-info` `/cables` (all + per-module) `/transport` `/engine-info`
-  `/plugins`. All 11 endpoints proven answering on a real running rack.
-- On an unpatched build every probe tool returns `probe_not_supported` — the other
-  31 tools keep working unchanged.
+- Each injector patches `src/CardinalCommon.cpp` (**both** the thread and non-thread
+  registration sites — patching only one fails silently), backs up first, and verifies
+  implementation x registration counts. All three support `--check` and `--rollback`.
+- Build with the WSL2 cross-compile recipe: `bash tools/cross_build_cardinal.sh 8 true`
+  followed by `make -C CardinalNative` (the second command is a required workaround for a
+  pre-existing `CardinalMini_dsp.dll` link failure; see `docs/TODO-BACKLOG.md`).
+- **All three batches landed and were verified live over OSC** (2026-10-19/20):
+  - batch A -- `/modules` `/param-get` `/ports` `/signal` `/light`
+  - batch B -- `/build-info` `/cables` (all + per-module) `/transport` `/engine-info` `/plugins`
+  - batch C -- `/param-set-by-display` `/cable-add` `/cable-remove` `/undo` `/redo`
+    `/module-json` `/module-remove` `/module-move` `/midi-out` + `/osc-js-run` `/osc-js-list`
+
+  Verification is **runtime-level**, never file-level: a real process answering real OSC
+  messages on a real rack. File-level evidence lies — the exe is stripped to an external
+  PDB, so `nm` is useless and even short path strings get inlined away.
+- On an unpatched build every one of these tools returns `probe_not_supported` — the rest
+  of the 52 tools keep working unchanged.
 - Verified live: `/modules` returns the engine's real module list, `/signal` reports
-  per-module peak voltage (the default rack's VCO reads 4.977 V).
+  per-module peak voltage (the default rack's VCO reads 4.977 V), the C-group undo names
+  come back correct (`change parameter` / `add cable` / `move module`), and the JS budget
+  interrupts a `while (true)` script at 2001 ms with the process still alive.
+
+### Known limits of this layer (design facts, not bugs)
+
+- **liblo cannot *receive* string OSC arguments on this build.** Verified 2026-10-20:
+  every string-input endpoint is dead; *sending* strings works fine (all `/resp` payloads
+  are strings). So operations needing free text or JSON go through a JS script file plus a
+  numeric index — see `cardinal_js_run` above.
+- **Knob display domains are module-specific and often non-linear.** Setting a display
+  value of `0.8` and reading back `11.56 Hz` on a VCO is correct conversion, not a bug.
+  Verify with `cardinal_get_param` instead of comparing numbers.
+- **CPU meters refresh once per second** (`/engine-info` reports `cpuRefreshMs` so you know
+  the data's age) and `/modules` has no pagination yet — a 200-module rack replies in one
+  datagram, which is large but under the UDP limit.
 
 ---
 
@@ -430,7 +511,8 @@ tools/osc_patch/
 
 | Not supported | Why |
 |---|---|
-| Live MIDI/CV injection into the engine | OSC still has no MIDI-injection message (stock: 4 write handlers; patched: +5 read probes). The route exists in source (`CardinalPluginContext::writeMidiMessage`) — tracked as C9 in `docs/TODO-BACKLOG.md`, batch B |
+| Batch-mode action applied atomically | OSC has no `/batch` endpoint. `ComplexAction` exists in the engine, but the C-group endpoints each go through history — so "apply N ops, then one undo" already works. If a real single-endpoint batch is ever needed, add C5 |
+| Add a module by slug over OSC | **liblo on this build cannot receive string arguments** (verified 2026-10-20). Adding a module needs a plugin|model slug, so it goes through `cardinal_js_run` → `cardinal.addModule(slug, x, y)` instead of a plain OSC endpoint |
 | Auto read-back of param changes on a **stock** build | The live autosave is only flushed on `/load` or an explicit GUI save — **not** on `/param` changes and **not** on a timer (measured on 26.02). With the **patched** build, `cardinal_get_param` reads the real display value via `/param-get` instead. See `docs/DESIGN-NOTES.md` 坑 8 |
 | Trusting `read_live` blindly | If several Cardinal sessions leave autosaves behind, the newest file may belong to a *previous* session. `read_live` / `save_live` now return `stale` / `age_seconds` / `note`; check them. See 坑 8b |
 | Audio in WSL2 | A WSL2 build can create windows (software GL) and answer OSC, but JACK audio does not work there — WSL is for build/verify, not for playing |

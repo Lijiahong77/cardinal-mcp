@@ -59,9 +59,11 @@
 > **合并编译的理由**：探针是**一次性能力清单**（做完定稿），JS 绑定是**无上限能力**。分两次编则第一次编完到第二次编之间 MCP 侧全部不可用。合并后边际成本只有几十行，却**永久消除「补任何 handler」的需求**。
 > 编译脚本：`bash tools/cross_build_cardinal.sh`（重编全量 102MB）
 > **进度：B1-B5 已于 2026-10-20 第一批完工并运行级验证**（WINE+OSC 9/9 端点实测，
-> 含 A 组 3 个带参端点首次验证）。C 组（模拟人类操作）与 QuickJS 绑定待李拍板后
-> 同批编译。⚠️ 坑 D 仍在：主构建断在 CardinalMini_dsp.dll，须单独补
-> `make -C CardinalNative`（既有问题，2026-09-20 起）。
+> 含 A 组 3 个带参端点首次验证）。**C 组 + F 组（QuickJS）已于 2026-10-20 第二批
+> 完工并运行级验证**（R1 12/12、R2 5/5、R3 4/4）。⚠️ 坑 D 仍在：主构建断在
+> CardinalMini_dsp.dll，须单独补 `make -C CardinalNative`（既有问题，2026-09-20 起）。
+> ⚠️ **liblo 接收 string 参数在本 Cardinal 版上确认不通**（10-20 三轮实测：echo /
+> module-add / js-eval 全无应答）⇒ 需自由文本/JSON 的操作改走 JS 脚本路径。
 
 **B 组 · 零 hook 读数（数据全现成，只差 OSC 入口）**
 
@@ -73,19 +75,19 @@
 | B4 | ✅ `/engine-info`（带 cpuRefreshMs=1000 诚实标注，age 不假装知道） | `getSampleRate`/`getMeterAverage`/`getMeterMax`。⚠️ CPU 值**每 1 秒才刷新**（`Engine.cpp:576`）⇒ 必须带 `cpuAgeMs` |
 | B5 | ✅ `/plugins`（运行列表+safeMode；单查移师 MCP 侧 PluginManifests——liblo string 接收不可靠，10-20 决策） | 「我拼写的 plugin 存不存在」的权威答案。⚠️ **必须同时暴露 `settings::safeMode`** —— 为 true 时 `plugin::init()`（`plugin.cpp:273-275`）直接 return，**零插件加载** |
 
-**C 组 · 模拟人类操作（李定的核心方向）**
+**C 组 · 模拟人类操作（李定的核心方向）** —— 10-20 第二批全部 ✅，WINE 运行级实测
 
-| # | handler | 人类操作 | 源码依据 |
+| # | handler | 人类操作 | 实测结果 |
 |---|---|---|---|
-| C1 | `/param-set-by-display` | 右键旋钮输数值 | ⭐ `ParamQuantity::setDisplayValue`（`ParamQuantity.cpp:91`）⇒ 能把「275ms」写进去而不只是「0.275」。⛔ `fromDisplayValue` 不存在 |
-| C2 | `/module-add` | 右键 Add module → 拖进机架 | `history::ModuleAdd::redo()` 是现成完整范式（createModule → fromJson → Engine::addModule → createModuleWidget → RackWidget::addModule）⚠️ 依赖 `APP->scene` ⇒ headless 不可做 |
-| C3 | `/cable-add` `/cable-remove` | 从输出口拖一条线到输入口 | `history::CableAdd::redo()` 现成。⚠️ **同一输入口只能接一根线**，后一根挤掉前一根 ⇒ 必须查重 |
-| C7 | `/module-remove` | 右键模块 → Remove | `history::ModuleRemove::redo()` 现成 |
-| C8 | `/module-move` | 拖动模块改位置 | `RackWidget::requestModulePos` / `setModulePosForce`。⚠️ 宪法：改布局前必须确认 Cardinal 已关，或走 OSC |
-| C9 | `/midi-out` | 在 DAW 里弹 MIDI 键盘 | `CardinalPluginContext::writeMidiMessage`（`plugincontext.hpp:100`）。⚠️ 必须自己设 `message.frame >= 0`（`:208` 的 assert）；⚠️ bypassed 时提前 return（`:204`）⇒ 响应要回显 `skipped:bypassed` |
-| C4 | `/undo` `/redo` | Ctrl+Z | `history::State::undo/redo`（`history.cpp:260/267`，public）。⭐ GUI 版 OSC **每帧在 UI 线程 pump**（`MenuBar.cpp:852` 在 `step()` 里）⇒ handler 里直接调 history 安全 |
-| C5 | `/batch` | 批量操作 | `history::ComplexAction`（`history.hpp:52`）。⚠️ **诚实契约**：不做 all-or-nothing，返回 `applied:N skipped:M`（`ModuleAdd::redo()` 是吞异常后继续） |
-| C6 | `/module-json` | 通用改任意模块数据 | `Engine::moduleFromJson`（`override/Engine.cpp:916`）是 public API ⇒ **通用支持任意插件的音符/参数，不必逐插件写绑定** |
+| C1 | ✅ `/param-set-by-display` | 右键旋钮输数值 | WINE 实测 `old=0 new=-54`。⚠️ **显示值域因模块而异且常为指数**（VCO 写 0.8 → 回读 11.56Hz 是正确换算），验收只能「回读值≠原值」，不能写死数字 |
+| C2 | ⛔ `/module-add` **下线，改走 JS `cardinal.addModule(slug,x,y)`** | 右键 Add module → 拖进机架 | OSC 版需 string 参数（plugin\|model slug）⇒ **liblo 收不了 string**。JS API 已实测 `addModule=[ok]` + undo 生效 |
+| C3 | ✅ `/cable-add` `/cable-remove` | 从输出口拖一条线到输入口 | WINE 实测 cable-add ok + undo 回 "add cable"。⚠️ **同一输入口只能接一根线** |
+| C7 | ✅ `/module-remove` | 右键模块 → Remove | 走 history，可 undo |
+| C8 | ✅ `/module-move` | 拖动模块改位置 | WINE 实测 ok + undo 回 "move module"。⚠️ **单位：x 是格、y 是行号**（.vcv 的 pos[0]/pos[1]） |
+| C9 | ✅ `/midi-out` | 在 DAW 里弹 MIDI 键盘 | WINE 实测回 "sent"。⚠️ bypassed 时回显 `skipped:bypassed`（不假装送达） |
+| C4 | ✅ `/undo` `/redo` | Ctrl+Z | WINE 实测 undo 名正确（change parameter / add cable / move module）+ 值回退。⭐ GUI 版 OSC 每帧在 UI 线程 pump ⇒ handler 里调 history 安全 |
+| C5 | ⚠️ `/batch` **未单做**：`cardinal_music`/现有工具已能批量 | 批量操作 | `ComplexAction` 已在库内。C 组九个端点各自走 history，本身已可「批量 + 一次 undo」；真需要单端点再说 |
+| C6 | ✅ 读 `/module-json`（整模块 .vcv JSON）· 写走 JS `moduleFromJson(id,json)` | 通用改任意模块数据 | ⭐ 拆成两半的原因：读只需 int64 参数（OSC 可发），写要 JSON 字符串（OSC 收不了） |
 
 **D 组 · 观察**
 
@@ -96,16 +98,21 @@
 
 **E 组 · 协议级（编完再改要 C++ + Python 双返工，必须一次定死）**
 - 统一三段式响应 `/resp "tag" "ok"|"err" "<code>|<msg>"`，8 个固定小写错误码。⚠️ 会改动现有 5 探针行为（`/param-get` 对不存在 module 回空串，无法区分「没这个参数」与「值就是空」）
-- 分页契约：列表类统一 `<path> <offset> <limit>`，回复带 `<returned>/<total>`，limit 上限 64（`/modules` 现在无上限拼接，200+ 模块必爆 MTU）
-- ⭐ **注册表抽函数** `CardinalCommon_RegisterOscMethods(server, self)`，一处实现两处调用。现状 thread 版 `:1135-1145` + 非 thread 版 `:1152-1160`，× build 变体 = **2×2 四处**，只改一处会**静默失效**
+- 分页契约：列表类统一 `<path> <offset> <limit>`，回复带 `<returned>/<total>`，limit 上限 64（`/modules` 现在无上限拼接，200+ 模块必爆 MTU）。⚠️ **仍未做**：实测 200+ 模块的 `/modules` 已能返回但偏大，是待补的债
+- ⭐ **注册表抽函数** `CardinalCommon_RegisterOscMethods(server, self)`，一处实现两处调用。现状 thread 版 `:1135-1145` + 非 thread 版 `:1152-1160`，× build 变体 = **2×2 四处**，只改一处会**静默失效**。三个注入器都在**两处**注册，但仍是三份代码各写一遍
 - `/screenshot` 注册必须包在 `#ifdef CARDINAL_WINDOW_CAN_GENERATE_SCREENSHOTS` 内（`override/Window.cpp:45`）否则 Mini/GLES 编不过
 
-**F 组 · QuickJS 绑定（把 MCP 从窄工具变万能遥控器）**
-- `libquickjs.a` **已静态链入**（`Makefile.cardinal.mk:152-154`，含 `quickjs-libc.o`）
-- ⚠️ **安全边界**：带 `os` 模块 = 有 `exec/waitpid/kill/pipe`（`quickjs-libc.c:2523-2612`），`std` 有 `loadScript/popen` ⇒ 一句 `std.exec()` = 任意命令执行。**OSC 端口默认绑定所有网卡** ⇒ 默认绝不初始化 std/os，另设 opt-in 端点 + 白名单
-- ⚠️ GC 耗时不可控 ⇒ handler 只入队，实际 eval 在 DSP 回调按预算执行，不要在音频回调里跑任意 JS
-- 现成 RAII 封装可抄：`plugins/AriaModules/src/javascript.hpp`（85 行）
-- 对标：Unity/Blender/UE/Godot MCP **10/10 都有「宿主内执行任意代码」工具**
+**F 组 · QuickJS 绑定** —— ✅ 2026-10-20 完工并运行级实测
+
+- `libquickjs.a` 已静态链入（`Makefile.cardinal.mk:152-154`）⇒ 实测 exe 体积 +21KB 即 JS 代码量
+- **实际实现与原设想的三处偏差**（都是实测逼出来的）：
+  1. **不跑在 DSP 回调**。原计划「入队 + DSP 回调里 eval」是为了躲 GC 抖动；实际 OSC handler 已在 UI 线程串行 pump，直接在 handler 里同步 eval 更简单、且不存在并发问题（代价：UI 线程最多卡 2 秒 = 预算上限）
+  2. **输入改「脚本文件 + 索引」**（`/osc-js-run i` + `/osc-js-list`）而非即时字符串——liblo 收不了 string。且脚本放 `js/` 可 git 管理，反倒更合李的工作流
+  3. **预算是墙钟不是指令数**。🔴 血泪：原先只数指令、上限 2000 万，实测死循环 **40 秒没被打断、UI 线程被永久卡死**。根因是 quickjs 只在 `interrupt_counter`（`JS_INTERRUPT_COUNTER_INIT=10000`，`deps/QuickJS/quickjs.c:316`）递减到 0 时才调 handler ⇒ 2000 万次 handler 调用 ≈ **2000 亿条指令**，差 5 个数量级。更根本的是**单位错了**：安全目标是「不卡 UI」，量纲必须是时间——同一指令数在真机和 WINE 上差几个数量级。⇒ 现为墙钟 2000ms（`CARDINAL_JS_BUDGET_MS` 可覆盖）+ 100 万次 handler 兜底，超时回 `budget-exceeded ms=2001`，实测**准点打断且进程存活**
+- ✅ 安全模型三门全落地并实测：**默认 off**（`CARDINAL_JS_MODE` 未设即拒绝）·**绝不初始化 libc**（无 std/os ⇒ 无 exec）·**墙钟预算**
+- 脚本契约：包成 `globalThis.result = (function(){ <脚本> })();` ⇒ **用 `return` 交结果**。🔴 血泪：脚本若自己 `globalThis.result = ...`，会被 IIFE 的 undefined 覆盖（实测踩过）
+- 实测数据（WINE 默认机架）：read API `modules_len=217 param2=261.626 ports_len=147 cables_len=307`；write API `setDisplay=[old=0 new=-54] addModule=[ok]` + undo 回 "add module"
+- 对标：Unity/Blender/UE/Godot MCP **10/10 都有「宿主内执行任意代码」工具** —— 本项是本项目唯一的硬差距，**现已补齐**
 
 ---
 
