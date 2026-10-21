@@ -1,0 +1,43 @@
+diff --git a/include/settings.hpp b/include/settings.hpp
+index 7c46dd2..d16f3fd 100644
+--- a/include/settings.hpp
++++ b/include/settings.hpp
+@@ -29,6 +29,8 @@ extern bool isPlugin;
+ 
+ /** Launches Rack without loading plugins or the autosave patch. Always set to false when settings are saved. */
+ extern bool safeMode;
++// OSC load in progress: suppress GUI warning dialog, keep warningLog for the OSC consumer
++extern bool oscLoadActive;
+ /** vcvrack.com user token */
+ extern std::string token;
+ /** Whether the window is maximized */
+diff --git a/src/patch.cpp b/src/patch.cpp
+index ac1c08d..1ba3455 100644
+--- a/src/patch.cpp
++++ b/src/patch.cpp
+@@ -528,10 +528,11 @@ void Manager::fromJson(json_t* rootJ) {
+ 	// TODO Assert this
+ 
+ 	// Display a message if we have something to say.
+-	if (warningLog != "") {
++	// OSC/MCP loads keep warningLog intact so osc_load_handler can send it back (D2).
++	if (warningLog != "" && !settings::oscLoadActive) {
+ 		osdialog_message(OSDIALOG_WARNING, OSDIALOG_OK, warningLog.c_str());
++		warningLog = "";
+ 	}
+-	warningLog = "";
+ }
+ 
+ 
+diff --git a/src/settings.cpp b/src/settings.cpp
+index b88be2c..077ad8f 100644
+--- a/src/settings.cpp
++++ b/src/settings.cpp
+@@ -21,6 +21,7 @@ bool headless = false;
+ bool isPlugin = false;
+ 
+ bool safeMode = false;
++bool oscLoadActive = false; // OSC/MCP loads never pop the GUI warning dialog
+ std::string token;
+ bool windowMaximized = false;
+ math::Vec windowSize = math::Vec(1024, 720);

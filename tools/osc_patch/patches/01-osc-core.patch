@@ -1,0 +1,2500 @@
+diff --git a/src/CardinalCommon.cpp b/src/CardinalCommon.cpp
+index 2875e59..cf8ef88 100644
+--- a/src/CardinalCommon.cpp
++++ b/src/CardinalCommon.cpp
+@@ -16,6 +16,12 @@
+ 
+ #include "CardinalCommon.hpp"
+ 
++// B 组前置声明（全局作用域；由 inject_osc_b.py 插入）
++namespace rack { namespace plugin {
++struct Plugin;
++Plugin* getPlugin(const std::string& pluginSlug);
++} }
++
+ #include "AsyncDialog.hpp"
+ #include "CardinalPluginContext.hpp"
+ #include "DistrhoPluginUtils.hpp"
+@@ -30,6 +36,11 @@
+ #include <app/Browser.hpp>
+ #include <app/Scene.hpp>
+ #include <engine/Engine.hpp>
++#include <engine/Module.hpp>
++#include <engine/Port.hpp>
++#include <plugin/Model.hpp>
++#include <plugin/Plugin.hpp>
++#include <engine/Cable.hpp>
+ #include <window/Window.hpp>
+ 
+ #ifndef DISTRHO_PLUGIN_WANT_DIRECT_ACCESS
+@@ -169,187 +180,1984 @@ CardinalPluginContext::CardinalPluginContext(Plugin* const p)
+     std::memset(parameters, 0, sizeof(parameters));
+ }
+ 
+-bool CardinalPluginContext::addIdleCallback(IdleCallback* const cb) const
++bool CardinalPluginContext::addIdleCallback(IdleCallback* const cb) const
++{
++   #if !(defined(HEADLESS) || defined(CARDINAL_COMMON_DSP_ONLY))
++    if (ui != nullptr)
++    {
++        ui->addIdleCallback(cb);
++        return true;
++    }
++   #else
++    // unused
++    (void)cb;
++   #endif
++
++    return false;
++}
++
++void CardinalPluginContext::removeIdleCallback(IdleCallback* const cb) const
++{
++   #if !(defined(HEADLESS) || defined(CARDINAL_COMMON_DSP_ONLY))
++    if (ui != nullptr)
++        ui->removeIdleCallback(cb);
++   #else
++    // unused
++    (void)cb;
++   #endif
++}
++
++void CardinalPluginContext::writeMidiMessage(const rack::midi::Message& message, const uint8_t channel)
++{
++    if (bypassed)
++        return;
++
++    const size_t size = message.bytes.size();
++    DISTRHO_SAFE_ASSERT_RETURN(size > 0,);
++    DISTRHO_SAFE_ASSERT_RETURN(message.frame >= 0,);
++
++    MidiEvent event;
++    event.frame = message.frame;
++
++    switch (message.bytes[0] & 0xF0)
++    {
++    case 0x80:
++    case 0x90:
++    case 0xA0:
++    case 0xB0:
++    case 0xE0:
++        event.size = 3;
++        break;
++    case 0xC0:
++    case 0xD0:
++        event.size = 2;
++        break;
++    case 0xF0:
++        switch (message.bytes[0] & 0x0F)
++        {
++        case 0x0:
++        case 0x4:
++        case 0x5:
++        case 0x7:
++        case 0x9:
++        case 0xD:
++            // unsupported
++            return;
++        case 0x1:
++        case 0x2:
++        case 0x3:
++        case 0xE:
++            event.size = 3;
++            break;
++        case 0x6:
++        case 0x8:
++        case 0xA:
++        case 0xB:
++        case 0xC:
++        case 0xF:
++            event.size = 1;
++            break;
++        }
++        break;
++    default:
++        // invalid
++        return;
++    }
++
++    DISTRHO_SAFE_ASSERT_RETURN(size >= event.size,);
++
++    std::memcpy(event.data, message.bytes.data(), event.size);
++
++    if (channel != 0 && event.data[0] < 0xF0)
++        event.data[0] |= channel & 0x0F;
++
++    plugin->writeMidiEvent(event);
++}
++
++// -----------------------------------------------------------------------------------------------------------
++
++namespace rack {
++namespace midi {
++
++struct InputQueue::Internal {
++    CardinalPluginContext* const pcontext = static_cast<CardinalPluginContext*>(APP);
++    const CardinalDISTRHO::MidiEvent* midiEvents = nullptr;
++    uint32_t midiEventsLeft = 0;
++    uint32_t lastProcessCounter = 0;
++    int64_t lastBlockFrame = 0;
++};
++
++InputQueue::InputQueue() {
++    internal = new Internal;
++}
++
++InputQueue::~InputQueue() {
++    delete internal;
++}
++
++bool InputQueue::tryPop(Message* const messageOut, int64_t maxFrame)
++{
++    const uint32_t processCounter = internal->pcontext->processCounter;
++    const bool processCounterChanged = internal->lastProcessCounter != processCounter;
++
++    if (processCounterChanged)
++    {
++        internal->lastBlockFrame = internal->pcontext->engine->getBlockFrame();
++        internal->lastProcessCounter = processCounter;
++
++        internal->midiEvents = internal->pcontext->midiEvents;
++        internal->midiEventsLeft = internal->pcontext->midiEventCount;
++    }
++
++    if (internal->midiEventsLeft == 0 || maxFrame < internal->lastBlockFrame)
++        return false;
++
++    const uint32_t frame = maxFrame - internal->lastBlockFrame;
++
++    if (frame > internal->midiEvents->frame)
++        return false;
++
++    const CardinalDISTRHO::MidiEvent& midiEvent(*internal->midiEvents);
++
++    const uint8_t* data;
++    if (midiEvent.size > CardinalDISTRHO::MidiEvent::kDataSize)
++    {
++        data = midiEvent.dataExt;
++        messageOut->bytes.resize(midiEvent.size);
++    }
++    else
++    {
++        data = midiEvent.data;
++    }
++
++    messageOut->frame = frame;
++    std::memcpy(messageOut->bytes.data(), data, midiEvent.size);
++
++    ++internal->midiEvents;
++    --internal->midiEventsLeft;
++    return true;
++}
++
++json_t* InputQueue::toJson() const
++{
++    return nullptr;
++}
++
++void InputQueue::fromJson(json_t* rootJ)
++{
++}
++
++}
++}
++
++// -----------------------------------------------------------------------------------------------------------
++
++START_NAMESPACE_DISTRHO
++
++// -----------------------------------------------------------------------------------------------------------
++
++#ifdef HAVE_LIBLO
++static void osc_error_handler(int num, const char* msg, const char* path)
++{
++    d_stderr("Cardinal OSC Error: code: %i, msg: \"%s\", path: \"%s\")", num, msg, path);
++}
++
++// ==== CARDINAL-MCP-READ-PROBES-BEGIN ====
++// ---------------------------------------------------------------------------
++// ★ 2026-10-19 新增：OSC 只读探针（read-only introspection）
++//
++// 【为什么需要】
++// Cardinal 的 OSC 服务器**只能写不能读**（原版只有 /hello /param /host-param /load
++// 四个 handler，且全都不回数据）。这让外部工具（我的 MCP）只能"盲写"：
++// 设了参数、加载了机架，但**永远无法确认软件现在到底是什么状态**——
++// 有没有加载成功、模块在不在、旋钮到底多少、有没有信号在跑。
++//
++// 【这些 handler 提供什么】
++//   /modules          → 列出所有模块 id + 插件 + 模型（机器可读，逗号分隔）
++//   /param-get h i    → 读回单个旋钮的**真实显示值**（走 ParamQuantity::getDisplayValue）
++//   /ports h          → 读回某模块所有输入口的**连接数 + 各通道电压**  ★核心
++//   /signal           → 全机架扫描：哪些模块的音频口**此刻真的有电压**
++//   /light h i        → 读回 LED 亮度（判断"运行/录制灯亮没亮"）
++//
++// 【为什么用 getDisplayValue 而不是 getValue】
++// Cardinal 的旋钮绝大多数存归一化值（0..1），但面板上显示的是物理量
++// （ADSR 存 0.275 显示 275ms；Bogaudio-VCO 存 6.0 八度显示 220Hz）。
++// getValue() 给的是**存储值**，对外部工具毫无意义；
++// getDisplayValue() 才是**人能读懂、也能判对错的**值。
++//
++// 【回复格式】统一 /resp: "tag" "payload"，payload 是逗号分隔的紧凑格式，
++//   避免引入 JSON 依赖（Cardinal 这边连 nlohmann 都是条件编译的）。
++// ---------------------------------------------------------------------------
++
++// 把 float 变成不含千分位/科学计数歧义的短字符串（ScopedSafeLocale 已在文件里）
++static std::string fmtShort(float v)
++{
++    char buf[32] = {};
++    const ScopedSafeLocale cssl;
++    std::snprintf(buf, sizeof(buf), "%.4g", (double)v);
++    return std::string(buf);
++}
++
++// ---- E1 (2026-10-21): 统一三段式回包 -------------------------------------
++// /resp 的第三段 status = "ok" 或 "err:<CODE>"。
++// 追加式设计：旧客户端只读前两段 (tag, payload)，行为完全不变。
++// 错误码：E_NO_PLUGIN / E_NO_MODULE / E_BAD_PARAM / E_NO_CABLE / E_BAD_PORT
++//         / E_NOTHING / E_BAD_ARGS / E_DISABLED（语义）+ E_INTERNAL（兜底）
++static void cardinalOscReply(const lo_address source, const lo_server server,
++                             const char* const tag, const std::string& payload,
++                             const char* const status)
++{
++    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "sss",
++                 tag, payload.c_str(), status);
++}
++
++// ---------------------------------------------------------------- /modules
++// 回复: /resp "modules" "id:plugin/model,id:plugin/model,..."
++static int osc_modules_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
++{
++    d_debug("osc_modules_handler()");
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "modules", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    CardinalPluginContext* const context = plugin->context;
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++#endif
++
++    std::string out;
++    const std::vector<int64_t> ids = context->engine->getModuleIds();
++
++    for (int64_t id : ids)
++    {
++        rack::engine::Module* const module = context->engine->getModule(id);
++        if (module == NULL)
++            continue;
++
++        rack::plugin::Model* const model = module->getModel();
++        if (model == NULL)
++            continue;
++
++        // slug 形如 "Bogaudio-VCO"；Model 直接持有 plugin 指针（Model.hpp:35），
++        // 拼出的 "plugin|model" 正好和 .vcv 里的 plugin/model 字段同构
++        // ⇒ 外部工具无需再查映射表。
++        if (!out.empty())
++            out += ",";
++        out += std::to_string(id);
++        out += ":";
++        out += model->plugin != NULL ? model->plugin->slug : std::string("?");
++        out += "|";
++        out += model->slug;
++    }
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++#endif
++
++    cardinalOscReply(source, server, "modules", out, "ok");
++    return 0;
++}
++
++// ==== CARDINAL-MCP-E2-MODULES-PAGE-BEGIN ====
++// ------------------------------------------------------------ /modules-page
++// E2 (2026-10-21): 分页版 /modules。入参 "ii" = offset, limit。
++// 回复: /resp "modules-page" "<returned>/<total>|id:plugin/model,..."
++// limit 上限 64；offset 越界返回空 items 但 total 仍报真实总数。
++static int osc_modules_page_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_modules_page_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "modules-page", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    const int64_t offset = argv[0]->i;
++    const int64_t limit = argv[1]->i;
++    if (offset < 0 || limit <= 0 || limit > 64)
++    {
++        cardinalOscReply(source, server, "modules-page", "", "err:E_BAD_ARGS");
++        return 0;
++    }
++
++    CardinalPluginContext* const context = plugin->context;
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++#endif
++
++    const std::vector<int64_t> ids = context->engine->getModuleIds();
++    const size_t total = ids.size();
++    std::string items;
++    size_t count = 0;
++    const size_t start = static_cast<size_t>(offset);
++
++    if (start < total)
++    {
++        for (size_t n = start; n < total && count < static_cast<size_t>(limit); ++n)
++        {
++            rack::engine::Module* const module = context->engine->getModule(ids[n]);
++            if (module == NULL)
++                continue;
++            rack::plugin::Model* const model = module->getModel();
++            if (model == NULL)
++                continue;
++
++            if (!items.empty())
++                items += ",";
++            items += std::to_string(ids[n]);
++            items += ":";
++            items += model->plugin != NULL ? model->plugin->slug : std::string("?");
++            items += "|";
++            items += model->slug;
++            ++count;
++        }
++    }
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++#endif
++
++    const std::string payload = std::to_string(count) + "/" + std::to_string(total) + "|" + items;
++    cardinalOscReply(source, server, "modules-page", payload, "ok");
++    return 0;
++}
++// ==== CARDINAL-MCP-E2-MODULES-PAGE-END ====
++
++// ------------------------------------------------------------ /param-get
++// 入参: "hi" = moduleId, paramId
++// 回复: /resp "param" "<displayValue>"   （字符串，方便显示真实物理量）
++static int osc_param_get_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_param_get_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == NULL)
++    {
++        cardinalOscReply(source, server, "param", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    CardinalPluginContext* const context = plugin->context;
++    const int64_t moduleId = argv[0]->h;
++    const int paramId = argv[1]->i;
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++#endif
++
++    std::string result;
++    const char* status = "ok";
++    rack::engine::Module* const module = context->engine->getModule(moduleId);
++
++    if (module == NULL)
++    {
++        status = "err:E_NO_MODULE";
++    }
++    else if (paramId < 0 || paramId >= module->getNumParams())
++    {
++        status = "err:E_BAD_PARAM";
++    }
++    else
++    {
++        // ★ 关键：用 getDisplayValue 而非 getValue。
++        //   存 0.275 的 ADSR.Attack，getValue 给 0.275（无意义），
++        //   getDisplayValue 给 275（= 275 ms，这才是能判对错的值）。
++        rack::engine::ParamQuantity* const pq = module->getParamQuantity(paramId);
++        if (pq != NULL)
++            result = fmtShort(pq->getDisplayValue());
++        else
++            status = "err:E_INTERNAL";
++    }
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++#endif
++
++    cardinalOscReply(source, server, "param", result, status);
++    return 0;
++}
++
++// ---------------------------------------------------------------- /ports
++// 入参: "h" = moduleId
++// 回复: /resp "ports" "in:conn:ch0vol:ch1vol|in:...|out:conn:ch0vol:ch1vol|out:..."
++//
++// ★ 这是本补丁最重要的一个：它回答"这个模块的口上，现在有没有信号"。
++//   conn = getChannels()，0 表示**根本没接线**（⇒ 静态死模块，永远不工作）
++//   vol  = 该通道电压（音频 ±5V / 音高 CV / 门信号）
++//   ⇒ 外部工具由此能区分三种情况：
++//       未接线(conn=0) / 接了但此刻无电压(vol=0) / 接了且此刻有信号(vol≠0)
++static int osc_ports_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_ports_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == NULL)
++    {
++        cardinalOscReply(source, server, "ports", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    CardinalPluginContext* const context = plugin->context;
++    const int64_t moduleId = argv[0]->h;
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++#endif
++
++    std::string out;
++    rack::engine::Module* const module = context->engine->getModule(moduleId);
++    const char* status = module != NULL ? "ok" : "err:E_NO_MODULE";
++
++    if (module != NULL)
++    {
++        // ---- 输入口 ----
++        for (int i = 0; i < module->getNumInputs(); ++i)
++        {
++            rack::engine::Input& port = module->inputs[i];
++            const int conn = port.getChannels();
++
++            if (!out.empty())
++                out += "|";
++            out += "in:" + std::to_string(i);
++            out += ":" + std::to_string(conn);
++
++            // 只回前 4 个通道：立体声够用，poly 到 16 通道会让 payload 爆掉
++            for (int ch = 0; ch < 4; ++ch)
++            {
++                out += ":" + fmtShort(port.getPolyVoltage(ch));
++            }
++        }
++
++        // ---- 输出口 ----
++        for (int i = 0; i < module->getNumOutputs(); ++i)
++        {
++            rack::engine::Output& port = module->outputs[i];
++            const int conn = port.getChannels();
++
++            if (!out.empty())
++                out += "|";
++            out += "out:" + std::to_string(i);
++            out += ":" + std::to_string(conn);
++
++            for (int ch = 0; ch < 4; ++ch)
++            {
++                out += ":" + fmtShort(port.getPolyVoltage(ch));
++            }
++        }
++    }
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++#endif
++
++    cardinalOscReply(source, server, "ports", out, status);
++    return 0;
++}
++
++// -------------------------------------------------------------- /signal
++// 无入参。扫全机架所有模块的**音频输出口**，报告此刻真的有电压的模块。
++// 回复: /resp "signal" "id:volt,id:volt,..."  （只含电压非零的模块）
++//
++// ★ 这是「静音盲区」的正解：不需要离线渲染，直接问引擎"现在哪些口上有信号"。
++//   一个模块所有输出口都是 0V ⇒ 它此刻不产生任何声音。
++static int osc_signal_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
++{
++    d_debug("osc_signal_handler()");
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == NULL)
++    {
++        cardinalOscReply(source, server, "signal", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    CardinalPluginContext* const context = plugin->context;
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++#endif
++
++    std::string out;
++    const std::vector<int64_t> ids = context->engine->getModuleIds();
++
++    for (int64_t id : ids)
++    {
++        rack::engine::Module* const module = context->engine->getModule(id);
++        if (module == NULL)
++            continue;
++
++        // 取该模块所有输出口的最大绝对电压
++        float peak = 0.0f;
++        for (int i = 0; i < module->getNumOutputs(); ++i)
++        {
++            rack::engine::Output& port = module->outputs[i];
++            if (!port.isConnected())
++                continue;
++
++            for (int ch = 0; ch < 4; ++ch)
++            {
++                const float v = port.getPolyVoltage(ch);
++                const float a = v < 0.0f ? -v : v;
++                if (a > peak)
++                    peak = a;
++            }
++        }
++
++        // 阈值 1e-4 V：低于此在音频里等同静音（-80 dBFS 附近）
++        if (peak > 1e-4f)
++        {
++            if (!out.empty())
++                out += ",";
++            out += std::to_string(id);
++            out += ":" + fmtShort(peak);
++        }
++    }
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++#endif
++
++    cardinalOscReply(source, server, "signal", out, "ok");
++    return 0;
++}
++
++// ---------------------------------------------------------------- /light
++// 入参: "hi" = moduleId, lightId
++// 回复: /resp "light" "<brightness 0..1>"
++// 用途：判断 Clocked 的 RUN 灯、录音灯是否亮（机架是否在跑）
++static int osc_light_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_light_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == NULL)
++    {
++        cardinalOscReply(source, server, "light", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    CardinalPluginContext* const context = plugin->context;
++    const int64_t moduleId = argv[0]->h;
++    const int lightId = argv[1]->i;
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++#endif
++
++    std::string result;
++    const char* status = "ok";
++    rack::engine::Module* const module = context->engine->getModule(moduleId);
++
++    if (module == NULL)
++        status = "err:E_NO_MODULE";
++    else if (lightId < 0 || lightId >= module->getNumLights())
++        status = "err:E_BAD_PARAM";
++    else
++        result = fmtShort(module->lights[lightId].getBrightness());
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++#endif
++
++    cardinalOscReply(source, server, "light", result, status);
++    return 0;
++}
++// ==== CARDINAL-MCP-READ-PROBES-END ====
++// ==== CARDINAL-MCP-READ-PROBES-B-BEGIN ====
++// ---------------------------------------------------------------------------
++// ★ 2026-10-20 新增：B 组读数 handler（build-info / cables / transport /
++//   engine-info / plugins）。与 A 组（osc_read_handlers.cpp.inc）共用同一套
++//   回复契约：/resp "tag" "payload"，payload 内部用 | 分字段、逗号分列表。
++//
++// 【源码依据】（全部 2026-10-20 在 WSL 树 /home/lijia/Cardinal 实测核实，
++//   不照抄旧档行号——A5 的教训：行号会指错文件）
++//   B2  Cable 字段：src/Rack/include/engine/Cable.hpp
++//       （id / inputModule / inputId / outputModule / outputId 全 public）
++//       getCableIds()：engine/Engine.hpp:163；getCable(id)：:183
++//   B3  transport：include/plugincontext.hpp:86-90
++//       （CardinalPluginContext : rack::Context，playing/bar/beat/beatsPerBar/
++//        beatType/barStartTick/beatsPerMinute/tick/tickClock/ticksPerBeat 全现成）
++//   B4  meter：engine/Engine.hpp:87-88（getMeterAverage/getMeterMax）；
++//       ⚠️ CPU 值每 1 秒才刷新（engine/Engine.cpp:576 meterUpdateDuration=1.0，
++//       meterLastTime 是 Engine 私有成员，外部拿不到精确 age）
++//       ⇒ 诚实处理：回常量 cpuRefreshMs=1000，不假装知道精确 age
++//   B5  getPlugin：src/Rack/src/plugin.cpp:373（非 static，但 Plugin.hpp 未导出声明
++//       ⇒ 注入器把前置声明插到 CardinalCommon.cpp 顶部全局作用域）；
++//       safeMode：src/Rack/include/settings.hpp:31（在 namespace rack 内 ⇒ 写 rack::settings）
++//
++// ⚠️ liblo 的 method 匹配是 types 精确匹配（同 path 不同 types 要分开注册）：
++//   /cables 无参（全量）与 /cables "h"（单模块过滤）是两个 handler。
++//   /plugins 只做无参列表——单查（"s"）已下线：该 liblo 的 string 接收路径
++//   不可靠（2026-10-20 实测静默无回复），单查需求由 MCP 侧读 PluginManifests
++//   承担（磁盘事实 vs 运行事实分层，见 TODO-BACKLOG B5）。
++// ⚠️ liblo string 参数必须 *(char**)&argv[n]->s 取——本 Cardinal 版的 lo_arg.s
++//   声明为 char，实际存 char*（lo_osc_types.h 官方注释原话：
++//   "strings must be read with &argv[n]->t"）。直接 argv[n]->s 会按 char 解析报错。
++//
++// 【为什么 B1 重要】（TODO-BACKLOG 标 P0）
++//   OSC 开不开由运行期 getenv 决定（override/MenuBar.cpp:741），没开时所有工具
++//   超时——现象与「Cardinal 崩了」无法区分。/build-info 让客户端一发拿到构建
++//   指纹；MCP 侧配合进程探测即可区分「没开 OSC」与「崩了」。
++// ---------------------------------------------------------------------------
++
++// 数字 → 短字符串（与 A 组 fmtShort 独立命名，避免重定义；ScopedSafeLocale
++// 来自 CardinalCommon.cpp 既有 include 链，A 组已实证可用）
++static std::string fmtB(double v)
++{
++    char buf[40] = {};
++    const ScopedSafeLocale cssl;
++    std::snprintf(buf, sizeof(buf), "%.6g", v);
++    return std::string(buf);
++}
++
++// liblo string 参数取值（见文件头：必须取 s 成员地址转型——联合起始 8 字节
++// 是 i/i32 的地盘，读 (char**)a 会拿到垃圾指针，2026-10-20 实测栽过）
++static const char* oscArgStr(const lo_arg* a)
++{
++    return *(char**)&a->s;
++}
++
++static const char* cardinalVariantName(CardinalVariant v)
++{
++    switch (v)
++    {
++    case kCardinalVariantMain:   return "main";
++    case kCardinalVariantMini:   return "mini";
++    case kCardinalVariantFX:     return "fx";
++    case kCardinalVariantNative: return "native";
++    case kCardinalVariantSynth:  return "synth";
++    default:                     return "?";
++    }
++}
++
++// ---------------------------------------------------------------- B1 /build-info
++// 无入参。回复 /resp "build-info" "variant=..|mode=..|build=..|safeMode=..|caps=.."
++static int osc_build_info_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
++{
++    d_debug("osc_build_info_handler()");
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    const char* variant = "?";
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin != nullptr && plugin->context != nullptr)
++        variant = cardinalVariantName(plugin->context->variant);
++
++    std::string mode =
++       #ifdef CARDINAL_INIT_OSC_THREAD
++        "thread";
++       #else
++        "gui";
++       #endif
++
++    // caps 清单 = 当前构建实际注入的全部 OSC 端点（加新端点时同步更新这里！）
++    std::string caps = "modules,param-get,ports,signal,light,"
++                       "build-info,cables,transport,engine-info,plugins";
++
++    std::string payload = std::string("variant=") + variant
++        + "|mode=" + mode
++        + "|build=" + __DATE__ " " __TIME__
++        + "|safeMode=" + (rack::settings::safeMode ? "1" : "0")
++        + "|caps=" + caps;
++
++    cardinalOscReply(source, server, "build-info", payload, "ok");
++    return 0;
++}
++
++// ---------------------------------------------------------------- B2 /cables
++// /cables        无参 → 全机架所有线
++// /cables "h"    带 moduleId → 只回涉及该模块的线
++// 回复 /resp "cables" "id:inMod:inId:outMod:outId,..."（无线 = "none"）
++static int osc_cables_handler_impl(const lo_message m, void* const self, bool filter, int64_t filterId)
++{
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "cables", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    CardinalPluginContext* const context = plugin->context;
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++   #endif
++
++    std::string out;
++    const std::vector<int64_t> ids = context->engine->getCableIds();
++    for (int64_t id : ids)
++    {
++        rack::engine::Cable* const c = context->engine->getCable(id);
++        if (c == NULL)
++            continue;
++        const int64_t inMod  = c->inputModule  != NULL ? c->inputModule->id  : -1;
++        const int64_t outMod = c->outputModule != NULL ? c->outputModule->id : -1;
++        if (filter && inMod != filterId && outMod != filterId)
++            continue;
++        if (!out.empty())
++            out += ",";
++        out += std::to_string(id) + ":" + std::to_string(inMod) + ":"
++             + std::to_string(c->inputId) + ":" + std::to_string(outMod) + ":"
++             + std::to_string(c->outputId);
++    }
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++   #endif
++
++    if (out.empty())
++        out = "none";
++    cardinalOscReply(source, server, "cables", out, "ok");
++    return 0;
++}
++
++static int osc_cables_all_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
++{
++    d_debug("osc_cables_all_handler()");
++    return osc_cables_handler_impl(m, self, false, 0);
++}
++
++static int osc_cables_one_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_cables_one_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);  // types 匹配由 liblo 注册侧保证
++    return osc_cables_handler_impl(m, self, true, argv[0]->h);
++}
++
++// ---------------------------------------------------------------- B3 /transport
++// 无入参。回复 /resp "transport" "playing=..|bar=..|beat=..|bpb=..|beatType=..|bpm=..|tick=..|ticksPerBeat=..|bypassed=.."
++static int osc_transport_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
++{
++    d_debug("osc_transport_handler()");
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr || plugin->context == nullptr)
++    {
++        cardinalOscReply(source, server, "transport", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    const CardinalPluginContext* const context = plugin->context;
++    std::string payload = std::string("playing=") + (context->playing ? "1" : "0")
++        + "|bar=" + std::to_string(context->bar)
++        + "|beat=" + std::to_string(context->beat)
++        + "|bpb=" + std::to_string(context->beatsPerBar)
++        + "|beatType=" + std::to_string(context->beatType)
++        + "|bpm=" + fmtB(context->beatsPerMinute)
++        + "|tick=" + fmtB(context->tick)
++        + "|ticksPerBeat=" + fmtB(context->ticksPerBeat)
++        + "|bypassed=" + (context->bypassed ? "1" : "0");
++
++    cardinalOscReply(source, server, "transport", payload, "ok");
++    return 0;
++}
++
++// ---------------------------------------------------------------- B4 /engine-info
++// 无入参。回复 /resp "engine-info" "sampleRate=..|bufferSize=..|cpuAvg=..|cpuMax=..|cpuRefreshMs=1000"
++// ⚠️ CPU 负载每 1 秒刷新（Engine.cpp:576），meterLastTime 私有拿不到 ⇒ 回常量
++static int osc_engine_info_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
++{
++    d_debug("osc_engine_info_handler()");
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr || plugin->context == nullptr)
++    {
++        cardinalOscReply(source, server, "engine-info", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    const CardinalPluginContext* const context = plugin->context;
++    std::string payload = std::string("sampleRate=") + fmtB(context->sampleRate)
++        + "|bufferSize=" + std::to_string(context->bufferSize)
++        + "|cpuAvg=" + fmtB(context->engine->getMeterAverage())
++        + "|cpuMax=" + fmtB(context->engine->getMeterMax())
++        + "|cpuRefreshMs=1000";
++
++    cardinalOscReply(source, server, "engine-info", payload, "ok");
++    return 0;
++}
++
++// ---------------------------------------------------------------- B5 /plugins
++// /plugins        无参 → 当前机架里出现过的 plugin slug 列表（引擎真实数据，去重）
++// 带 safeMode 标志（true 时插件根本没加载——「拼写正确却找不到」的第一嫌疑）
++// 单查（"s"）已下线：liblo string 接收不可靠，单查由 MCP 侧读 PluginManifests 承担
++// 回复 /resp "plugins" "safeMode=..|plugins=.."
++static int osc_plugins_list_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
++{
++    d_debug("osc_plugins_list_handler()");
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    std::string payload = std::string("safeMode=") + (rack::settings::safeMode ? "1" : "0");
++    const char* status = "ok";
++
++    std::string list;
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin != nullptr && plugin->context != nullptr)
++    {
++       #ifdef CARDINAL_INIT_OSC_THREAD
++        rack::contextSet(plugin->context);
++       #endif
++        std::vector<std::string> seen;   // 量小（<100），线性查重，避免依赖 <set>
++        const std::vector<int64_t> ids = plugin->context->engine->getModuleIds();
++        for (int64_t id : ids)
++        {
++            rack::engine::Module* const module = plugin->context->engine->getModule(id);
++            if (module == NULL)
++                continue;
++            rack::plugin::Model* const model = module->getModel();
++            if (model == NULL || model->plugin == NULL)
++                continue;
++            const std::string slug = model->plugin->slug;
++            bool dup = false;
++            for (const std::string& s : seen)
++                if (s == slug) { dup = true; break; }
++            if (!dup)
++            {
++                seen.push_back(slug);
++                if (!list.empty())
++                    list += ",";
++                list += slug;
++            }
++        }
++       #ifdef CARDINAL_INIT_OSC_THREAD
++        rack::contextSet(nullptr);
++       #endif
++    }
++    else
++    {
++        status = "err:E_NO_PLUGIN";
++    }
++    payload += "|plugins=" + (list.empty() ? std::string("none") : list);
++
++    cardinalOscReply(source, server, "plugins", payload, status);
++    return 0;
++}
++
++// ==== CARDINAL-MCP-READ-PROBES-B-END ====
++// ==== CARDINAL-MCP-C-GROUP-BEGIN ====
++// ---------------------------------------------------------------------------
++// ★ 2026-10-20 新增：C 组 handler —— 模拟人类操作（李定的核心方向）
++//   全部走 history API（可 undo），与「人类点 UI」等价：
++//     C1 /param-set-by-display h i f   右键旋钮输数值（setDisplayValue）
++//     C2 /module-add       s i i       右键 Add module（Plugin 菜单）
++//     C3 /cable-add h i h i            从输出口拖线到输入口（查重：挤掉旧线）
++//        /cable-remove     h           选中线按 Delete
++//     C4 /undo  /redo                  Ctrl+Z / Ctrl+Shift+Z
++//     C6r /module-json      h          读模块 data（toJson；回复方向 string 可靠）
++//     C7 /module-remove     h          右键 Remove
++//     C8 /module-move h i i            拖动模块（ModuleMove history，可 undo）
++//     C9 /midi-out i i i i             在 DAW 里弹 MIDI（channel+3 字节，数值参数）
++//     /osc-echo-string     s           string 接收探针（验证 liblo string 通路）
++//
++// 【源码依据】（全部 2026-10-20 在 WSL 树 /home/lijia/Cardinal 实测核实）
++//   C1  ParamQuantity::setDisplayValue：src/Rack/include/engine/ParamQuantity.hpp:99
++//       ParamChange{moduleId,paramId,oldValue,newValue}：src/Rack/include/history.hpp
++//   C2  ModuleAdd{model,pos,moduleJ}：history.hpp:71；Plugin::getModel：plugin/Plugin.hpp
++//       ::rack::plugin::getPlugin：src/Rack/src/plugin.cpp:373
++//   C3  CableAdd{cableId,inputModuleId,inputId,outputModuleId,outputId,color}：history.hpp:137
++//       CableAdd::redo 自建 Cable（不需 widget）：src/Rack/src/history.cpp:171
++//       CableRemove：history.hpp:153（InverseAction<CableAdd>）
++//   C4  State::undo/redo/canUndo/canRedo/getUndoName/getRedoName：history.hpp:183+
++//       APP->history 已在 CardinalCommon.cpp:1604 使用（include 链通）
++//   C6r Module::toJson()：src/Rack/include/engine/Module.hpp:347
++//   C7  ModuleRemove：history.hpp:85
++//   C8  ModuleMove{moduleId,oldPos,newPos}：history.hpp（push 时 redo 填 oldPos）
++//   C9  midi::Message{bytes,frame=-1}：src/Rack/include/midi.hpp:16-24；
++//       writeMidiMessage：include/plugincontext.hpp:100；bypassed 提前 return 要回显
++//
++// ⚠️ liblo string 接收：lo_arg.s 声明为 char，官方约定 &argv[n]->s 取指针
++//   （lo_osc_types.h 注释原话 "strings must be read with &argv[n]->t"）。
++//   B5 曾因此止损下线单查（首版 oscArgStr 读错偏移写了 *(char**)a，联合起始
++//   8 字节是 i/i32 地盘；修正版 *(char**)&a->s 当时未验证）。本批带
++//   /osc-echo-string 探针重新验证——通则 C2 等 string 端点转正。
++// ---------------------------------------------------------------------------
++
++// 数字 → 短字符串（独立命名，避免与 B 组的 fmtB 重定义——同一 TU！）
++static std::string fmtC(double v)
++{
++    char buf[40] = {};
++    const ScopedSafeLocale cssl;
++    std::snprintf(buf, sizeof(buf), "%.6g", v);
++    return std::string(buf);
++}
++
++// liblo string 参数取值：取 s 成员地址转型（s 在联合内偏移约 40，不是 0）
++static const char* oscArgStrC(const lo_arg* a)
++{
++    return *(char**)&a->s;
++}
++
++static std::string oscJsonDumpsCompact(json_t* j)
++{
++    if (j == NULL)
++        return std::string("null");
++    char* s = json_dumps(j, JSON_COMPACT);
++    std::string out = s ? s : "";
++    if (s)
++        free(s);
++    return out;
++}
++
++// ---------------------------------------------------------------- C1 /param-set-by-display
++// 入参 "hif" = moduleId, paramId, displayValue
++// 回复 "param-set" "ok old=.. new=.."（存储值前后）/ 错误原因
++static int osc_param_set_display_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_param_set_display_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 3, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "param-set", "no-plugin", "err:E_NO_PLUGIN");
++        return 0;
++    }
++    CardinalPluginContext* const context = plugin->context;
++    const int64_t moduleId = argv[0]->h;
++    const int paramId = argv[1]->i;
++    const float displayValue = argv[2]->f;
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++   #endif
++
++    std::string payload;
++    const char* status = "ok";
++    rack::engine::Module* const module = context->engine->getModule(moduleId);
++    rack::engine::ParamQuantity* const pq = module != NULL
++        ? module->getParamQuantity(paramId) : NULL;
++    if (pq != NULL)
++    {
++        const float oldValue = pq->getValue();
++        pq->setDisplayValue(displayValue);   // 引擎按量纲换算存储值（275ms→0.275）
++        const float newValue = pq->getValue();
++        rack::history::ParamChange* a = new rack::history::ParamChange;
++        a->moduleId = moduleId;
++        a->paramId = paramId;
++        a->oldValue = oldValue;
++        a->newValue = newValue;
++        APP->history->push(a);
++        payload = std::string("ok old=") + fmtC(oldValue) + " new=" + fmtC(newValue);
++    }
++    else
++    {
++        if (module == NULL)
++        {
++            payload = "no-module";
++            status = "err:E_NO_MODULE";
++        }
++        else
++        {
++            payload = "bad-param";
++            status = "err:E_BAD_PARAM";
++        }
++    }
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++   #endif
++
++    cardinalOscReply(source, server, "param-set", payload, status);
++    return 0;
++}
++
++// ---------------------------------------------------------------- C3 /cable-add
++// 入参 "hihi" = outputModuleId, outputId, inputModuleId, inputId
++// 人类等价：从输出口拖一条线到输入口。同一输入口只能接一根线 ⇒ 旧线被挤掉
++// （Rack 的 GUI 行为），这里显式查重并先 remove，回复报告 replaced 数。
++static int osc_cable_add_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_cable_add_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 4, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "cable-add", "no-plugin", "err:E_NO_PLUGIN");
++        return 0;
++    }
++    CardinalPluginContext* const context = plugin->context;
++    const int64_t outMod = argv[0]->h;
++    const int outPort = argv[1]->i;
++    const int64_t inMod = argv[2]->h;
++    const int inPort = argv[3]->i;
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++   #endif
++
++    std::string payload;
++    const char* status = "ok";
++    rack::engine::Module* const outM = context->engine->getModule(outMod);
++    rack::engine::Module* const inM = context->engine->getModule(inMod);
++    if (outM == NULL || inM == NULL)
++    {
++        payload = "no-module";
++        status = "err:E_NO_MODULE";
++    }
++    else if (outPort < 0 || outPort >= outM->getNumOutputs()
++             || inPort < 0 || inPort >= inM->getNumInputs())
++    {
++        payload = "bad-port";
++        status = "err:E_BAD_PORT";
++    }
++    else
++    {
++        int replaced = 0;
++        // 查重：同一输入口已接的线，先 remove（模仿人类拖线挤掉）
++        std::vector<int64_t> ids = context->engine->getCableIds();
++        for (int64_t id : ids)
++        {
++            rack::engine::Cable* const c = context->engine->getCable(id);
++            if (c == NULL)
++                continue;
++            if (c->inputModule == inM && c->inputId == inPort)
++            {
++                rack::history::CableRemove* r = new rack::history::CableRemove;
++                r->cableId = id;
++                APP->history->push(r);
++                ++replaced;
++            }
++        }
++        rack::history::CableAdd* a = new rack::history::CableAdd;
++        a->cableId = -1;   // 加入引擎时分配新 id
++        a->inputModuleId = inMod;
++        a->inputId = inPort;
++        a->outputModuleId = outMod;
++        a->outputId = outPort;
++        APP->history->push(a);
++        payload = std::string("ok replaced=") + std::to_string(replaced);
++    }
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++   #endif
++
++    cardinalOscReply(source, server, "cable-add", payload, status);
++    return 0;
++}
++
++// ---------------------------------------------------------------- C3 /cable-remove
++// 入参 "h" = cableId
++static int osc_cable_remove_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_cable_remove_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "cable-remove", "no-plugin", "err:E_NO_PLUGIN");
++        return 0;
++    }
++    CardinalPluginContext* const context = plugin->context;
++    const int64_t cableId = argv[0]->h;
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++   #endif
++
++    std::string payload;
++    const char* status = "ok";
++    if (context->engine->getCable(cableId) != NULL)
++    {
++        rack::history::CableRemove* a = new rack::history::CableRemove;
++        a->cableId = cableId;
++        APP->history->push(a);
++        payload = "ok";
++    }
++    else
++    {
++        payload = "no-cable";
++        status = "err:E_NO_CABLE";
++    }
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++   #endif
++
++    cardinalOscReply(source, server, "cable-remove", payload, status);
++    return 0;
++}
++
++// ---------------------------------------------------------------- C4 /undo /redo
++static int osc_undo_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
++{
++    d_debug("osc_undo_handler()");
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++    std::string payload;
++    const char* status = "ok";
++    if (APP->history->canUndo())
++    {
++        payload = APP->history->getUndoName();
++        APP->history->undo();
++    }
++    else
++    {
++        payload = "nothing";
++        status = "err:E_NOTHING";
++    }
++    cardinalOscReply(source, server, "undo", payload, status);
++    return 0;
++}
++
++static int osc_redo_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
++{
++    d_debug("osc_redo_handler()");
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++    std::string payload;
++    const char* status = "ok";
++    if (APP->history->canRedo())
++    {
++        payload = APP->history->getRedoName();
++        APP->history->redo();
++    }
++    else
++    {
++        payload = "nothing";
++        status = "err:E_NOTHING";
++    }
++    cardinalOscReply(source, server, "redo", payload, status);
++    return 0;
++}
++
++// ---------------------------------------------------------------- C6r /module-json
++// 入参 "h" = moduleId。回复 "module-json" "<compact json>"（截断保护：OSC UDP 上限）
++static int osc_module_json_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_module_json_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "module-json", "no-plugin", "err:E_NO_PLUGIN");
++        return 0;
++    }
++    CardinalPluginContext* const context = plugin->context;
++    const int64_t moduleId = argv[0]->h;
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++   #endif
++
++    std::string payload;
++    const char* status = "ok";
++    rack::engine::Module* const module = context->engine->getModule(moduleId);
++    if (module == NULL)
++    {
++        payload = "no-module";
++        status = "err:E_NO_MODULE";
++    }
++    else
++    {
++        json_t* const j = module->toJson();
++        std::string s = oscJsonDumpsCompact(j);
++        if (j != NULL)
++            json_decref(j);
++        if (s.size() > 60000)
++        {
++            s.resize(60000);
++            s += "...TRUNCATED";
++        }
++        payload = s;
++    }
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++   #endif
++
++    cardinalOscReply(source, server, "module-json", payload, status);
++    return 0;
++}
++
++// ---------------------------------------------------------------- C7 /module-remove
++// 入参 "h" = moduleId
++static int osc_module_remove_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_module_remove_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "module-remove", "no-plugin", "err:E_NO_PLUGIN");
++        return 0;
++    }
++    CardinalPluginContext* const context = plugin->context;
++    const int64_t moduleId = argv[0]->h;
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++   #endif
++
++    std::string payload;
++    const char* status = "ok";
++    if (context->engine->getModule(moduleId) != NULL)
++    {
++        rack::history::ModuleRemove* a = new rack::history::ModuleRemove;
++        a->moduleId = moduleId;
++        APP->history->push(a);
++        payload = "ok";
++    }
++    else
++    {
++        payload = "no-module";
++        status = "err:E_NO_MODULE";
++    }
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++   #endif
++
++    cardinalOscReply(source, server, "module-remove", payload, status);
++    return 0;
++}
++
++// ---------------------------------------------------------------- C8 /module-move
++// 入参 "hii" = moduleId, x, y（格坐标）。走 ModuleMove history ⇒ 可 undo
++static int osc_module_move_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_module_move_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 3, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "module-move", "no-plugin", "err:E_NO_PLUGIN");
++        return 0;
++    }
++    CardinalPluginContext* const context = plugin->context;
++    const int64_t moduleId = argv[0]->h;
++    const float px = argv[1]->i;
++    const float py = argv[2]->i;
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++   #endif
++
++    std::string payload;
++    const char* status = "ok";
++    if (context->engine->getModule(moduleId) != NULL)
++    {
++        rack::history::ModuleMove* a = new rack::history::ModuleMove;
++        a->moduleId = moduleId;
++        a->newPos = rack::math::Vec(px, py);
++        APP->history->push(a);
++        payload = std::string("ok ") + std::to_string((int)px) + ":" + std::to_string((int)py);
++    }
++    else
++    {
++        payload = "no-module";
++        status = "err:E_NO_MODULE";
++    }
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++   #endif
++
++    cardinalOscReply(source, server, "module-move", payload, status);
++    return 0;
++}
++
++// ---------------------------------------------------------------- C9 /midi-out
++// 入参 "iiii" = channel, byte0, byte1, byte2（数值参数，避开 string/blob 通路）
++// ⚠️ frame 必须 >= 0（TODO: plugincontext.hpp:208 assert）⇒ 用 context->frame
++// ⚠️ bypassed 时引擎提前 return ⇒ 回显 skipped:bypassed，不假装发成功
++static int osc_midi_out_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+ {
+-   #if !(defined(HEADLESS) || defined(CARDINAL_COMMON_DSP_ONLY))
+-    if (ui != nullptr)
++    d_debug("osc_midi_out_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 4, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
+     {
+-        ui->addIdleCallback(cb);
+-        return true;
++        cardinalOscReply(source, server, "midi-out", "no-plugin", "err:E_NO_PLUGIN");
++        return 0;
+     }
+-   #else
+-    // unused
+-    (void)cb;
+-   #endif
++    CardinalPluginContext* const context = plugin->context;
+ 
+-    return false;
++    std::string payload;
++    const char* status = "ok";
++    if (context->bypassed)
++    {
++        payload = "skipped:bypassed";
++    }
++    else
++    {
++        rack::midi::Message msg;
++        msg.bytes.push_back((uint8_t) argv[1]->i);
++        msg.bytes.push_back((uint8_t) argv[2]->i);
++        msg.bytes.push_back((uint8_t) argv[3]->i);
++        msg.frame = (int64_t) context->frame;
++        context->writeMidiMessage(msg, (uint8_t) argv[0]->i);
++        payload = "sent";
++    }
++
++    cardinalOscReply(source, server, "midi-out", payload, status);
++    return 0;
+ }
+ 
+-void CardinalPluginContext::removeIdleCallback(IdleCallback* const cb) const
++// ---------------------------------------------------------------------------
++// ★ 2026-10-20 新增：QuickJS 绑定 —— Cardinal 进程内 JS 执行
++//
++// 【为什么】（10-19 战略对标结论）
++//   Unity / UE / Blender / Godot 的 MCP **10/10 都有「宿主内执行任意代码」工具**
++//   （Roslyn 内存编译 / execute_blender_code / editor_run_python / execute_script）。
++//   探针是「一次性清单」会过时，JS 是「无限能力」会生长——这是行业标配。
++//   且 liblo 的 string 接收通路不可靠（B5 教训），任意文本类输入（JS 源码、
++//   模块 JSON）走 OSC 参数是死路 ⇒ JS 绑定同时是协议短板的解药。
++//
++// 【安全模型】（lethal trifecta：私数据 + 不可信内容 + 外发能力 = 窃盗条件）
++//   1. **默认 off**：env CARDINAL_JS_MODE=off|read|write，默认 off。off 时端点
++//      直接拒绝并提示。李不显式开启就没有这个能力。
++//   2. **绝不初始化 quickjs-libc**（JS_NewContext 裸上下文，不调 js_std_loop/
++//      js_init_module_os）⇒ JS 里**没有 std/os/script 模块** ⇒ 没有
++//      exec/waitpid/kill/pipe ⇒ **任意命令执行这条路从根上不存在**。
++//   3. **指令预算**：JS_SetInterruptHandler 计数，超 2000 万指令中断
++//      （防死循环卡 UI 线程；handler 在 UI 线程同步跑，预算=界面冻结预算）。
++//   4. **API 分级**：read 模式只读（modules/getParam/ports/signal/cables/
++//      transport/moduleJson）；write 模式才追加 setParam/setDisplayValue/
++//      moduleFromJson/addModule/cableAdd/undo/redo。
++//   5. **无文件/网络 API**：不给 JS 任何 fs/net 能力（ Cardinal 数据全走 API）。
++//
++// 【源码依据】（2026-10-20 WSL 树实测）
++//   链接：src/Makefile.cardinal.mk:153 RACK_EXTRA_LIBS += libquickjs.a
++//   头文件：src/Rack/dep/include/quickjs.h（相对 src/ 的稳 include 路径）
++//   RAII 范本：plugins/AriaModules/src/javascript.hpp（WTFPL，可抄）
++//   惯例：每次 eval 新建 runtime（AriaModules 注释："basically instant"，
++//         无状态污染）——本实现沿用，budget 挂在 runtime 上。
++//
++// 【调用约定】
++//   /osc-js-run "i" = 脚本索引（1-based，先用 /osc-js-list 查）。
++//   脚本被包成 `globalThis.result = (function(){ <脚本> })();`，所以脚本用
++//   `return` 交结果（不要自己赋 globalThis.result——会被 undefined 覆盖）。
++//   墙钟超预算如实回 `budget-exceeded ms=N`；其余异常回 `error: ...`。
++// ---------------------------------------------------------------------------
++
++// 相对 src/ 的稳路径（ CardinalCommon.cpp 在 src/ 下；勿用尖括号——include
++// 路径里没有 quickjs.h 的保证，相对路径一定找得到）
++#include "Rack/dep/include/quickjs.h"
++#include <dirent.h>
++#include <stdio.h>
++#include <time.h>
++// ⚠️ 不用 <fstream>/<sstream>：实测在本 inc 的插入位置（CardinalCommon.cpp
++// 中部）会炸 ios_base 未声明（mingw C++ 库内部前置状态问题）；FILE* 零风险。
++
++// JS API 回调拿 self（Initializer*）的通道：JS C 函数签名里没有 self 参数。
++// OSC handler 在 GUI 版是 UI 线程串行执行的 ⇒ eval 期间独占，前后置空即安全。
++static void* g_osc_js_self = NULL;
++
++// 执行预算：挂在 JSRuntime 上，超限中断（返回 1 = 中断）。
++//
++// 【血泪·为什么用墙钟而不是指令数】2026-10-20 运行级实测：原先只数指令、
++// 上限 2000 万，结果死循环脚本 40 秒没被打断、UI 线程被永久卡死。根因是
++// 数量级错得离谱——quickjs 只在 `interrupt_counter`（JS_INTERRUPT_COUNTER_INIT
++// = 10000，见 deps/QuickJS/quickjs.c:316）递减到 0 时才调一次 handler，即
++// handler 每 ~10000 条指令才被调一次；2000 万次 handler 调用 ≈ 2000 亿条指令。
++//
++// 【更根本的问题：单位错了】安全目标是「不能卡死 UI 线程」，量纲必须是时间。
++// 同一个指令数在真机（原生 Windows）和 WINE+xvfb 下时间含义差几个数量级，
++// 按指令数定阈值等于把「快机器更早被打断」和「慢机器可能卡很久」都留给了运气。
++// ⇒ 主判据用墙钟毫秒（env CARDINAL_JS_BUDGET_MS 覆盖），指令数只留作兜底。
++struct OscJsBudget {
++    clock_t start;    // 起跑时刻
++    double limitMs;   // 墙钟上限（毫秒）
++    long counter;     // handler 调用次数（兜底判据）
++    long counterLimit;
++};
++
++static int oscJsInterrupt(JSRuntime* rt, void* opaque)
+ {
+-   #if !(defined(HEADLESS) || defined(CARDINAL_COMMON_DSP_ONLY))
+-    if (ui != nullptr)
+-        ui->removeIdleCallback(cb);
+-   #else
+-    // unused
+-    (void)cb;
+-   #endif
++    (void) rt;
++    OscJsBudget* const b = static_cast<OscJsBudget*>(opaque);
++    const double elapsedMs = (double)(clock() - b->start) * 1000.0 / (double) CLOCKS_PER_SEC;
++    if (elapsedMs > b->limitMs)
++        return 1;
++    if (++b->counter > b->counterLimit)   // 兜底：时钟异常时的硬上限
++        return 1;
++    return 0;
+ }
+ 
+-void CardinalPluginContext::writeMidiMessage(const rack::midi::Message& message, const uint8_t channel)
++// ---- JS 侧 API 的 C 实现 ---------------------------------------------------
++// 约定：每个 C 函数从 this_val 之后的 argv 取参，返回 JSValue。
++// 出错返回 JS_EXCEPTION（会冒泡成 JS 异常，如实回传）。
++
++static JSValue jsApiModules(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
+ {
+-    if (bypassed)
+-        return;
++    (void) this_val; (void) argc; (void) argv;
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
++    if (plugin == nullptr)
++        return JS_ThrowInternalError(ctx, "no plugin");
++    CardinalPluginContext* const context = plugin->context;
++    std::string out;
++    const std::vector<int64_t> ids = context->engine->getModuleIds();
++    for (int64_t id : ids)
++    {
++        rack::engine::Module* const module = context->engine->getModule(id);
++        if (module == NULL)
++            continue;
++        rack::plugin::Model* const model = module->getModel();
++        if (model == NULL)
++            continue;
++        if (!out.empty())
++            out += ",";
++        out += std::to_string(id) + ":" +
++               (model->plugin != NULL ? model->plugin->slug : std::string("?")) + "|" + model->slug;
++    }
++    return JS_NewStringLen(ctx, out.c_str(), out.size());
++}
+ 
+-    const size_t size = message.bytes.size();
+-    DISTRHO_SAFE_ASSERT_RETURN(size > 0,);
+-    DISTRHO_SAFE_ASSERT_RETURN(message.frame >= 0,);
++static JSValue jsApiGetParam(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val;
++    if (argc < 2)
++        return JS_ThrowTypeError(ctx, "getParam(id, param) needs 2 args");
++    int64_t mid = 0;
++    int32_t pid = 0;
++    if (JS_ToInt64(ctx, &mid, argv[0]) != 0 || JS_ToInt32(ctx, &pid, argv[1]) != 0)
++        return JS_ThrowTypeError(ctx, "getParam: bad number args");
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
++    if (plugin == nullptr)
++        return JS_ThrowInternalError(ctx, "no plugin");
++    rack::engine::Module* const module = plugin->context->engine->getModule(mid);
++    if (module == NULL)
++        return JS_ThrowInternalError(ctx, "no module");
++    rack::engine::ParamQuantity* const pq = module->getParamQuantity(pid);
++    if (pq == NULL)
++        return JS_ThrowInternalError(ctx, "no param");
++    const std::string s = fmtB((double) pq->getDisplayValue());
++    return JS_NewStringLen(ctx, s.c_str(), s.size());
++}
+ 
+-    MidiEvent event;
+-    event.frame = message.frame;
++static JSValue jsApiPorts(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val;
++    if (argc < 1)
++        return JS_ThrowTypeError(ctx, "ports(id) needs 1 arg");
++    int64_t mid = 0;
++    if (JS_ToInt64(ctx, &mid, argv[0]) != 0)
++        return JS_ThrowTypeError(ctx, "ports: bad id");
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
++    if (plugin == nullptr)
++        return JS_ThrowInternalError(ctx, "no plugin");
++    rack::engine::Module* const module = plugin->context->engine->getModule(mid);
++    if (module == NULL)
++        return JS_ThrowInternalError(ctx, "no module");
++    std::string out;
++    for (int i = 0; i < module->getNumInputs(); ++i)
++    {
++        rack::engine::Input& port = module->inputs[i];
++        if (!out.empty()) out += "|";
++        out += "in:" + std::to_string(i) + ":" + std::to_string(port.getChannels());
++        for (int ch = 0; ch < 4; ++ch)
++            out += ":" + fmtB(port.getPolyVoltage(ch));
++    }
++    for (int i = 0; i < module->getNumOutputs(); ++i)
++    {
++        rack::engine::Output& port = module->outputs[i];
++        if (!out.empty()) out += "|";
++        out += "out:" + std::to_string(i) + ":" + std::to_string(port.getChannels());
++        for (int ch = 0; ch < 4; ++ch)
++            out += ":" + fmtB(port.getPolyVoltage(ch));
++    }
++    return JS_NewStringLen(ctx, out.c_str(), out.size());
++}
+ 
+-    switch (message.bytes[0] & 0xF0)
++static JSValue jsApiCables(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val; (void) argc; (void) argv;
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
++    if (plugin == nullptr)
++        return JS_ThrowInternalError(ctx, "no plugin");
++    std::string out;
++    const std::vector<int64_t> ids = plugin->context->engine->getCableIds();
++    for (int64_t id : ids)
+     {
+-    case 0x80:
+-    case 0x90:
+-    case 0xA0:
+-    case 0xB0:
+-    case 0xE0:
+-        event.size = 3;
+-        break;
+-    case 0xC0:
+-    case 0xD0:
+-        event.size = 2;
+-        break;
+-    case 0xF0:
+-        switch (message.bytes[0] & 0x0F)
+-        {
+-        case 0x0:
+-        case 0x4:
+-        case 0x5:
+-        case 0x7:
+-        case 0x9:
+-        case 0xD:
+-            // unsupported
+-            return;
+-        case 0x1:
+-        case 0x2:
+-        case 0x3:
+-        case 0xE:
+-            event.size = 3;
+-            break;
+-        case 0x6:
+-        case 0x8:
+-        case 0xA:
+-        case 0xB:
+-        case 0xC:
+-        case 0xF:
+-            event.size = 1;
+-            break;
+-        }
+-        break;
+-    default:
+-        // invalid
+-        return;
++        rack::engine::Cable* const c = plugin->context->engine->getCable(id);
++        if (c == NULL) continue;
++        if (!out.empty()) out += ",";
++        out += std::to_string(id) + ":"
++             + std::to_string(c->inputModule != NULL ? c->inputModule->id : -1) + ":"
++             + std::to_string(c->inputId) + ":"
++             + std::to_string(c->outputModule != NULL ? c->outputModule->id : -1) + ":"
++             + std::to_string(c->outputId);
+     }
++    if (out.empty()) out = "none";
++    return JS_NewStringLen(ctx, out.c_str(), out.size());
++}
+ 
+-    DISTRHO_SAFE_ASSERT_RETURN(size >= event.size,);
++static JSValue jsApiTransport(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val; (void) argc; (void) argv;
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
++    if (plugin == nullptr || plugin->context == nullptr)
++        return JS_ThrowInternalError(ctx, "no plugin");
++    const CardinalPluginContext* const context = plugin->context;
++    std::string payload = std::string("playing=") + (context->playing ? "1" : "0")
++        + "|bar=" + std::to_string(context->bar)
++        + "|beat=" + std::to_string(context->beat)
++        + "|bpm=" + fmtB(context->beatsPerMinute)
++        + "|tick=" + fmtB(context->tick)
++        + "|bypassed=" + (context->bypassed ? "1" : "0");
++    return JS_NewStringLen(ctx, payload.c_str(), payload.size());
++}
+ 
+-    std::memcpy(event.data, message.bytes.data(), event.size);
++static JSValue jsApiModuleJson(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val;
++    if (argc < 1)
++        return JS_ThrowTypeError(ctx, "moduleJson(id) needs 1 arg");
++    int64_t mid = 0;
++    if (JS_ToInt64(ctx, &mid, argv[0]) != 0)
++        return JS_ThrowTypeError(ctx, "moduleJson: bad id");
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
++    if (plugin == nullptr)
++        return JS_ThrowInternalError(ctx, "no plugin");
++    rack::engine::Module* const module = plugin->context->engine->getModule(mid);
++    if (module == NULL)
++        return JS_ThrowInternalError(ctx, "no module");
++    std::string s = oscJsonDumpsCompact(module->toJson());
++    return JS_NewStringLen(ctx, s.c_str(), s.size());
++}
+ 
+-    if (channel != 0 && event.data[0] < 0xF0)
+-        event.data[0] |= channel & 0x0F;
++// ---- write 模式 API ----
+ 
+-    plugin->writeMidiEvent(event);
++static JSValue jsApiSetDisplayValue(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val;
++    if (argc < 3)
++        return JS_ThrowTypeError(ctx, "setDisplayValue(id, param, value) needs 3 args");
++    int64_t mid = 0; int32_t pid = 0; double dv = 0;
++    if (JS_ToInt64(ctx, &mid, argv[0]) != 0 || JS_ToInt32(ctx, &pid, argv[1]) != 0
++        || JS_ToFloat64(ctx, &dv, argv[2]) != 0)
++        return JS_ThrowTypeError(ctx, "setDisplayValue: bad args");
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
++    if (plugin == nullptr)
++        return JS_ThrowInternalError(ctx, "no plugin");
++    rack::engine::Module* const module = plugin->context->engine->getModule(mid);
++    rack::engine::ParamQuantity* const pq = module != NULL ? module->getParamQuantity(pid) : NULL;
++    if (pq == NULL)
++        return JS_ThrowInternalError(ctx, "no module/param");
++    const float oldValue = pq->getValue();
++    pq->setDisplayValue((float) dv);
++    const float newValue = pq->getValue();
++    rack::history::ParamChange* a = new rack::history::ParamChange;
++    a->moduleId = mid; a->paramId = pid; a->oldValue = oldValue; a->newValue = newValue;
++    APP->history->push(a);
++    const std::string s = std::string("old=") + fmtB(oldValue) + " new=" + fmtB(newValue);
++    return JS_NewStringLen(ctx, s.c_str(), s.size());
+ }
+ 
+-// -----------------------------------------------------------------------------------------------------------
++static JSValue jsApiModuleFromJson(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val;
++    if (argc < 2)
++        return JS_ThrowTypeError(ctx, "moduleFromJson(id, json) needs 2 args");
++    int64_t mid = 0;
++    if (JS_ToInt64(ctx, &mid, argv[0]) != 0)
++        return JS_ThrowTypeError(ctx, "moduleFromJson: bad id");
++    const char* js = JS_ToCString(ctx, argv[1]);
++    if (js == NULL)
++        return JS_ThrowTypeError(ctx, "moduleFromJson: bad json string");
++    const std::string jsonStr(js);
++    JS_FreeCString(ctx, js);
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
++    if (plugin == nullptr)
++        return JS_ThrowInternalError(ctx, "no plugin");
++    rack::engine::Module* const module = plugin->context->engine->getModule(mid);
++    if (module == NULL)
++        return JS_ThrowInternalError(ctx, "no module");
++    json_error_t err;
++    json_t* rootJ = json_loads(jsonStr.c_str(), 0, &err);
++    if (rootJ == NULL)
++        return JS_ThrowInternalError(ctx, "json parse failed");
++    APP->engine->moduleFromJson(module, rootJ);
++    json_decref(rootJ);
++    return JS_NewStringLen(ctx, "ok", 2);
++}
+ 
+-namespace rack {
+-namespace midi {
++static JSValue jsApiAddModule(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val;
++    if (argc < 3)
++        return JS_ThrowTypeError(ctx, "addModule('plugin|model', x, y) needs 3 args");
++    const char* slugC = JS_ToCString(ctx, argv[0]);
++    if (slugC == NULL)
++        return JS_ThrowTypeError(ctx, "addModule: bad slug");
++    const std::string slugPair(slugC);
++    JS_FreeCString(ctx, slugC);
++    int32_t px = 0, py = 0;
++    if (JS_ToInt32(ctx, &px, argv[1]) != 0 || JS_ToInt32(ctx, &py, argv[2]) != 0)
++        return JS_ThrowTypeError(ctx, "addModule: bad coords");
++    std::string pluginSlug, modelSlug;
++    const size_t bar = slugPair.find('|');
++    if (bar != std::string::npos)
++    {
++        pluginSlug = slugPair.substr(0, bar);
++        modelSlug = slugPair.substr(bar + 1);
++    }
++    rack::plugin::Model* model = NULL;
++    if (!pluginSlug.empty())
++    {
++        rack::plugin::Plugin* const p = ::rack::plugin::getPlugin(pluginSlug);
++        model = p != NULL ? p->getModel(modelSlug) : NULL;
++    }
++    if (model == NULL)
++        return JS_ThrowInternalError(ctx, "no model (need plugin|model full slug)");
++    rack::history::ModuleAdd* a = new rack::history::ModuleAdd;
++    a->model = model;
++    a->pos = rack::math::Vec(px, py);
++    APP->history->push(a);
++    return JS_NewStringLen(ctx, "ok", 2);
++}
+ 
+-struct InputQueue::Internal {
+-    CardinalPluginContext* const pcontext = static_cast<CardinalPluginContext*>(APP);
+-    const CardinalDISTRHO::MidiEvent* midiEvents = nullptr;
+-    uint32_t midiEventsLeft = 0;
+-    uint32_t lastProcessCounter = 0;
+-    int64_t lastBlockFrame = 0;
+-};
++static JSValue jsApiCableAdd(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val;
++    if (argc < 4)
++        return JS_ThrowTypeError(ctx, "cableAdd(outMod, outPort, inMod, inPort) needs 4 args");
++    int64_t om = 0, im = 0; int32_t op = 0, ip = 0;
++    if (JS_ToInt64(ctx, &om, argv[0]) != 0 || JS_ToInt32(ctx, &op, argv[1]) != 0
++        || JS_ToInt64(ctx, &im, argv[2]) != 0 || JS_ToInt32(ctx, &ip, argv[3]) != 0)
++        return JS_ThrowTypeError(ctx, "cableAdd: bad args");
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
++    if (plugin == nullptr)
++        return JS_ThrowInternalError(ctx, "no plugin");
++    CardinalPluginContext* const context = plugin->context;
++    rack::engine::Module* const inM = context->engine->getModule(im);
++    if (inM == NULL)
++        return JS_ThrowInternalError(ctx, "no input module");
++    int replaced = 0;
++    const std::vector<int64_t> ids = context->engine->getCableIds();
++    for (int64_t id : ids)
++    {
++        rack::engine::Cable* const c = context->engine->getCable(id);
++        if (c != NULL && c->inputModule == inM && c->inputId == ip)
++        {
++            rack::history::CableRemove* r = new rack::history::CableRemove;
++            r->cableId = id;
++            APP->history->push(r);
++            ++replaced;
++        }
++    }
++    rack::history::CableAdd* a = new rack::history::CableAdd;
++    a->cableId = -1;
++    a->inputModuleId = im;
++    a->inputId = ip;
++    a->outputModuleId = om;
++    a->outputId = op;
++    APP->history->push(a);
++    const std::string s = std::string("ok replaced=") + std::to_string(replaced);
++    return JS_NewStringLen(ctx, s.c_str(), s.size());
++}
+ 
+-InputQueue::InputQueue() {
+-    internal = new Internal;
++static JSValue jsApiUndo(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val; (void) argc; (void) argv;
++    const std::string s = APP->history->canUndo() ? APP->history->getUndoName() : std::string("nothing");
++    if (s != "nothing")
++        APP->history->undo();
++    return JS_NewStringLen(ctx, s.c_str(), s.size());
+ }
+ 
+-InputQueue::~InputQueue() {
+-    delete internal;
++static JSValue jsApiRedo(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
++{
++    (void) this_val; (void) argc; (void) argv;
++    const std::string s = APP->history->canRedo() ? APP->history->getRedoName() : std::string("nothing");
++    if (s != "nothing")
++        APP->history->redo();
++    return JS_NewStringLen(ctx, s.c_str(), s.size());
+ }
+ 
+-bool InputQueue::tryPop(Message* const messageOut, int64_t maxFrame)
++// ---- 注册表 ----
++
++typedef JSValue (*OscJsFn)(JSContext*, JSValueConst, int, JSValueConst*);
++
++static void oscJsRegisterApi(JSContext* ctx, bool writeMode)
+ {
+-    const uint32_t processCounter = internal->pcontext->processCounter;
+-    const bool processCounterChanged = internal->lastProcessCounter != processCounter;
++    JSValue global = JS_GetGlobalObject(ctx);
++    JSValue api = JS_NewObject(ctx);
++
++    struct { const char* name; OscJsFn fn; } readFns[] = {
++        {"modules", jsApiModules},
++        {"getParam", jsApiGetParam},
++        {"ports", jsApiPorts},
++        {"cables", jsApiCables},
++        {"transport", jsApiTransport},
++        {"moduleJson", jsApiModuleJson},
++    };
++    for (const auto& e : readFns)
++        JS_SetPropertyStr(ctx, api, e.name, JS_NewCFunction(ctx, e.fn, e.name, 8));
+ 
+-    if (processCounterChanged)
++    if (writeMode)
+     {
+-        internal->lastBlockFrame = internal->pcontext->engine->getBlockFrame();
+-        internal->lastProcessCounter = processCounter;
++        struct { const char* name; OscJsFn fn; } writeFns[] = {
++            {"setDisplayValue", jsApiSetDisplayValue},
++            {"moduleFromJson", jsApiModuleFromJson},
++            {"addModule", jsApiAddModule},
++            {"cableAdd", jsApiCableAdd},
++            {"undo", jsApiUndo},
++            {"redo", jsApiRedo},
++        };
++        for (const auto& e : writeFns)
++            JS_SetPropertyStr(ctx, api, e.name, JS_NewCFunction(ctx, e.fn, e.name, 8));
++    }
+ 
+-        internal->midiEvents = internal->pcontext->midiEvents;
+-        internal->midiEventsLeft = internal->pcontext->midiEventCount;
++    JS_SetPropertyStr(ctx, global, "cardinal", api);
++    JS_FreeValue(ctx, global);
++}
++
++// ---- 脚本目录与输入 ----
++// ⚠️ liblo string 接收在本 Cardinal 版上确认不通（2026-10-20 实测：echo /
++//   module-add / js-eval 三个 string 输入端点全部无回复，oscArgStrC 两种偏移
++//   读法都救不回——B5 止损案的根因坐实）。⇒ JS 源码改走「脚本文件 + 索引」：
++//   纯数值参数（i），脚本放 CARDINAL_JS_DIR（默认仓库根 js/），可 git 管理
++//   ——比每次传字符串更工程化，李的 Cardinal 工作流本来就是 git diff 资产。
++static std::string oscJsScriptDir()
++{
++    const char* const env = std::getenv("CARDINAL_JS_DIR");
++    if (env != nullptr && env[0] != '\0')
++        return std::string(env);
++    // 默认：仓库根下的 js/（本文件所在仓库的约定目录）
++    return std::string("D:/Cardinal/js");
++}
++
++static std::vector<std::string> oscJsListFiles()
++{
++    std::vector<std::string> files;
++    const std::string dir = oscJsScriptDir();
++    DIR* d = opendir(dir.c_str());
++    if (d == NULL)
++        return files;
++    struct dirent* e;
++    while ((e = readdir(d)) != NULL)
++    {
++        const std::string name(e->d_name);
++        if (name.size() > 3 && name.substr(name.size() - 3) == ".js")
++            files.push_back(name);
+     }
++    closedir(d);
++    std::sort(files.begin(), files.end());
++    return files;
++}
+ 
+-    if (internal->midiEventsLeft == 0 || maxFrame < internal->lastBlockFrame)
++static bool oscJsReadScript(int index1Based, std::string& out)
++{
++    const std::vector<std::string> files = oscJsListFiles();
++    if (index1Based < 1 || index1Based > (int) files.size())
++        return false;
++    FILE* f = fopen((oscJsScriptDir() + "/" + files[index1Based - 1]).c_str(), "rb");
++    if (f == NULL)
+         return false;
++    char buf[8192];
++    size_t n;
++    while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
++        out.append(buf, n);
++    fclose(f);
++    return true;
++}
+ 
+-    const uint32_t frame = maxFrame - internal->lastBlockFrame;
++// /osc-js-run "i" = 脚本索引（1-based，见 /osc-js-list）。源码里把结果赋给
++// globalThis.result；eval 后把 result 字符串化回传。
++static int osc_js_run_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_js_run_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
+ 
+-    if (frame > internal->midiEvents->frame)
+-        return false;
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
+ 
+-    const CardinalDISTRHO::MidiEvent& midiEvent(*internal->midiEvents);
++    // ---- 模式门禁（默认 off；三级 env）----
++    const char* const modeEnv = std::getenv("CARDINAL_JS_MODE");
++    const std::string mode = modeEnv != nullptr ? std::string(modeEnv) : std::string("off");
++    if (mode != "read" && mode != "write")
++    {
++        cardinalOscReply(source, server, "js",
++                         "disabled: set CARDINAL_JS_MODE=read or =write to enable",
++                         "err:E_DISABLED");
++        return 0;
++    }
+ 
+-    const uint8_t* data;
+-    if (midiEvent.size > CardinalDISTRHO::MidiEvent::kDataSize)
++    // ---- 读脚本文件（索引制，避开 liblo string 通路）----
++    std::string src;
++    if (!oscJsReadScript(argv[0]->i, src))
+     {
+-        data = midiEvent.dataExt;
+-        messageOut->bytes.resize(midiEvent.size);
++        cardinalOscReply(source, server, "js",
++                         "no-script: bad index (see /osc-js-list)",
++                         "err:E_BAD_ARGS");
++        return 0;
++    }
++
++    // ---- 诊断回显（定位期临时；通了即删）----
++    {
++        const std::string diag = "mode=" + mode
++            + " src_len=" + std::to_string(src.size())
++            + " src_head=" + src.substr(0, 48);
++        cardinalOscReply(source, server, "js-diag", diag, "ok");
++    }
++
++    // ---- runtime（不初始化 libc ⇒ 无 std/os）+ 墙钟执行预算 ----
++    JSRuntime* const rt = JS_NewRuntime();
++    JSContext* const ctx = JS_NewContext(rt);
++    if (rt == NULL || ctx == NULL)
++    {
++        cardinalOscReply(source, server, "js", "runtime-failed", "err:E_INTERNAL");
++        if (ctx) JS_FreeContext(ctx);
++        if (rt) JS_FreeRuntime(rt);
++        return 0;
++    }
++    // 墙钟上限默认 2000ms（CARDINAL_JS_BUDGET_MS 可覆盖）；兜底 counter 上限
++    // 100 万次 handler 调用 ≈ 100 亿条指令，正常路径永远碰不到。
++    double budgetMs = 2000.0;
++    if (const char* const envMs = std::getenv("CARDINAL_JS_BUDGET_MS"))
++    {
++        const double v = std::atof(envMs);
++        if (v > 0.0)
++            budgetMs = v;
++    }
++    OscJsBudget budget = {clock(), budgetMs, 0, 1000000};
++    JS_SetInterruptHandler(rt, oscJsInterrupt, &budget);
++
++    g_osc_js_self = self;
++    oscJsRegisterApi(ctx, mode == "write");
++
++    // ---- eval（包 IIFE，结果落 globalThis.result）----
++    const std::string wrapped = std::string("globalThis.result = (function() {\n")
++        + src + "\n})();";
++    std::string payload;
++    JSValue r = JS_Eval(ctx, wrapped.c_str(), wrapped.size(), "<osc-js>", JS_EVAL_TYPE_GLOBAL);
++    const double elapsedMs = (double)(clock() - budget.start) * 1000.0 / (double) CLOCKS_PER_SEC;
++    if (JS_IsException(r))
++    {
++        JSValue exc = JS_GetException(ctx);
++        const char* msg = JS_ToCString(ctx, exc);
++        // 预算打满的异常在 quickjs 里是 "interrupted"；如实标成 budget-exceeded
++        // 并附实测耗时，让调用方一眼分得清「脚本写错」和「脚本跑太久」。
++        const bool overBudget = elapsedMs >= budget.limitMs;
++        payload = std::string(overBudget ? "budget-exceeded ms=" : "error: ");
++        if (!overBudget)
++            payload += msg != nullptr ? msg : "(unknown)";
++        else
++        {
++            char b[32] = {};
++            std::snprintf(b, sizeof(b), "%.0f", elapsedMs);
++            payload += b;
++        }
++        if (msg != nullptr)
++            JS_FreeCString(ctx, msg);
++        JS_FreeValue(ctx, exc);
+     }
+     else
+     {
+-        data = midiEvent.data;
++        JS_FreeValue(ctx, r);
++        JSValue global = JS_GetGlobalObject(ctx);
++        JSValue res = JS_GetPropertyStr(ctx, global, "result");
++        const char* s = JS_ToCString(ctx, res);
++        payload = s != nullptr ? std::string(s) : std::string("undefined");
++        if (s != nullptr)
++            JS_FreeCString(ctx, s);
++        JS_FreeValue(ctx, res);
++        JS_FreeValue(ctx, global);
+     }
+ 
+-    messageOut->frame = frame;
+-    std::memcpy(messageOut->bytes.data(), data, midiEvent.size);
++    g_osc_js_self = NULL;
++    JS_FreeContext(ctx);
++    JS_FreeRuntime(rt);
+ 
+-    ++internal->midiEvents;
+-    --internal->midiEventsLeft;
+-    return true;
++    cardinalOscReply(source, server, "js", payload, "ok");
++    return 0;
+ }
+ 
+-json_t* InputQueue::toJson() const
++// /osc-js-list 无参 —— 列脚本目录（索引 1-based，按文件名排序）
++static int osc_js_list_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
+ {
+-    return nullptr;
+-}
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
+ 
+-void InputQueue::fromJson(json_t* rootJ)
+-{
+-}
++    std::string out;
++    const std::vector<std::string> files = oscJsListFiles();
++    for (size_t i = 0; i < files.size(); ++i)
++    {
++        if (!out.empty())
++            out += ",";
++        out += std::to_string(i + 1) + ":" + files[i];
++    }
++    if (out.empty())
++        out = "none";
+ 
++    cardinalOscReply(source, server, "js-list", out, "ok");
++    return 0;
+ }
+-}
+-
+-// -----------------------------------------------------------------------------------------------------------
+ 
+-START_NAMESPACE_DISTRHO
++// ==== CARDINAL-MCP-C-GROUP-END ====
+ 
+-// -----------------------------------------------------------------------------------------------------------
+ 
+-#ifdef HAVE_LIBLO
+-static void osc_error_handler(int num, const char* msg, const char* path)
+-{
+-    d_stderr("Cardinal OSC Error: code: %i, msg: \"%s\", path: \"%s\")", num, msg, path);
+-}
+ 
+ static int osc_fallback_handler(const char* const path, const char* const types, lo_arg**, int, lo_message, void*)
+ {
+@@ -388,6 +2196,8 @@ static int osc_load_handler(const char*, const char* types, lo_arg** argv, int a
+     DISTRHO_SAFE_ASSERT_RETURN(blob != nullptr, 0);
+ 
+     bool ok = false;
++    std::string diag; // load diagnostics (D2): json warnings or unarchive exception
++    std::string warn; // D2: warningLog snapshot from Manager::fromJson
+ 
+     if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+     {
+@@ -403,11 +2213,17 @@ static int osc_load_handler(const char*, const char* types, lo_arg** argv, int a
+         rack::system::createDirectories(context->patch->autosavePath);
+         try {
+             rack::system::unarchiveToDirectory(data, context->patch->autosavePath);
++            rack::settings::oscLoadActive = true; // D2: no GUI dialog, keep warningLog
+             context->patch->loadAutosave();
++            rack::settings::oscLoadActive = false;
++            warn = context->patch->warningLog; // take it before anything else
++            context->patch->warningLog = "";
+             ok = true;
+         }
+         catch (rack::Exception& e) {
++            rack::settings::oscLoadActive = false;
+             WARN("%s", e.what());
++            diag = e.what();
+         }
+ 
+        #ifdef CARDINAL_INIT_OSC_THREAD
+@@ -415,9 +2231,23 @@ static int osc_load_handler(const char*, const char* types, lo_arg** argv, int a
+        #endif
+     }
+ 
++    std::string payload;
++    if (ok) {
++        // D2: 「加载诊断 → 静音诊断」闭环 —— warningLog 已在 try 内取走并清空。
++        if (warn.empty())
++            payload = "ok";
++        else {
++            if (warn.size() > 400)
++                warn = warn.substr(0, 400) + "...trunc";
++            payload = "warn " + warn;
++        }
++    } else {
++        payload = diag.empty() ? "fail" : "fail " + (diag.size() > 400 ? diag.substr(0, 400) + "...trunc" : diag);
++    }
++
+     const lo_address source = lo_message_get_source(m);
+     const lo_server server = static_cast<Initializer*>(self)->oscServer;
+-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "load", ok ? "ok" : "fail");
++    cardinalOscReply(source, server, "load", payload, ok ? "ok" : "err:E_INTERNAL");
+     return 0;
+ }
+ 
+@@ -481,36 +2311,31 @@ static int osc_host_param_handler(const char*, const char* types, lo_arg** argv,
+     return 0;
+ }
+ 
+-# ifdef CARDINAL_INIT_OSC_THREAD
+-static int osc_screenshot_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++static int osc_screenshot_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
+ {
+     d_debug("osc_screenshot_handler()");
+-    DISTRHO_SAFE_ASSERT_RETURN(argc == 1, 0);
+-    DISTRHO_SAFE_ASSERT_RETURN(types != nullptr && types[0] == 'b', 0);
+-
+-    const int32_t size = argv[0]->blob.size;
+-    DISTRHO_SAFE_ASSERT_RETURN(size > 4, 0);
+-
+-    const uint8_t* const blob = (uint8_t*)(&argv[0]->blob.data);
+-    DISTRHO_SAFE_ASSERT_RETURN(blob != nullptr, 0);
+-
+-    bool ok = false;
++    std::string result;
++    const char* status = "ok";
+ 
+     if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)
+     {
+-        if (char* const screenshot = String::asBase64(blob, size).getAndReleaseBuffer())
+-        {
+-            ok = plugin->updateStateValue("screenshot", screenshot);
+-            std::free(screenshot);
+-        }
++        CardinalPluginContext* const context = plugin->context;
++        // D1: full-size PNG to the autosave dir (same folder MCP already finds
++        // for read_live). OSC handler returns the absolute path; MCP polls the
++        // file — thus no base64 over the OSC MTU.
++        const std::string path = rack::system::join(context->patch->autosavePath, "screenshot.png");
++        rack::window::generateScreenshotToFile(path);
++        result = path;
++    } else {
++        result = "fail";
++        status = "err:E_INTERNAL";
+     }
+ 
+     const lo_address source = lo_message_get_source(m);
+     const lo_server server = static_cast<Initializer*>(self)->oscServer;
+-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "screenshot", ok ? "ok" : "fail");
++    cardinalOscReply(source, server, "screenshot", result, status);
+     return 0;
+ }
+-# endif
+ #endif
+ 
+ // -----------------------------------------------------------------------------------------------------------
+@@ -785,6 +2610,70 @@ void Initializer::loadSettings(const bool isRealInstance)
+ }
+ 
+ #ifdef HAVE_LIBLO
++
++// ==== CARDINAL-MCP-E3-METHOD-REGISTRY-BEGIN ====
++// E3 (2026-10-21): OSC 端点注册表 —— 单一真源。
++//
++// 之前 thread 版与 plain 版各写一遍完整端点表，加端点要记得改两处，
++// 漏一处就静默失效（编译过、运行时不报错、端点就是不存在）。
++// 现在端点表只写这一份，两个薄封装各自展开成对应的 liblo 入口 ——
++// 两个入口后三个参数类型一致、只有第一个不同 ⇒ 零类型强转。
++//
++// 用法：定义 REG(path, types, handler) 宏 → 展开 CARDINAL_OSC_METHODS(REG)
++//       → #undef REG。REG 负责展开成具体的 add_method 调用。
++#define CARDINAL_OSC_METHODS(REG) \
++    REG("/hello", "", osc_hello_handler) \
++    REG("/host-param", "if", osc_host_param_handler) \
++    REG("/load", "b", osc_load_handler) \
++    REG("/param", "hif", osc_param_handler) \
++    REG("/modules", "", osc_modules_handler) \
++    REG("/modules-page", "ii", osc_modules_page_handler) \
++    REG("/param-get", "hi", osc_param_get_handler) \
++    REG("/ports", "h", osc_ports_handler) \
++    REG("/signal", "", osc_signal_handler) \
++    REG("/light", "hi", osc_light_handler) \
++    REG("/build-info", "", osc_build_info_handler) \
++    REG("/cables", "", osc_cables_all_handler) \
++    REG("/cables", "h", osc_cables_one_handler) \
++    REG("/transport", "", osc_transport_handler) \
++    REG("/engine-info", "", osc_engine_info_handler) \
++    REG("/plugins", "", osc_plugins_list_handler) \
++    REG("/param-set-by-display", "hif", osc_param_set_display_handler) \
++    REG("/cable-add", "hihi", osc_cable_add_handler) \
++    REG("/cable-remove", "h", osc_cable_remove_handler) \
++    REG("/undo", "", osc_undo_handler) \
++    REG("/redo", "", osc_redo_handler) \
++    REG("/module-json", "h", osc_module_json_handler) \
++    REG("/module-remove", "h", osc_module_remove_handler) \
++    REG("/module-move", "hii", osc_module_move_handler) \
++    REG("/midi-out", "iiii", osc_midi_out_handler) \
++    REG("/osc-js-run", "i", osc_js_run_handler) \
++    REG("/osc-js-list", "", osc_js_list_handler) \
++    REG("/screenshot", "", osc_screenshot_handler)
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++static void CardinalCommon_RegisterOscMethodsThread(lo_server_thread const st, void* const self)
++{
++    #define REG(path, types, handler) lo_server_thread_add_method(st, path, types, handler, self);
++    CARDINAL_OSC_METHODS(REG)
++    #undef REG
++
++    // fallback：未匹配路径的兜底（user_data 传 nullptr，与原实现一致）
++    lo_server_thread_add_method(st, nullptr, nullptr, osc_fallback_handler, nullptr);
++}
++#else
++static void CardinalCommon_RegisterOscMethodsPlain(lo_server const s, void* const self)
++{
++    #define REG(path, types, handler) lo_server_add_method(s, path, types, handler, self);
++    CARDINAL_OSC_METHODS(REG)
++    #undef REG
++
++    // fallback：未匹配路径的兜底（user_data 传 nullptr，与原实现一致）
++    lo_server_add_method(s, nullptr, nullptr, osc_fallback_handler, nullptr);
++}
++#endif
++// ==== CARDINAL-MCP-E3-METHOD-REGISTRY-END ====
++
+ bool Initializer::startRemoteServer(const char* const port)
+ {
+    #ifdef CARDINAL_INIT_OSC_THREAD
+@@ -796,12 +2685,7 @@ bool Initializer::startRemoteServer(const char* const port)
+ 
+     oscServer = lo_server_thread_get_server(oscServerThread);
+ 
+-    lo_server_thread_add_method(oscServerThread, "/hello", "", osc_hello_handler, this);
+-    lo_server_thread_add_method(oscServerThread, "/host-param", "if", osc_host_param_handler, this);
+-    lo_server_thread_add_method(oscServerThread, "/load", "b", osc_load_handler, this);
+-    lo_server_thread_add_method(oscServerThread, "/param", "hif", osc_param_handler, this);
+-    lo_server_thread_add_method(oscServerThread, "/screenshot", "b", osc_screenshot_handler, this);
+-    lo_server_thread_add_method(oscServerThread, nullptr, nullptr, osc_fallback_handler, nullptr);
++    CardinalCommon_RegisterOscMethodsThread(oscServerThread, this);
+     lo_server_thread_start(oscServerThread);
+    #else
+     if (oscServer != nullptr)
+@@ -810,11 +2694,7 @@ bool Initializer::startRemoteServer(const char* const port)
+     if ((oscServer = lo_server_new_with_proto(port, LO_UDP, osc_error_handler)) == nullptr)
+         return false;
+ 
+-    lo_server_add_method(oscServer, "/hello", "", osc_hello_handler, this);
+-    lo_server_add_method(oscServer, "/host-param", "if", osc_host_param_handler, this);
+-    lo_server_add_method(oscServer, "/load", "b", osc_load_handler, this);
+-    lo_server_add_method(oscServer, "/param", "hif", osc_param_handler, this);
+-    lo_server_add_method(oscServer, nullptr, nullptr, osc_fallback_handler, nullptr);
++    CardinalCommon_RegisterOscMethodsPlain(oscServer, this);
+    #endif
+ 
+     return true;
+diff --git a/src/CardinalCommon.hpp b/src/CardinalCommon.hpp
+index 31b81b1..05cd3ab 100644
+--- a/src/CardinalCommon.hpp
++++ b/src/CardinalCommon.hpp
+@@ -24,6 +24,7 @@ struct Menu;
+ 
+ namespace window {
+ void generateScreenshot();
++void generateScreenshotToFile(const std::string& path);
+ }
+ 
+ bool isMini();
+diff --git a/src/override/Engine.cpp b/src/override/Engine.cpp
+index ba95f4c..2376568 100644
+--- a/src/override/Engine.cpp
++++ b/src/override/Engine.cpp
+@@ -1257,7 +1257,7 @@ void Engine::fromJson(json_t* rootJ) {
+ 		}
+ 		catch (Exception& e) {
+ 			WARN("Cannot load model: %s", e.what());
+-			// APP->patch->log(e.what());
++			APP->patch->log(e.what()); // D2: keep the diagnostic (was silenced upstream)
+ 			continue;
+ 		}
+ 
+@@ -1286,7 +1286,7 @@ void Engine::fromJson(json_t* rootJ) {
+ 		}
+ 		catch (Exception& e) {
+ 			WARN("Cannot load module: %s", e.what());
+-			// APP->patch->log(e.what());
++			APP->patch->log(e.what()); // D2: keep the diagnostic (was silenced upstream)
+ 			helper->removeCachedModuleWidget(module);
+ 			delete module;
+ 			continue;
+diff --git a/src/override/MenuBar.cpp b/src/override/MenuBar.cpp
+index 77ad6d1..3f37227 100644
+--- a/src/override/MenuBar.cpp
++++ b/src/override/MenuBar.cpp
+@@ -27,6 +27,7 @@
+ 
+ #include <thread>
+ #include <utility>
++#include <cstdlib>
+ 
+ #include <app/MenuBar.hpp>
+ #include <app/TipWindow.hpp>
+@@ -730,6 +731,24 @@ struct ViewButton : MenuButton {
+ struct EngineButton : MenuButton {
+ #ifdef HAVE_LIBLO
+ 	bool remoteServerStarted = false;
++	bool oscAutostartAttempted = false;
++	int  oscAutostartFrames = 0;
++#endif
++
++#ifdef HAVE_LIBLO
++	// OSC remote control autostart: enabled when CARDINAL_OSC_AUTOSTART is unset or != "0",
++	// disabled when explicitly set to "0" (manual menu toggle keeps working).
++	bool oscAutostartEnabled() {
++		const char* const env = std::getenv("CARDINAL_OSC_AUTOSTART");
++		return env == nullptr || env[0] != '0';
++	}
++
++	void startOsc() {
++		CardinalPluginContext* const context = static_cast<CardinalPluginContext*>(APP);
++		CardinalBasePlugin* const plugin = static_cast<CardinalBasePlugin*>(context->plugin);
++		if (plugin != nullptr && plugin->startRemoteServer(CARDINAL_DEFAULT_REMOTE_PORT))
++			remoteServerStarted = true;
++	}
+ #endif
+ 
+ 	void onAction(const ActionEvent& e) override {
+@@ -818,6 +837,19 @@ struct EngineButton : MenuButton {
+ 	void step() override {
+ 		MenuButton::step();
+ 
++		// Autostart after the UI has settled: starting liblo's server thread on
++		// the very first frames races with GL/audio init (observed as a robust
++		// mutex assertion under Wine). Wait ~120 frames (~2 s at 60 fps).
++		if (!oscAutostartAttempted) {
++			++oscAutostartFrames;
++			CardinalPluginContext* const context = static_cast<CardinalPluginContext*>(APP);
++			if (context != nullptr && context->plugin != nullptr && oscAutostartFrames >= 120) {
++				oscAutostartAttempted = true;
++				if (isStandalone() && oscAutostartEnabled())
++					startOsc();
++			}
++		}
++
+ 		if (remoteServerStarted) {
+ 			CardinalPluginContext* const context = static_cast<CardinalPluginContext*>(APP);
+ 			CardinalBasePlugin* const plugin = static_cast<CardinalBasePlugin*>(context->plugin);
+diff --git a/src/override/Window.cpp b/src/override/Window.cpp
+index 6457d04..45b9512 100644
+--- a/src/override/Window.cpp
++++ b/src/override/Window.cpp
+@@ -14,6 +14,7 @@
+  * the License, or (at your option) any later version.
+  */
+ 
++#include <cstdio>
+ #include <map>
+ #include <queue>
+ #include <thread>
+@@ -582,6 +583,15 @@ static void Window__downscaleBitmap(uint8_t* pixels, int& width, int& height) {
+ 	height = targetHeight;
+ }
+ 
++// D1: full-size screenshot dump —— MCP 走「触发 + 落盘 + 回传路径」，绕开 base64 分块
++// 与 340x210 remote 预览压缩。Path 由 OSC handler 经 generateScreenshotToFile 设置。
++static std::string g_screenshotFilePath;
++
++static void Window__writePngDump(void* context, void* data, int size) {
++	if (context != nullptr)
++		std::fwrite(data, 1, size, static_cast<FILE*>(context));
++}
++
+ static void Window__writeImagePNG(void* context, void* data, int size) {
+ 	USE_NAMESPACE_DISTRHO
+ 	CardinalBaseUI* const ui = static_cast<CardinalBaseUI*>(context);
+@@ -730,9 +740,20 @@ void Window::step() {
+ 			const int stride = winWidth * depth;
+ 			uint8_t* const pixelsWithOffset = pixels + (stride * y);
+ #ifdef STBI_WRITE_NO_STDIO
+-			Window__downscaleBitmap(pixelsWithOffset, winWidth, winHeight);
+-			stbi_write_png_to_func(Window__writeImagePNG, internal->ui,
+-			                       winWidth, winHeight, depth, pixelsWithOffset, stride);
++if (!g_screenshotFilePath.empty()) {
++				// D1: full-size PNG (no downscale). MCP polls the returned path.
++				FILE* const f = std::fopen(g_screenshotFilePath.c_str(), "wb");
++				if (f) {
++					stbi_write_png_to_func(Window__writePngDump, f,
++					                       winWidth, winHeight, depth, pixelsWithOffset, stride);
++					std::fclose(f);
++				}
++				g_screenshotFilePath.clear();
++			} else {
++				Window__downscaleBitmap(pixelsWithOffset, winWidth, winHeight);
++				stbi_write_png_to_func(Window__writeImagePNG, internal->ui,
++				                       winWidth, winHeight, depth, pixelsWithOffset, stride);
++			}
+ #else
+ 			stbi_write_png("screenshot.png", winWidth, winHeight, depth, pixelsWithOffset, stride);
+ #endif
+@@ -909,6 +930,15 @@ void generateScreenshot() {
+ #endif
+ }
+ 
++// D1: 全尺寸落盘入口。设置目标路径后触发截图，Window__writePngDump 会把
++// 原始分辨率 PNG 写到该路径（保存分支见上）。
++void generateScreenshotToFile(const std::string& path) {
++	g_screenshotFilePath = path;
++#ifdef CARDINAL_WINDOW_CAN_GENERATE_SCREENSHOTS
++	APP->window->internal->generateScreenshotStep = kScreenshotStepStarted;
++#endif
++}
++
+ 
+ void init() {
+ }

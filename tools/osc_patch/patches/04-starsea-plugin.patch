@@ -1,0 +1,2836 @@
+diff --git a/plugins/Starsea/plugin.json b/plugins/Starsea/plugin.json
+new file mode 100755
+index 0000000..f131d80
+--- /dev/null
++++ b/plugins/Starsea/plugin.json
+@@ -0,0 +1,41 @@
++{
++	"slug": "Starsea",
++	"name": "Starsea",
++	"version": "0.0.1",
++	"license": "GPL-3.0-or-later",
++	"brand": "Starsea",
++	"author": "Li Jiahong",
++	"authorEmail": "",
++	"authorUrl": "",
++	"pluginUrl": "",
++	"manualUrl": "",
++	"sourceUrl": "",
++	"donateUrl": "",
++	"changelogUrl": "",
++	"modules": [
++
++	{
++		"slug": "Starsea-Sketch",
++		"name": "Sketch",
++		"description": "Plugin skeleton module - pipeline verification",
++		"tags": [
++			"Utility"
++		],
++		"keywords": ["skeleton", "test"]
++	},
++	{
++		"slug": "Starsea-MiniArranger",
++		"name": "MiniArranger",
++		"description": "Multi-voice arranger: 4 editable note tracks with per-track V/Oct + gate + velocity outputs",
++		"tags": ["Sequencer"],
++		"keywords": ["sequencer", "arranger", "multi-track", "song", "piano roll"]
++	},
++	{
++		"slug": "Starsea-MiniArrangerExpander",
++		"name": "MiniArranger Expander",
++		"description": "Adds 4 more note tracks to MiniArranger. Holds its own editable data, has its own per-track V/Oct + gate + velocity outputs. Place it to the right of a MiniArranger.",
++		"tags": ["Sequencer", "Expander"],
++		"keywords": ["expander", "sequencer", "arranger", "multi-track", "extra tracks"]
++	}
++	]
++}
+diff --git a/plugins/Starsea/res/MiniArranger.svg b/plugins/Starsea/res/MiniArranger.svg
+new file mode 100755
+index 0000000..fb5e864
+--- /dev/null
++++ b/plugins/Starsea/res/MiniArranger.svg
+@@ -0,0 +1,113 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!-- Starsea / MiniArranger panel - 40HP (203.2mm x 147.3mm = 435px, 29 HP rows)
++     NOTE: nanosvg (used by Rack for panels) does NOT render <text> elements,
++     so every marking here is pure geometry; the lettering is drawn in code
++     by StarseaMiniArrangerWidget::draw(). -->
++<svg xmlns="http://www.w3.org/2000/svg"
++     width="203.20mm"
++     height="147.30mm"
++     viewBox="0 0 203.20 147.30">
++  <rect x="0" y="0" width="203.20" height="147.30" fill="#14171c"/>
++  <rect x="0.75" y="0.75" width="201.70" height="145.80" fill="none" stroke="#2b333d" stroke-width="0.5"/>
++  <rect x="0.75" y="0.75" width="201.70" height="6.5" fill="#2f6f8f"/>
++  <g fill="#cfe8f5">
++    <rect x="7.0" y="2.00" width="14.00" height="0.9"/>
++    <rect x="7.0" y="3.90" width="9.00" height="0.9"/>
++    <rect x="7.0" y="5.80" width="5.00" height="0.9"/>
++  </g>
++  <rect x="7.5" y="13.0" width="56.0" height="132.8" fill="#10141a" stroke="#242c35" stroke-width="0.4"/>
++  <rect x="7.5" y="13.0" width="56.0" height="7.0" fill="#1a2028"/>
++  <rect x="68.0" y="13.0" width="130.0" height="46.0" fill="#10141a" stroke="#242c35" stroke-width="0.4"/>
++  <rect x="68.0" y="60.0" width="130.0" height="32.0" fill="#0f131a" stroke="#242c35" stroke-width="0.4"/>
++  <rect x="68.0" y="93.0" width="130.0" height="52.8" fill="#10141a" stroke="#242c35" stroke-width="0.4"/>
++  <rect x="70.0" y="17.50" width="18.0" height="8.00" fill="#141922"/>
++  <rect x="70.0" y="26.50" width="18.0" height="8.00" fill="#141922"/>
++  <rect x="70.0" y="35.50" width="18.0" height="8.00" fill="#141922"/>
++  <rect x="70.0" y="44.50" width="18.0" height="8.00" fill="#141922"/>
++  <rect x="93.00" y="94.5" width="22.00" height="30.5" fill="#141922"/>
++  <rect x="117.00" y="94.5" width="22.00" height="30.5" fill="#141922"/>
++  <rect x="141.00" y="94.5" width="22.00" height="30.5" fill="#141922"/>
++  <rect x="165.00" y="94.5" width="22.00" height="30.5" fill="#141922"/>
++  <circle cx="14.00" cy="26.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="14.00" cy="26.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="14.00" cy="39.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="14.00" cy="39.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="14.00" cy="52.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="14.00" cy="52.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="14.00" cy="65.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="14.00" cy="65.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="14.00" cy="78.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="14.00" cy="78.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="14.00" cy="91.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="14.00" cy="91.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="14.00" cy="104.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="14.00" cy="104.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="14.00" cy="117.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="14.00" cy="117.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="44.00" cy="26.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="44.00" cy="26.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="44.00" cy="39.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="44.00" cy="39.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="44.00" cy="52.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="44.00" cy="52.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="44.00" cy="65.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="44.00" cy="65.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="44.00" cy="78.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="44.00" cy="78.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <rect x="33.0" y="85.0" width="22.0" height="25.5" fill="#141922"/>
++  <circle cx="44.00" cy="91.00" r="5.0" fill="#0b0e12" stroke="#6a5a33" stroke-width="0.45"/>
++  <circle cx="44.00" cy="91.00" r="3.5" fill="none" stroke="#3a3220" stroke-width="0.3"/>
++  <circle cx="44.00" cy="104.00" r="5.0" fill="#0b0e12" stroke="#6a5a33" stroke-width="0.45"/>
++  <circle cx="44.00" cy="104.00" r="3.5" fill="none" stroke="#3a3220" stroke-width="0.3"/>
++  <circle cx="104.00" cy="96.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="104.00" cy="96.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="104.00" cy="109.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="104.00" cy="109.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="104.00" cy="122.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="104.00" cy="122.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="128.00" cy="96.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="128.00" cy="96.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="128.00" cy="109.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="128.00" cy="109.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="128.00" cy="122.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="128.00" cy="122.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="152.00" cy="96.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="152.00" cy="96.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="152.00" cy="109.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="152.00" cy="109.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="152.00" cy="122.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="152.00" cy="122.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="176.00" cy="96.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="176.00" cy="96.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="176.00" cy="109.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="176.00" cy="109.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="176.00" cy="122.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="176.00" cy="122.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <rect x="76.00" y="16.00" width="6.0" height="11.0" rx="1.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.4"/>
++  <rect x="76.00" y="25.00" width="6.0" height="11.0" rx="1.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.4"/>
++  <rect x="76.00" y="34.00" width="6.0" height="11.0" rx="1.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.4"/>
++  <rect x="76.00" y="43.00" width="6.0" height="11.0" rx="1.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.4"/>
++  <circle cx="76.00" cy="74.00" r="5.6" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="76.00" cy="74.00" r="4.0" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="94.00" cy="74.00" r="5.6" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="94.00" cy="74.00" r="4.0" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="112.00" cy="74.00" r="5.6" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="112.00" cy="74.00" r="4.0" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="140.00" cy="74.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="140.00" cy="74.00" r="3.7" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="157.00" cy="74.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="157.00" cy="74.00" r="3.7" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="174.00" cy="74.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="174.00" cy="74.00" r="3.7" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="191.00" cy="74.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="191.00" cy="74.00" r="3.7" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="158.00" cy="7.0" r="3.2" fill="#0b0e12" stroke="#3a454f" stroke-width="0.45"/>
++  <circle cx="184.00" cy="7.0" r="3.2" fill="#0b0e12" stroke="#3a454f" stroke-width="0.45"/>
++  <circle cx="167.00" cy="7.0" r="2.4" fill="#1b2028" stroke="#3a454f" stroke-width="0.4"/>
++  <circle cx="193.00" cy="7.0" r="2.4" fill="#1b2028" stroke="#3a454f" stroke-width="0.4"/>
++  <g fill="#222932">
++    <rect x="10.0" y="118.00" width="53.0" height="0.55"/>
++    <rect x="10.0" y="121.00" width="53.0" height="0.55"/>
++    <rect x="10.0" y="124.00" width="53.0" height="0.55"/>
++  </g>
++</svg>
+diff --git a/plugins/Starsea/res/MiniArrangerExpander.svg b/plugins/Starsea/res/MiniArrangerExpander.svg
+new file mode 100755
+index 0000000..a73d5a3
+--- /dev/null
++++ b/plugins/Starsea/res/MiniArrangerExpander.svg
+@@ -0,0 +1,70 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!-- Starsea / MiniArrangerExpander panel - 24HP (121.92mm x 128.5mm)
++     NOTE: nanosvg (used by Rack for panels) does NOT render <text> elements,
++     so every marking here is pure geometry; the lettering is drawn in code
++     by StarseaMiniArrangerExpanderWidget::draw(). -->
++<svg xmlns="http://www.w3.org/2000/svg"
++     width="121.92mm"
++     height="128.50mm"
++     viewBox="0 0 121.92 128.50">
++  <rect x="0" y="0" width="121.92" height="128.50" fill="#14171c"/>
++  <rect x="0.75" y="0.75" width="120.42" height="127.00" fill="none" stroke="#2b333d" stroke-width="0.5"/>
++  <rect x="0.75" y="0.75" width="120.42" height="6.5" fill="#2f6f8f"/>
++  <g fill="#cfe8f5">
++    <rect x="5.0" y="2.00" width="12.00" height="0.9"/>
++    <rect x="5.0" y="3.90" width="7.50" height="0.9"/>
++    <rect x="5.0" y="5.80" width="4.00" height="0.9"/>
++  </g>
++  <rect x="6.0" y="20.0" width="64.0" height="72.0" fill="#10141a" stroke="#242c35" stroke-width="0.4"/>
++  <rect x="6.0" y="20.0" width="64.0" height="7.0" fill="#1a2028"/>
++  <rect x="76.0" y="20.0" width="42.0" height="76.0" fill="#0f131a" stroke="#242c35" stroke-width="0.4"/>
++  <rect x="76.0" y="96.0" width="42.0" height="30.0" fill="#10141a" stroke="#242c35" stroke-width="0.4"/>
++  <rect x="14.00" y="31.0" width="12.0" height="58.0" fill="#141922"/>
++  <circle cx="20.00" cy="44.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="20.00" cy="44.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="20.00" cy="60.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="20.00" cy="60.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="20.00" cy="76.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="20.00" cy="76.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <rect x="28.00" y="31.0" width="12.0" height="58.0" fill="#141922"/>
++  <circle cx="34.00" cy="44.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="34.00" cy="44.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="34.00" cy="60.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="34.00" cy="60.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="34.00" cy="76.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="34.00" cy="76.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <rect x="42.00" y="31.0" width="12.0" height="58.0" fill="#141922"/>
++  <circle cx="48.00" cy="44.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="48.00" cy="44.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="48.00" cy="60.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="48.00" cy="60.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="48.00" cy="76.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="48.00" cy="76.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <rect x="56.00" y="31.0" width="12.0" height="58.0" fill="#141922"/>
++  <circle cx="62.00" cy="44.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="62.00" cy="44.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="62.00" cy="60.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="62.00" cy="60.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="62.00" cy="76.00" r="5.0" fill="#0b0e12" stroke="#333d47" stroke-width="0.45"/>
++  <circle cx="62.00" cy="76.00" r="3.5" fill="none" stroke="#222a33" stroke-width="0.3"/>
++  <circle cx="88.00" cy="50.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="88.00" cy="50.00" r="3.7" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="106.00" cy="50.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="106.00" cy="50.00" r="3.7" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="88.00" cy="78.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="88.00" cy="78.00" r="3.7" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="106.00" cy="78.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="106.00" cy="78.00" r="3.7" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="88.00" cy="106.00" r="5.6" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="88.00" cy="106.00" r="4.0" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="106.00" cy="106.00" r="5.6" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="106.00" cy="106.00" r="4.0" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++  <circle cx="36.00" cy="15.00" r="1.8" fill="#1b2028" stroke="#3a454f" stroke-width="0.4"/>
++  <circle cx="60.00" cy="15.00" r="1.8" fill="#1b2028" stroke="#3a454f" stroke-width="0.4"/>
++  <circle cx="84.00" cy="15.00" r="1.8" fill="#1b2028" stroke="#3a454f" stroke-width="0.4"/>
++  <g fill="#222932">
++    <rect x="8.0" y="112.00" width="60.0" height="0.55"/>
++    <rect x="8.0" y="114.60" width="60.0" height="0.55"/>
++    <rect x="8.0" y="117.20" width="60.0" height="0.55"/>
++  </g>
++</svg>
+diff --git a/plugins/Starsea/res/Sketch.svg b/plugins/Starsea/res/Sketch.svg
+new file mode 100755
+index 0000000..45847d9
+--- /dev/null
++++ b/plugins/Starsea/res/Sketch.svg
+@@ -0,0 +1,44 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!-- Starsea / Sketch panel - 9HP
++     NOTE: nanosvg (used by Rack for panels) does NOT render <text> elements,
++     so every marking here is pure geometry. -->
++<svg xmlns="http://www.w3.org/2000/svg"
++     width="45.72mm"
++     height="128.5mm"
++     viewBox="0 0 45.72 128.5">
++
++  <!-- panel body -->
++  <rect x="0" y="0" width="45.72" height="128.5" fill="#14171c"/>
++  <rect x="0.75" y="0.75" width="44.22" height="127" fill="none" stroke="#2b333d" stroke-width="0.5"/>
++
++  <!-- top accent band -->
++  <rect x="0.75" y="0.75" width="44.22" height="6.5" fill="#2f6f8f"/>
++
++  <!-- title mark: three bars (evokes a step grid) -->
++  <g fill="#7fb6cf">
++    <rect x="14.86" y="11.0" width="16.0" height="1.1"/>
++    <rect x="17.86" y="13.6" width="10.0" height="1.1"/>
++    <rect x="20.36" y="16.2" width="5.0" height="1.1"/>
++  </g>
++
++  <!-- knob footprint -->
++  <circle cx="22.86" cy="38.0" r="6.9" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="22.86" cy="38.0" r="5.3" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++
++  <!-- level light socket -->
++  <circle cx="22.86" cy="60.0" r="2.6" fill="#1b2028" stroke="#3a454f" stroke-width="0.45"/>
++
++  <!-- divider -->
++  <rect x="6.0" y="72.0" width="33.72" height="0.35" fill="#2b333d"/>
++
++  <!-- port sockets: input / output -->
++  <circle cx="14.0" cy="95.0" r="5.0" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++  <circle cx="31.0" cy="95.0" r="5.0" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++
++  <!-- bottom vent lines -->
++  <g fill="#222932">
++    <rect x="9.0" y="112.0" width="27.72" height="0.7"/>
++    <rect x="9.0" y="115.0" width="27.72" height="0.7"/>
++    <rect x="9.0" y="118.0" width="27.72" height="0.7"/>
++  </g>
++</svg>
+diff --git a/plugins/Starsea/src/ArrangerData.hpp b/plugins/Starsea/src/ArrangerData.hpp
+new file mode 100755
+index 0000000..a88d531
+--- /dev/null
++++ b/plugins/Starsea/src/ArrangerData.hpp
+@@ -0,0 +1,461 @@
++/*
++ * Starsea plugin for Cardinal
++ * MiniArranger - data model
++ *
++ * 设计要点（2026-09-21 拍板）：
++ *  - 一个模块内部装 N 条独立声部（多轨），不拆成两块
++ *  - 主模块自带 4 轨；扩展器各持有自己那几轨的数据
++ *    （所以「拔掉扩展器」= 它的轨跟着走，主模块不受影响）
++ *  - 每个音符带「时长」字段 —— 现成 rcm-pianoroll 缺这个
++ *  - CLOCK / RESET / RUN / RECORD 的语义照抄 rcm-pianoroll
++ *  - 内部时间单位 = 格（step），导出 Portable Sequence 时折算成
++ *    「1.0 = 一个四分音符」的浮点，可以直接喂给 Aria / Impromptu 的音序器
++ *
++ * 编辑语法（照抄 CVfunk/Arrange 的「旋钮 = 当前步」范式，见 PROJECT2-SPEC §14.3 #1）：
++ *   面板上不画 N x M 网格；只画「当前步」，步一变就把那一列的值灌进旋钮，
++ *   你一拧旋钮，值就写回那一列。竞态由 isEditing 标志挡（在 Module 里）。
++ *
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ */
++
++#pragma once
++
++#include "plugin.hpp"
++
++#include <algorithm>
++#include <string>
++#include <vector>
++
++namespace StarseaArranger {
++
++// ---------------------------------------------------------------------------
++// 常量
++// ---------------------------------------------------------------------------
++static const int MA_TRACKS            = 4;   // 主模块自带轨数（= 面板上 4 列输出）
++static const int MA_MAX_MEASURES      = 64;  // 每轨最长小节数
++static const int MA_STEPS_PER_MEASURE = 16;  // 4/4 下每小节 16 格（4 拍 x 4 格）
++static const int MA_MAX_LENGTH        = 16;  // 单个音符最长 16 格（= 一小节）
++static const int MA_PITCH_MIN         = 12;
++static const int MA_PITCH_MAX         = 108;
++
++// 编辑层：一次只编辑一个字段（照抄 CVfunk 的分层思路，见 §14.3 #9）
++enum MaLayer {
++	MA_LAYER_PITCH = 0,
++	MA_LAYER_LENGTH,
++	MA_LAYER_VELOCITY,
++	MA_NUM_LAYERS
++};
++
++// ---------------------------------------------------------------------------
++// 一个音符
++//   step     : 起始格，从 0 起
++//   length   : 持续几格（>= 1）—— 这就是现成件缺的那个字段
++//   pitch    : MIDI 音高 0..127（输出时转 V/Oct：(pitch - 60) / 12）
++//   velocity : 0..1（导出 Portable Sequence 时 x10）
++// ---------------------------------------------------------------------------
++struct MaNote {
++	int   step     = 0;
++	int   length   = 1;
++	int   pitch    = 60;
++	float velocity = 0.8f;
++
++	bool operator<(const MaNote& other) const {
++		if (step != other.step)
++			return step < other.step;
++		return pitch < other.pitch;
++	}
++
++	void clampValues() {
++		if (step < 0) step = 0;
++		if (length < 1) length = 1;
++		if (length > MA_MAX_LENGTH) length = MA_MAX_LENGTH;
++		if (pitch < MA_PITCH_MIN) pitch = MA_PITCH_MIN;
++		if (pitch > MA_PITCH_MAX) pitch = MA_PITCH_MAX;
++		if (velocity < 0.f) velocity = 0.f;
++		if (velocity > 1.f) velocity = 1.f;
++	}
++
++	bool soundingAt(const int s) const {
++		return (s >= step) && (s < step + length);
++	}
++
++	json_t* toJson() const {
++		json_t* const o = json_object();
++		json_object_set_new(o, "step",     json_integer(step));
++		json_object_set_new(o, "length",   json_integer(length));
++		json_object_set_new(o, "pitch",    json_integer(pitch));
++		json_object_set_new(o, "velocity", json_real(velocity));
++		return o;
++	}
++
++	static MaNote fromJson(json_t* const o) {
++		MaNote n;
++		if (o == nullptr)
++			return n;
++
++		json_t* j = json_object_get(o, "step");
++		if (j != nullptr) n.step = int(json_integer_value(j));
++		j = json_object_get(o, "length");
++		if (j != nullptr) n.length = int(json_integer_value(j));
++		j = json_object_get(o, "pitch");
++		if (j != nullptr) n.pitch = int(json_integer_value(j));
++		j = json_object_get(o, "velocity");
++		if (j != nullptr) n.velocity = float(json_real_value(j));
++
++		n.clampValues();
++		return n;
++	}
++};
++
++// ---------------------------------------------------------------------------
++// 一条轨 = 一个声部（鼓 / 贝斯 / 琴 / 弦乐 ...）
++// ---------------------------------------------------------------------------
++struct MaTrack {
++	std::string         label;      // 显示名，例如 "Drums"
++	bool                mute     = false;
++	int                 measures = 4;   // 本轨长度（小节数）
++	std::vector<MaNote> notes;          // 始终按 step 排序
++
++	MaTrack() {}
++
++	int maxSteps() const {
++		int m = measures;
++		if (m < 1) m = 1;
++		if (m > MA_MAX_MEASURES) m = MA_MAX_MEASURES;
++		return m * MA_STEPS_PER_MEASURE;
++	}
++
++	void sortNotes() {
++		std::stable_sort(notes.begin(), notes.end());
++	}
++
++	// --- 查询 -----------------------------------------------------------
++	// 在 s 处「正在响」的音符下标（含跨步延音）；没有则 -1。
++	// 列表已排序，从后往前扫，取最后一个开始的（= 最新的）。
++	int indexSounding(const int s) const {
++		int found = -1;
++		for (int i = int(notes.size()) - 1; i >= 0; --i) {
++			if (notes[i].soundingAt(s)) {
++				found = i;
++				break;
++			}
++		}
++		return found;
++	}
++
++	// --- 编辑 -----------------------------------------------------------
++	// 删掉所有覆盖 s 的音符（录制新的之前先清干净，避免叠音）
++	void clearAt(const int s) {
++		for (int i = int(notes.size()) - 1; i >= 0; --i) {
++			if (notes[i].soundingAt(s))
++				notes.erase(notes.begin() + i);
++		}
++	}
++
++	// 取 s 处的音符下标；没有就造一个（用于「拧旋钮即创建」）
++	int ensureNoteAt(const int s, const int defaultPitch) {
++		int idx = indexSounding(s);
++		if (idx >= 0)
++			return idx;
++
++		MaNote n;
++		n.step   = s;
++		n.length = 1;
++		n.pitch  = defaultPitch;
++		notes.push_back(n);
++		sortNotes();
++
++		// 重新定位（排序后下标会变）
++		for (size_t i = 0; i < notes.size(); ++i) {
++			if (notes[i].step == s) {
++				idx = int(i);
++				break;
++			}
++		}
++		return idx;
++	}
++
++	void pushNote(const MaNote& note) {
++		notes.push_back(note);
++	}
++
++	// --- 存取 -----------------------------------------------------------
++	json_t* toJson() const {
++		json_t* const t = json_object();
++		json_object_set_new(t, "label",    json_string(label.c_str()));
++		json_object_set_new(t, "mute",     json_boolean(mute));
++		json_object_set_new(t, "measures", json_integer(measures));
++
++		json_t* const arr = json_array();
++		for (size_t i = 0; i < notes.size(); ++i)
++			json_array_append_new(arr, notes[i].toJson());
++		json_object_set_new(t, "notes", arr);
++		return t;
++	}
++
++	void fromJson(json_t* const t) {
++		if (t == nullptr)
++			return;
++
++		json_t* j = json_object_get(t, "label");
++		if (j != nullptr) label = json_string_value(j);
++		j = json_object_get(t, "mute");
++		if (j != nullptr) mute = json_is_true(j);
++		j = json_object_get(t, "measures");
++		if (j != nullptr) measures = int(json_integer_value(j));
++
++		notes.clear();
++		json_t* const arr = json_object_get(t, "notes");
++		if (arr != nullptr) {
++			size_t idx;
++			json_t* n;
++			json_array_foreach(arr, idx, n)
++				notes.push_back(MaNote::fromJson(n));
++		}
++		sortNotes();
++	}
++};
++
++// ---------------------------------------------------------------------------
++// 一台模块持有的全部轨
++//   主模块 = 一份 MaUnit（4 轨）；每块扩展器各有一份自己的 MaUnit
++// ---------------------------------------------------------------------------
++struct MaUnit {
++	MaTrack tracks[MA_TRACKS];
++	int     tracksUsed      = MA_TRACKS;  // 扩展器可以只填前 N 条
++	int     editTrack       = 0;          // 当前编辑 / 录制轨
++	float   stepsPerQuarter = 4.f;        // 每四分音符几格（16 分 = 4）
++
++	MaUnit() { reset(); }
++
++	void reset() {
++		for (int i = 0; i < MA_TRACKS; ++i) {
++			tracks[i] = MaTrack();
++			tracks[i].label = string::f("Track %d", i + 1);
++		}
++		tracksUsed      = MA_TRACKS;
++		editTrack       = 0;
++		stepsPerQuarter = 4.f;
++	}
++
++	// --- 全局查询 -------------------------------------------------------
++	int totalNotes() const {
++		int n = 0;
++		for (int i = 0; i < MA_TRACKS; ++i)
++			n += int(tracks[i].notes.size());
++		return n;
++	}
++
++	// 整首歌的长度 = 最长那条轨（也是走带一圈的格数）
++	int songSteps() const {
++		int m = 1;
++		for (int i = 0; i < MA_TRACKS; ++i)
++			if (tracks[i].measures > m)
++				m = tracks[i].measures;
++		if (m < 1) m = 1;
++		if (m > MA_MAX_MEASURES) m = MA_MAX_MEASURES;
++		return m * MA_STEPS_PER_MEASURE;
++	}
++
++	int longestMeasures() const { return songSteps() / MA_STEPS_PER_MEASURE; }
++
++	void clearAll() {
++		for (int i = 0; i < MA_TRACKS; ++i)
++			tracks[i].notes.clear();
++	}
++
++	// 回灌 / 写回用的统一入口：读当前步某轨某层的值（0..1 归一化）
++	float readLayerNorm(const int track, const int layer, const int step) const {
++		if (track < 0 || track >= MA_TRACKS)
++			return 0.f;
++
++		const int idx = tracks[track].indexSounding(step);
++		if (idx < 0)
++			return 0.f;   // 没有音符 → 0（旋钮拧到 0 位）
++
++		const MaNote& n = tracks[track].notes[size_t(idx)];
++		switch (layer) {
++			case MA_LAYER_PITCH:
++				return float(n.pitch - MA_PITCH_MIN) / float(MA_PITCH_MAX - MA_PITCH_MIN);
++			case MA_LAYER_LENGTH:
++				return float(n.length - 1) / float(MA_MAX_LENGTH - 1);
++			case MA_LAYER_VELOCITY:
++			default:
++				return n.velocity;
++		}
++	}
++
++	// 写回：把归一化值写进当前步某轨某层（没有音符就创建一个）
++	void writeLayerNorm(const int track, const int layer, const int step,
++	                    const float norm, const int defaultPitch) {
++		if (track < 0 || track >= MA_TRACKS)
++			return;
++
++		const float v = (norm < 0.f) ? 0.f : ((norm > 1.f) ? 1.f : norm);
++		const int idx = tracks[track].ensureNoteAt(step, defaultPitch);
++		if (idx < 0)
++			return;
++
++		MaNote& n = tracks[track].notes[size_t(idx)];
++		switch (layer) {
++			case MA_LAYER_PITCH:
++				n.pitch = MA_PITCH_MIN + int(std::round(v * float(MA_PITCH_MAX - MA_PITCH_MIN)));
++				break;
++			case MA_LAYER_LENGTH:
++				n.length = 1 + int(std::round(v * float(MA_MAX_LENGTH - 1)));
++				break;
++			case MA_LAYER_VELOCITY:
++			default:
++				n.velocity = v;
++				break;
++		}
++		n.clampValues();
++	}
++
++	// --- 存取 -----------------------------------------------------------
++	json_t* toJson() const {
++		json_t* const root = json_object();
++		json_object_set_new(root, "editTrack",       json_integer(editTrack));
++		json_object_set_new(root, "stepsPerQuarter", json_real(stepsPerQuarter));
++
++		json_t* const arr = json_array();
++		for (int i = 0; i < MA_TRACKS; ++i)
++			json_array_append_new(arr, tracks[i].toJson());
++		json_object_set_new(root, "tracks", arr);
++		return root;
++	}
++
++	void fromJson(json_t* const root) {
++		if (root == nullptr)
++			return;
++
++		json_t* j = json_object_get(root, "editTrack");
++		if (j != nullptr) editTrack = int(json_integer_value(j));
++		j = json_object_get(root, "stepsPerQuarter");
++		if (j != nullptr) stepsPerQuarter = float(json_real_value(j));
++
++		json_t* const arr = json_object_get(root, "tracks");
++		if (arr != nullptr) {
++			size_t idx;
++			json_t* t;
++			json_array_foreach(arr, idx, t) {
++				if (idx < size_t(MA_TRACKS))
++					tracks[idx].fromJson(t);
++			}
++		}
++
++		if (editTrack < 0) editTrack = 0;
++		if (editTrack >= MA_TRACKS) editTrack = MA_TRACKS - 1;
++	}
++};
++
++// ---------------------------------------------------------------------------
++// 小工具：面板要显示音名（CVfunk 的做法，见 §14.3 #11）
++// ---------------------------------------------------------------------------
++inline std::string noteNameOf(const int pitch) {
++	static const char* names[12] = {"C", "C#", "D", "D#", "E", "F",
++	                                "F#", "G", "G#", "A", "A#", "B"};
++	int p = pitch;
++	if (p < 0) p = 0;
++	const int oct  = p / 12 - 1;
++	const int semi = p % 12;
++	return string::f("%s%d", names[semi], oct);
++}
++
++// ---------------------------------------------------------------------------
++// UI 只读快照
++//   为什么需要：面板要画总览、要导出剪贴板，都得读「音符列表」，而音符列表是
++//   std::vector —— 音频线程在改。跨线程直接读 vector 是未定义行为（重新分配时
++//   可能撞上野指针），所以音频线程在数据变化时把音符拷进这块**定长 POD 数组**，
++//   UI 线程只读它。代价：每轨最多快照 MA_MAX_NOTES 个音符，超出的不显示也不导出。
++// ---------------------------------------------------------------------------
++static const int MA_MAX_NOTES = 512;
++
++struct MaSnapNote {
++	int16_t step     = 0;
++	int16_t length   = 1;
++	int16_t pitch    = 60;
++	float   velocity = 0.8f;
++};
++
++// ---------------------------------------------------------------------------
++// 主模块 <-> 扩展器 的消息协议
++//
++// Rack 的扩展器是「双缓冲指针交换」：两边各准备一块 float 数组，写完置
++// messageFlipRequested，引擎在时间步末尾把 producer / consumer 换过来。
++// 零拷贝，但有 **1 个时间步的延迟**（不是 1 个采样的延迟）。
++//
++// 四条硬约束：
++//   1. 两边数组长度必须一致 —— 对方会直接往「我的 producerMessage」那块内存写
++//   2. 延迟是「时间步」级的，所以步号这类离散量必须显式传过去，不能靠
++//      「把时钟边沿传过去、对方自己步进」—— 边沿会在时间步里被吞掉
++//   3. 不缓存对面的指针（Rack 2.4.1 删邻居模块时 onExpanderChange 不触发，
++//      缓存下来的指针会变野指针，见 PROJECT2-SPEC 11.3）
++//   4. 不走「扩展器转发时钟」这条路 —— 走带状态由主模块算好直接发
++// ---------------------------------------------------------------------------
++static const int MA_MSG_EVENTS    = 16;  // 一个时间步内最多带几条键盘事件
++static const int MA_MSG_EV_STRIDE = 5;   // 每条事件占几个 float
++static const int MA_MSG_SIZE      = 8 + MA_MSG_EVENTS * MA_MSG_EV_STRIDE;
++
++enum MaMsgIndex {
++	MA_MSG_STEP       = 0,  // 主模块当前步（扩展器直接跟随，不自己步进）
++	MA_MSG_LOOP       = 1,  // 一圈多少步
++	MA_MSG_RUN        = 2,  // 走带中
++	MA_MSG_REC        = 3,  // 录音中
++	MA_MSG_NCHAN      = 4,  // 键盘 VOCT 的声道数（复音阶梯用）
++	MA_MSG_EVCOUNT    = 5,  // 本次带了几条事件
++	MA_MSG_TOTALNOTES = 6,  // 扩展器回传：我这边有多少音符
++	MA_MSG_RESERVED   = 7,
++	MA_MSG_EV_BASE    = 8   // 事件区起点
++};
++
++enum MaMsgEventType {
++	MA_EV_NONE     = 0,
++	MA_EV_NOTE_ON  = 1,  // step = 起始步；pitch / velocity 有意义
++	MA_EV_NOTE_OFF = 2   // step = 结束步（不含）；length = step - onStep
++};
++
++// ---------------------------------------------------------------------------
++// 共用小部件：智能旋钮
++//   拖拽时置 isEditing 标志，告诉 DSP「手正在拧，别用回灌覆盖我」。
++//   从 ParamQuantity 反查模块与索引，所以接哪个旋钮都不用额外传参。
++//   主模块与扩展器共用本模板，靠 ModuleT 区分（两者的 VALUE1_PARAM 与
++//   isEditing 命名一致，这是刻意的）。
++// ---------------------------------------------------------------------------
++template <typename BaseKnob, typename ModuleT>
++struct StarseaSmartKnob : BaseKnob {
++	using BaseKnob::BaseKnob;
++
++	ModuleT* targetModule() {
++		ParamQuantity* const pq = this->getParamQuantity();
++		if (pq == nullptr)
++			return nullptr;
++		return dynamic_cast<ModuleT*>(pq->module);
++	}
++
++	int targetIndex() {
++		ParamQuantity* const pq = this->getParamQuantity();
++		if (pq == nullptr)
++			return -1;
++		const int idx = pq->paramId - ModuleT::VALUE1_PARAM;
++		return (idx >= 0 && idx < MA_TRACKS) ? idx : -1;
++	}
++
++	void onDragStart(const event::DragStart& e) override {
++		ModuleT* const m = targetModule();
++		const int idx = targetIndex();
++		if (m != nullptr && idx >= 0)
++			m->isEditing[idx].store(true);
++		BaseKnob::onDragStart(e);
++	}
++
++	void onDragEnd(const event::DragEnd& e) override {
++		ModuleT* const m = targetModule();
++		const int idx = targetIndex();
++		if (m != nullptr && idx >= 0)
++			m->isEditing[idx].store(false);
++		BaseKnob::onDragEnd(e);
++	}
++};
++
++} // namespace StarseaArranger
+diff --git a/plugins/Starsea/src/MiniArranger.cpp b/plugins/Starsea/src/MiniArranger.cpp
+new file mode 100755
+index 0000000..0d9c552
+--- /dev/null
++++ b/plugins/Starsea/src/MiniArranger.cpp
+@@ -0,0 +1,1179 @@
++/*
++ * Starsea plugin for Cardinal
++ * Module: MiniArranger - 多声部编曲机
++ *
++ * 形态（2026-09-21 拍板，见 D:\Cardinal\docs\PROJECT2-SPEC.md）：
++ *   - 一块模块内部装 4 条独立声部，输出口每轨一组 VOCT / GATE / VELOCITY
++ *   - 键盘录制输入只有一组（面板上选「录给哪一轨」）
++ *   - 复音阶梯：若 VOCT 接的是多声道线，第 c 声道自动录到第 c 轨（照抄 CVfunk 14.3 #2）
++ *   - 扩展器架构：主模块 4 轨；扩展器各持有自己那几轨的数据（乙案：数据分散）
++ *   - CLOCK / RESET / RUN / RECORD 语义照抄 rcm-pianoroll（RUN / RECORD 是边沿翻转）
++ *
++ * 已实现：
++ *   - 录制引擎：GATE 上升沿开音符、下降沿收音符 ⇒ 「按住多久 = 多长」
++ *   - 编辑范式：面板不画网格，只画「当前步」；旋钮 = 当前步的值（CVfunk 14.3 #1）
++ *   - 竞态保护：isEditing[] + 旋钮值变化检测（滚轮也能编辑，不只是拖拽）
++ *   - RESET 两段式：置标志、下一个时钟才复位，避免吃掉一拍（JW 14.3 #4）
++ *   - 面板自带 RUN / REC 按钮（不用再外接 Button 模块）
++ *   - 总览时间轴：4 行点阵 + 小节线 + 红色游标 + 每轨配色
++ *   - 扩展器：主模块把「走带状态 + 键盘事件」打包发给右边的 MiniArrangerExpander，
++ *     扩展器自己存自己那 4 轨、自己播放输出。走的是 Rack 的扩展器双缓冲消息，
++ *     1 个时间步延迟，零拷贝。
++ *   - Portable Sequence：右键菜单可以把某轨导出到系统剪贴板，或把剪贴板里的
++ *     社区标准 JSON 灌进某轨（鼓点可以由外部生成后直接粘贴，不用手弹）
++ *
++ * 尚未实现：复音输出打包（每轨目前是单声道 CV）、歌曲级段落编排、撤销。
++ *
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ */
++
++#include "plugin.hpp"
++#include "ArrangerData.hpp"
++#include "PortableSequence.hpp"
++
++#include <atomic>
++#include <mutex>
++#include <vector>
++
++namespace MA = StarseaArranger;
++namespace SPS = StarseaPortableSequence;
++
++// 录制最多跟踪几个复音声道
++static const int MA_REC_CHAN = MA::MA_TRACKS;
++
++// ---------------------------------------------------------------------------
++// 模块
++// ---------------------------------------------------------------------------
++struct StarseaMiniArrangerModule : Module {
++	enum ParamIds {
++		MUTE1_PARAM,
++		MUTE2_PARAM,
++		MUTE3_PARAM,
++		MUTE4_PARAM,
++		TRACK_EDIT_PARAM,    // 选「当前编辑 / 录制轨」
++		STEP_PARAM,          // 当前编辑步（0..1 归一化，映射到 0..songSteps-1）
++		LAYER_PARAM,         // 编辑哪个字段：PITCH / LENGTH / VELOCITY
++		VALUE1_PARAM,        // 每轨当前步的值（0..1 归一化）
++		VALUE2_PARAM,
++		VALUE3_PARAM,
++		VALUE4_PARAM,
++		RUN_BUTTON_PARAM,
++		REC_BUTTON_PARAM,
++		NUM_PARAMS
++	};
++	enum InputIds {
++		// --- 共享时钟与控制（一组，不按轨重复）---
++		CLOCK_INPUT,
++		RESET_INPUT,
++		RUN_INPUT,
++		RECORD_INPUT,
++		// --- 共享键盘输入（录制用，只有一组）---
++		VOCT_INPUT,
++		GATE_INPUT,
++		RETRIGGER_INPUT,
++		VELOCITY_INPUT,
++		NUM_INPUTS
++	};
++	enum OutputIds {
++		// --- 共享转发输出（串联下一台编曲机用）---
++		CLOCK_OUTPUT,
++		RESET_OUTPUT,
++		RUN_OUTPUT,
++		RECORD_OUTPUT,
++		END_OF_SONG_OUTPUT,
++		// --- 每轨一组 ---
++		TRACK1_VOCT_OUTPUT, TRACK1_GATE_OUTPUT, TRACK1_VEL_OUTPUT,
++		TRACK2_VOCT_OUTPUT, TRACK2_GATE_OUTPUT, TRACK2_VEL_OUTPUT,
++		TRACK3_VOCT_OUTPUT, TRACK3_GATE_OUTPUT, TRACK3_VEL_OUTPUT,
++		TRACK4_VOCT_OUTPUT, TRACK4_GATE_OUTPUT, TRACK4_VEL_OUTPUT,
++		// --- 试听输出（固定输出「当前编辑轨」的内容，一条发声链听任意轨）---
++		// ⚠️ 必须追加在末尾：插到中间会让后面所有口的编号整体位移，老机架的接线会错位。
++		AUDITION_VOCT_OUTPUT, AUDITION_GATE_OUTPUT,
++		NUM_OUTPUTS
++	};
++	enum LightIds {
++		RUN_LIGHT,
++		RECORD_LIGHT,
++		NUM_LIGHTS
++	};
++
++	// ---- 数据 ----
++	MA::MaUnit unit;
++
++	// ---- 走带状态 ----
++	std::atomic<int>  currentStep{0};
++	bool running   = false;
++	bool recording = false;
++	bool resetPending = false;
++
++	// ---- 触发器 ----
++	dsp::SchmittTrigger clockTrig, resetTrig, runTrig, recTrig;
++	dsp::SchmittTrigger runButtonTrig, recButtonTrig;
++	dsp::SchmittTrigger gateTrig[MA_REC_CHAN];
++	dsp::PulseGenerator eocPulse;
++
++	// ---- 录制跟踪（每个声道一个）----
++	bool  recActive[MA_REC_CHAN] = {false};
++	int   recStep[MA_REC_CHAN]   = {0};
++	int   recPitch[MA_REC_CHAN]  = {60};
++	int   recTrack[MA_REC_CHAN]  = {0};
++	float recVel[MA_REC_CHAN]    = {0.8f};
++
++	// ---- 编辑竞态（UI 线程写、音频线程读）----
++	alignas(std::atomic<bool>) std::atomic<bool> isEditing[MA::MA_TRACKS];
++
++	// ---- 旋钮值变化检测（回灌时同步，避免自触发写回）----
++	float lastKnobValue[MA::MA_TRACKS] = {0.f};
++	float lastStepKnob = 0.f;
++
++	// ---- UI 请求跳步（UI 线程写 -1 以外的值，音频线程消费）----
++	std::atomic<int> stepJump{-1};
++
++	// ---- 扩展器消息缓冲（与扩展器等长；对方会直接往我的 producer 里写）----
++	float rightMessages[2][MA::MA_MSG_SIZE] = {{0.f}};
++
++	// ---- 本时间步要发给扩展器的键盘事件 ----
++	float outEvents[MA::MA_MSG_EVENTS][MA::MA_MSG_EV_STRIDE] = {{0.f}};
++	int   outEventCount = 0;
++
++	// ---- UI 只读快照（定长 POD，音频线程写、UI 线程读）----
++	MA::MaSnapNote   noteSnap[MA::MA_TRACKS][MA::MA_MAX_NOTES];
++	std::atomic<int> snapNoteCount[MA::MA_TRACKS];
++
++	// ---- 剪贴板导入：UI 线程解析、音频线程落库 ----
++	std::mutex              importMutex;
++	std::vector<MA::MaNote> importNotes;
++	std::atomic<int>        importTarget{-1};
++	std::atomic<bool>       clearRequest{false};
++	std::atomic<float>      importFlash{0.f};    // 面板提示倒计时（秒）
++	std::atomic<int>        importFlashCount{0};
++
++	// ---- 给 UI 的快照（POD，良性竞争，无锁）----
++	std::atomic<int>   snapStep{0};
++	std::atomic<int>   snapSteps{MA::MA_STEPS_PER_MEASURE * 4};
++	std::atomic<int>   snapEditTrack{0};
++	std::atomic<int>   snapLayer{0};
++	std::atomic<bool>  snapRunning{false};
++	std::atomic<bool>  snapRecording{false};
++	std::atomic<int>   snapTotalNotes{0};
++	std::atomic<bool>  snapHasNote[MA::MA_TRACKS];
++	std::atomic<int>   snapPitch[MA::MA_TRACKS];
++	std::atomic<int>   snapLength[MA::MA_TRACKS];
++	std::atomic<float> snapVel[MA::MA_TRACKS];
++	// 总览：每轨每格有没有音符（供面板画时间轴）
++	uint8_t overview[MA::MA_TRACKS][MA::MA_MAX_MEASURES * MA::MA_STEPS_PER_MEASURE] = {{0}};
++	std::atomic<bool> snapMute[MA::MA_TRACKS];
++	std::atomic<bool> snapExpander{false};        // 右边挂没挂扩展器
++	std::atomic<int>  snapExpanderNotes{0};       // 扩展器那边有多少音符
++
++	// ---- 内部 ----
++	bool   dirty = true;        // 音符数据变了，需要重建 overview / 输出
++	int    lastEditTrack = -1;
++	int    lastLayer = -1;
++	float  outVoct[MA::MA_TRACKS] = {0.f};
++	float  outGate[MA::MA_TRACKS] = {0.f};
++	float  outVel[MA::MA_TRACKS]  = {0.f};
++
++	StarseaMiniArrangerModule() {
++		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
++
++		for (int i = 0; i < MA::MA_TRACKS; ++i) {
++			configSwitch(MUTE1_PARAM + i, 0.f, 1.f, 0.f,
++			             string::f("Track %d mute", i + 1), {"Off", "On"});
++			isEditing[i].store(false);
++			snapHasNote[i].store(false);
++			snapPitch[i].store(-1);
++			snapLength[i].store(0);
++			snapVel[i].store(0.f);
++			snapMute[i].store(false);
++			snapNoteCount[i].store(0);
++		}
++
++		configSwitch(TRACK_EDIT_PARAM, 0.f, float(MA::MA_TRACKS - 1), 0.f,
++		             "Edit / record track", {"1", "2", "3", "4"});
++		configParam(STEP_PARAM, 0.f, 1.f, 0.f, "Edit step");
++
++		configSwitch(LAYER_PARAM, 0.f, float(MA::MA_NUM_LAYERS - 1), 0.f,
++		             "Edit layer", {"PITCH", "LENGTH", "VELOCITY"});
++
++		for (int i = 0; i < MA::MA_TRACKS; ++i)
++			configParam(VALUE1_PARAM + i, 0.f, 1.f, 0.f,
++			            string::f("Track %d value", i + 1));
++
++		configButton(RUN_BUTTON_PARAM, "Run (toggle)");
++		configButton(REC_BUTTON_PARAM, "Record (toggle)");
++
++		configInput(CLOCK_INPUT,     "Clock");
++		configInput(RESET_INPUT,     "Reset");
++		configInput(RUN_INPUT,       "Run (toggle)");
++		configInput(RECORD_INPUT,    "Record (toggle)");
++		configInput(VOCT_INPUT,      "Keyboard V/Oct (poly chained across tracks)");
++		configInput(GATE_INPUT,      "Keyboard gate");
++		configInput(RETRIGGER_INPUT, "Keyboard retrigger");
++		configInput(VELOCITY_INPUT,  "Keyboard velocity");
++
++		configOutput(CLOCK_OUTPUT,       "Clock (thru)");
++		configOutput(RESET_OUTPUT,       "Reset (thru)");
++		configOutput(RUN_OUTPUT,         "Run (thru)");
++		configOutput(RECORD_OUTPUT,      "Record (thru)");
++		configOutput(END_OF_SONG_OUTPUT, "End of song");
++
++		for (int i = 0; i < MA::MA_TRACKS; ++i) {
++			configOutput(TRACK1_VOCT_OUTPUT + i * 3, string::f("Track %d V/Oct", i + 1));
++			configOutput(TRACK1_GATE_OUTPUT + i * 3, string::f("Track %d gate", i + 1));
++			configOutput(TRACK1_VEL_OUTPUT  + i * 3, string::f("Track %d velocity", i + 1));
++		}
++
++		configOutput(AUDITION_VOCT_OUTPUT, "Audition V/Oct (follows current edit track)");
++		configOutput(AUDITION_GATE_OUTPUT, "Audition gate (follows current edit track)");
++
++		for (int c = 0; c < MA_REC_CHAN; ++c) {
++			recActive[c] = false;
++			recTrack[c]  = 0;
++		}
++
++		// 扩展器消息缓冲挂在 rightExpander 上（对方会往这块内存写）
++		rightExpander.producerMessage = rightMessages[0];
++		rightExpander.consumerMessage = rightMessages[1];
++		for (int i = 0; i < MA::MA_MSG_SIZE; ++i) {
++			rightMessages[0][i] = 0.f;
++			rightMessages[1][i] = 0.f;
++		}
++	}
++
++	// -----------------------------------------------------------------------
++	// 工具
++	// -----------------------------------------------------------------------
++	static int pitchFromVoltage(const float v) {
++		int p = int(std::lround(v * 12.f)) + 60;
++		if (p < MA::MA_PITCH_MIN) p = MA::MA_PITCH_MIN;
++		if (p > MA::MA_PITCH_MAX) p = MA::MA_PITCH_MAX;
++		return p;
++	}
++
++	int recTrackFor(const int c, const int nChan) const {
++		if (nChan <= 1)
++			return clamp(unit.editTrack, 0, MA::MA_TRACKS - 1);
++		return clamp(c, 0, MA::MA_TRACKS - 1);
++	}
++
++	// 记一条「要发给扩展器」的键盘事件（音频线程调用）
++	void emitEvent(const int type, const int chan, const int pitch,
++	               const float vel, const int step) {
++		if (outEventCount >= MA::MA_MSG_EVENTS)
++			return;
++		float* const e = outEvents[outEventCount];
++		e[0] = float(type);
++		e[1] = float(chan);
++		e[2] = float(pitch);
++		e[3] = vel;
++		e[4] = float(step);
++		outEventCount++;
++	}
++
++	// -----------------------------------------------------------------------
++	// 录制
++	// -----------------------------------------------------------------------
++	void finishNote(const int c, const int endStep) {
++		if (!recActive[c])
++			return;
++
++		const int track = clamp(recTrack[c], 0, MA::MA_TRACKS - 1);
++
++		MA::MaNote n;
++		n.step = recStep[c];
++		n.length = (endStep > recStep[c]) ? (endStep - recStep[c]) : 1;
++		n.pitch = recPitch[c];
++		n.velocity = recVel[c];
++		n.clampValues();
++
++		// 同一位置先清干净，避免叠音（重录同一处 = 覆盖）
++		unit.tracks[track].clearAt(n.step);
++		unit.tracks[track].pushNote(n);
++		unit.tracks[track].sortNotes();
++
++		// 同一件事也告诉扩展器（它自己决定存进哪条轨）
++		emitEvent(MA::MA_EV_NOTE_OFF, c, recPitch[c], recVel[c], endStep);
++
++		recActive[c] = false;
++		dirty = true;
++	}
++
++	void finishAllRecordings(const int endStep) {
++		for (int c = 0; c < MA_REC_CHAN; ++c) {
++			if (recActive[c])
++				finishNote(c, endStep);
++		}
++	}
++
++	void doRecording() {
++		const int nChan = std::max(1, inputs[VOCT_INPUT].getChannels());
++		const int nUse  = std::min(nChan, MA_REC_CHAN);
++
++		for (int c = 0; c < nUse; ++c) {
++			const int track = recTrackFor(c, nUse);
++
++			const float g   = inputs[GATE_INPUT].getPolyVoltage(c);
++			const float v   = inputs[VOCT_INPUT].getPolyVoltage(c);
++			const float vel = inputs[VELOCITY_INPUT].isConnected()
++			                  ? inputs[VELOCITY_INPUT].getPolyVoltage(c) : 10.f;
++
++			const bool high = gateTrig[c].process(g);
++
++			if (high && !recActive[c]) {
++				// 音符开始
++				recActive[c] = true;
++				recStep[c]   = currentStep.load();
++				recPitch[c]  = pitchFromVoltage(v);
++				recTrack[c]  = track;
++				recVel[c]    = clamp(vel / 10.f, 0.f, 1.f);
++				emitEvent(MA::MA_EV_NOTE_ON, c, recPitch[c], recVel[c], recStep[c]);
++			} else if (!high && recActive[c]) {
++				// 音符结束 —— 按住几格就是几格
++				finishNote(c, currentStep.load() + 1);
++			} else if (high && recActive[c]) {
++				// 按住过程中允许改音高（滑音后停住 = 取最终音高）
++				recPitch[c] = pitchFromVoltage(v);
++				recVel[c]   = clamp(vel / 10.f, 0.f, 1.f);
++			}
++		}
++
++		// 声道数变少了：把多出来的收尾
++		for (int c = nUse; c < MA_REC_CHAN; ++c) {
++			if (recActive[c])
++				finishNote(c, currentStep.load() + 1);
++		}
++	}
++
++	// -----------------------------------------------------------------------
++	// 输出 / 快照
++	// -----------------------------------------------------------------------
++	void refreshOutputs() {
++		const int s = currentStep.load();
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			const int idx = unit.tracks[t].indexSounding(s);
++			if (idx >= 0 && !unit.tracks[t].mute) {
++				const MA::MaNote& n = unit.tracks[t].notes[size_t(idx)];
++				outVoct[t] = float(n.pitch - 60) / 12.f;
++				outGate[t] = 10.f;
++				outVel[t]  = n.velocity * 10.f;
++			} else {
++				// VOCT 刻意保持不变：门关了但音高不断，免得外部 VCO 每次跳音
++				outGate[t] = 0.f;
++				outVel[t]  = 0.f;
++			}
++		}
++	}
++
++	void rebuildOverview() {
++		const int steps = unit.songSteps();
++		snapSteps.store(steps);
++
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			uint8_t* row = overview[t];
++			for (int s = 0; s < steps; ++s)
++				row[s] = 0;
++
++			const MA::MaTrack& tr = unit.tracks[t];
++
++			// 顺手灌一份 UI 只读快照（导出剪贴板时用，避免跨线程读 vector）
++			int cnt = 0;
++			const int maxStep = MA::MA_MAX_MEASURES * MA::MA_STEPS_PER_MEASURE;
++			for (size_t i = 0; i < tr.notes.size() && cnt < MA::MA_MAX_NOTES; ++i) {
++				const MA::MaNote& n = tr.notes[i];
++				noteSnap[t][cnt].step     = int16_t(clamp(n.step, 0, maxStep - 1));
++				noteSnap[t][cnt].length   = int16_t(clamp(n.length, 1, MA::MA_MAX_LENGTH));
++				noteSnap[t][cnt].pitch    = int16_t(clamp(n.pitch, MA::MA_PITCH_MIN, MA::MA_PITCH_MAX));
++				noteSnap[t][cnt].velocity = n.velocity;
++				cnt++;
++			}
++			snapNoteCount[t].store(cnt);
++
++			for (size_t i = 0; i < tr.notes.size(); ++i) {
++				const MA::MaNote& n = tr.notes[i];
++				for (int k = 0; k < n.length; ++k) {
++					const int s = n.step + k;
++					if (s >= 0 && s < steps && s < maxStep)
++						row[s] = 1;
++				}
++			}
++		}
++	}
++
++	void updateSnapshot() {
++		const int s = currentStep.load();
++		snapStep.store(s);
++		snapEditTrack.store(unit.editTrack);
++		snapLayer.store(int(std::round(params[LAYER_PARAM].getValue())));
++		snapRunning.store(running);
++		snapRecording.store(recording);
++		snapTotalNotes.store(unit.totalNotes());
++
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			snapMute[t].store(unit.tracks[t].mute);
++			const int idx = unit.tracks[t].indexSounding(s);
++			if (idx >= 0) {
++				const MA::MaNote& n = unit.tracks[t].notes[size_t(idx)];
++				snapHasNote[t].store(true);
++				snapPitch[t].store(n.pitch);
++				snapLength[t].store(n.length);
++				snapVel[t].store(n.velocity);
++			} else {
++				snapHasNote[t].store(false);
++				snapPitch[t].store(-1);
++				snapLength[t].store(0);
++				snapVel[t].store(0.f);
++			}
++		}
++	}
++
++	// -----------------------------------------------------------------------
++	// 剪贴板导入 / 导出（都在 UI 线程调用，见 appendContextMenu）
++	// -----------------------------------------------------------------------
++	// 读剪贴板 -> 转成内部音符 -> 排队给音频线程落库。
++	// 返回音符数；-1 = 剪贴板不是 Portable Sequence；-2 = 格式对但一个音符都没有。
++	int uiImportToTrack(const int track) {
++		SPS::Sequence seq;
++		if (!seq.fromClipboard()) {
++			importFlash.store(4.f);
++			importFlashCount.store(-1);
++			return -1;
++		}
++		if (seq.notes.empty()) {
++			importFlash.store(4.f);
++			importFlashCount.store(-2);
++			return -2;
++		}
++
++		const double spq = double(unit.stepsPerQuarter > 0.f ? unit.stepsPerQuarter : 4.f);
++		std::vector<MA::MaNote> notes;
++		notes.reserve(seq.notes.size());
++		for (size_t i = 0; i < seq.notes.size(); ++i) {
++			const SPS::Note& pn = seq.notes[i];
++			MA::MaNote n;
++			n.step     = int(std::lround(double(pn.start) * spq));
++			n.length   = int(std::lround(double(pn.length) * spq));
++			n.pitch    = int(std::lround(double(pn.pitch) * 12.0)) + 60;
++			n.velocity = (pn.velocity >= 0.f) ? (pn.velocity / 10.f) : 0.8f;
++			n.clampValues();
++			notes.push_back(n);
++		}
++
++		{
++			std::lock_guard<std::mutex> lock(importMutex);
++			importNotes.swap(notes);
++		}
++		importTarget.store(clamp(track, 0, MA::MA_TRACKS - 1));
++
++		importFlash.store(4.f);
++		importFlashCount.store(int(seq.notes.size()));
++		return int(seq.notes.size());
++	}
++
++	// 把某轨快照写成 Portable Sequence 放剪贴板
++	bool uiExportTrack(const int track) {
++		if (track < 0 || track >= MA::MA_TRACKS)
++			return false;
++
++		const double spq = double(unit.stepsPerQuarter > 0.f ? unit.stepsPerQuarter : 4.f);
++		SPS::Sequence seq;
++		const int cnt = clamp(snapNoteCount[track].load(), 0, MA::MA_MAX_NOTES);
++		for (int i = 0; i < cnt; ++i) {
++			const MA::MaSnapNote& s = noteSnap[track][i];
++			SPS::Note pn;
++			pn.start    = float(double(s.step) / spq);
++			pn.pitch    = float((double(s.pitch) - 60.0) / 12.0);
++			pn.length   = float(double(s.length) / spq);
++			pn.velocity = s.velocity * 10.f;
++			seq.addNote(pn);
++		}
++		seq.length = double(unit.songSteps()) / spq;
++		seq.sort();
++
++		const bool ok = seq.toClipboard();
++		importFlash.store(4.f);
++		importFlashCount.store(ok ? cnt : -3);
++		return ok;
++	}
++
++	void requestClearAll() {
++		clearRequest.store(true);
++	}
++
++	// -----------------------------------------------------------------------
++	// 主循环
++	// -----------------------------------------------------------------------
++	void process(const ProcessArgs& args) override {
++		// ---------- 0. 消费 UI 线程的请求 ----------
++		const int importTo = importTarget.exchange(-1);
++		if (importTo >= 0) {
++			std::vector<MA::MaNote> incoming;
++			{
++				std::lock_guard<std::mutex> lock(importMutex);
++				incoming.swap(importNotes);
++			}
++			const int track = clamp(importTo, 0, MA::MA_TRACKS - 1);
++			MA::MaTrack& tr = unit.tracks[track];
++			tr.notes.clear();                       // 导入 = 替换该轨，不是叠加
++			for (size_t i = 0; i < incoming.size(); ++i)
++				tr.pushNote(incoming[i]);
++			tr.sortNotes();
++			dirty = true;
++		}
++
++		if (clearRequest.exchange(false)) {
++			unit.clearAll();
++			dirty = true;
++		}
++
++		if (importFlash.load() > 0.f)
++			importFlash.store(std::max(0.f, importFlash.load() - args.sampleTime));
++
++		const int steps = unit.songSteps();
++		const int layer = clamp(int(std::round(params[LAYER_PARAM].getValue())), 0, MA::MA_NUM_LAYERS - 1);
++
++		// 面板开关落到数据层
++		// ⚠️ 必须检测「变化」：mute 只在 refreshOutputs()/updateSnapshot() 里生效，
++		//    而那两处只在 step/track/layer/data 变化时才跑 ⇒ 停止状态下拨 Mute
++		//    永远不刷新（门保持 10V 挂着，音一直响）。见下方 muteChanged 进刷新条件。
++		bool muteChanged = false;
++		for (int i = 0; i < MA::MA_TRACKS; ++i) {
++			const bool m = params[MUTE1_PARAM + i].getValue() > 0.5f;
++			if (m != unit.tracks[i].mute) {
++				unit.tracks[i].mute = m;
++				muteChanged = true;
++			}
++		}
++		unit.editTrack = clamp(int(std::round(params[TRACK_EDIT_PARAM].getValue())),
++		                       0, MA::MA_TRACKS - 1);
++
++		// ---------- 1. RUN / RECORD 翻转（按钮与输入各自检测边沿，再合并）----------
++		const bool runEdge = runButtonTrig.process(params[RUN_BUTTON_PARAM].getValue());
++		const bool runInEdge = runTrig.process(inputs[RUN_INPUT].getVoltage());
++		if (runEdge || runInEdge)
++			running = !running;
++
++		const bool recEdge = recButtonTrig.process(params[REC_BUTTON_PARAM].getValue());
++		const bool recInEdge = recTrig.process(inputs[RECORD_INPUT].getVoltage());
++		if (recEdge || recInEdge)
++			recording = !recording;
++
++		// ---------- 2. RESET：两段式（置标志，等下个时钟才真复位）----------
++		const bool resetEdge = resetTrig.process(inputs[RESET_INPUT].getVoltage());
++		if (resetEdge)
++			resetPending = true;
++
++		// ---------- 3. 时钟步进 ----------
++		bool stepChanged = false;
++		const bool clockEdge = clockTrig.process(inputs[CLOCK_INPUT].getVoltage());
++		if (clockEdge && running) {
++			if (resetPending) {
++				resetPending = false;
++				finishAllRecordings(currentStep.load() + 1);
++				currentStep.store(0);
++			} else {
++				int nxt = currentStep.load() + 1;
++				if (nxt >= steps) {
++					nxt = 0;
++					eocPulse.trigger(0.001f);
++					finishAllRecordings(steps);   // 跨回卷：收到歌尾
++				}
++				currentStep.store(nxt);
++			}
++			stepChanged = true;
++		}
++
++		// 不跑的时候按 reset 就立即复位
++		if (resetPending && !running) {
++			resetPending = false;
++			finishAllRecordings(currentStep.load() + 1);
++			currentStep.store(0);
++			stepChanged = true;
++		}
++
++		// UI 点击跳步
++		const int jump = stepJump.exchange(-1);
++		if (jump >= 0) {
++			finishAllRecordings(currentStep.load() + 1);
++			currentStep.store(clamp(jump, 0, steps - 1));
++			stepChanged = true;
++		}
++
++		// ---------- 4. 录制 ----------
++		if (running && recording) {
++			doRecording();
++		} else if (!recording) {
++			// 退出录制：把手上按着的音符收尾，并清触发器状态
++			finishAllRecordings(currentStep.load() + 1);
++			for (int c = 0; c < MA_REC_CHAN; ++c)
++				gateTrig[c].reset();
++		}
++
++		// ---------- 5. 编辑：回灌 + 写回 ----------
++		const bool trackChanged = (unit.editTrack != lastEditTrack);
++		const bool layerChanged = (layer != lastLayer);
++		const bool needRecall = stepChanged || trackChanged || layerChanged;
++
++		// 5a. 回灌：把「当前步 + 当前层」的值送进旋钮
++		if (needRecall) {
++			for (int t = 0; t < MA::MA_TRACKS; ++t) {
++				if (isEditing[t].load())
++					continue;   // 正在拧，别覆盖
++				const float v = unit.readLayerNorm(t, layer, currentStep.load());
++				params[VALUE1_PARAM + t].setValue(v);
++				lastKnobValue[t] = v;
++			}
++			// STEP 旋钮位置跟随走带
++			const float sv = (steps > 1) ? float(currentStep.load()) / float(steps - 1) : 0.f;
++			params[STEP_PARAM].setValue(clamp(sv, 0.f, 1.f));
++			lastStepKnob = sv;
++		}
++
++		// 5b. STEP 旋钮被拧 -> 跳步
++		const float stepKnob = params[STEP_PARAM].getValue();
++		if (std::fabs(stepKnob - lastStepKnob) > 1e-6f) {
++			lastStepKnob = stepKnob;
++			const int want = int(std::lround(stepKnob * float(steps - 1)));
++			if (want != currentStep.load()) {
++				finishAllRecordings(currentStep.load() + 1);
++				currentStep.store(clamp(want, 0, steps - 1));
++				stepChanged = true;
++				updateSnapshot();
++				refreshOutputs();
++				// 跳步后立刻回灌一次，旋钮才不会和谱面对不上
++				for (int t = 0; t < MA::MA_TRACKS; ++t) {
++					if (isEditing[t].load())
++						continue;
++					const float v = unit.readLayerNorm(t, layer, currentStep.load());
++					params[VALUE1_PARAM + t].setValue(v);
++					lastKnobValue[t] = v;
++				}
++			}
++		}
++
++		// 5c. 写回：谁的值变了就写谁（覆盖拖拽与滚轮两种操作）
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			const float v = params[VALUE1_PARAM + t].getValue();
++			if (std::fabs(v - lastKnobValue[t]) > 1e-6f) {
++				lastKnobValue[t] = v;
++				unit.writeLayerNorm(t, layer, currentStep.load(), v, 60);
++				dirty = true;
++			}
++		}
++
++		// ---------- 6. 位置或数据变了 -> 刷新输出与快照 ----------
++		// 只在需要时扫音符，不每帧扫（1024 格 x 4 轨扫一遍不值得每帧做）
++		const bool dataChanged = dirty;
++		if (dirty) {
++			dirty = false;
++			rebuildOverview();
++		}
++		if (stepChanged || trackChanged || layerChanged || dataChanged || muteChanged) {
++			refreshOutputs();
++			updateSnapshot();
++		}
++
++		lastEditTrack = unit.editTrack;
++		lastLayer = layer;
++
++		// ---------- 7. 输出 ----------
++		// mute 在这里再判一次（不依赖 refreshOutputs 的时机）—— 这是「拨下开关立刻静音」的硬保证，
++		// 走带停着、没有任何 step 变化时也不会漏。VOCT 保持不变是刻意的：门关了但音高不断，
++		// 免得外部 VCO 每次跳音。
++		// 键盘直通（手弹优先）：外部键盘按住键时，把输入的 V/Oct / gate / velocity 直接送到
++		// 「当前编辑轨」(= TRACK 旋钮选的那一轨) 的输出口。于是不必等走带走到那一步，弹下去
++		// 立刻就有声音；松手立刻回到该轨的回放内容。静音的轨不直通（静音优先）。
++		// 每帧重算、不缓存 —— 所以不存在「门卡在 10V 不落」的风险（同 mute 那次的教训）。
++		const bool  thruDown  = inputs[GATE_INPUT].isConnected() &&
++		                        (inputs[GATE_INPUT].getVoltage() > 1.f);
++		const int   thruTrack = clamp(unit.editTrack, 0, MA::MA_TRACKS - 1);
++		const float thruVoct  = inputs[VOCT_INPUT].getVoltage();
++		const float thruVel   = inputs[VELOCITY_INPUT].isConnected()
++		                        ? inputs[VELOCITY_INPUT].getVoltage() : 10.f;
++
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			const bool muted = unit.tracks[t].mute;
++			const bool thru  = thruDown && (t == thruTrack) && !muted;
++			outputs[TRACK1_VOCT_OUTPUT + t * 3].setVoltage(thru ? thruVoct : outVoct[t]);
++			outputs[TRACK1_GATE_OUTPUT + t * 3].setVoltage(muted ? 0.f : (thru ? 10.f : outGate[t]));
++			outputs[TRACK1_VEL_OUTPUT  + t * 3].setVoltage(muted ? 0.f : (thru ? thruVel : outVel[t]));
++		}
++
++		// 试听口 = 「当前编辑轨」那一组的镜像（含手弹直通、静音判定）。
++		// 于是只需把一条 VCO+ADSR+VCA 链接到试听口，拧 TRACK 旋钮就能听任意轨。
++		// 同样每帧重算、不缓存（thruTrack 已经是 clamp 过的编辑轨号）。
++		{
++			const bool audMuted = unit.tracks[thruTrack].mute;
++			const bool audThru  = thruDown && !audMuted;
++			outputs[AUDITION_VOCT_OUTPUT].setVoltage(audThru ? thruVoct : outVoct[thruTrack]);
++			outputs[AUDITION_GATE_OUTPUT].setVoltage(audMuted ? 0.f : (audThru ? 10.f : outGate[thruTrack]));
++		}
++
++		// 共享转发（串接下一台编曲机用）
++		outputs[CLOCK_OUTPUT].setVoltage(inputs[CLOCK_INPUT].getVoltage());
++		outputs[RESET_OUTPUT].setVoltage(inputs[RESET_INPUT].getVoltage());
++		outputs[RUN_OUTPUT].setVoltage(inputs[RUN_INPUT].getVoltage());
++		outputs[RECORD_OUTPUT].setVoltage(inputs[RECORD_INPUT].getVoltage());
++		outputs[END_OF_SONG_OUTPUT].setVoltage(eocPulse.process(args.sampleTime) ? 10.f : 0.f);
++
++		// ---------- 8. 灯 ----------
++		lights[RUN_LIGHT].setBrightness(running ? 1.f : 0.f);
++		lights[RECORD_LIGHT].setBrightness(recording ? 1.f : 0.f);
++
++		// ---------- 9. 与右边的扩展器交换消息 ----------
++		// 每帧重取指针、用前判断 model —— 不缓存（Rack 2.4.1 删邻居不触发回调）
++		const bool expPresent = (rightExpander.module != nullptr) &&
++		                        (rightExpander.module->model == modelStarseaMiniArrangerExpander);
++		snapExpander.store(expPresent);
++
++		if (expPresent) {
++			float* const msg = (float*)(rightExpander.module->leftExpander.producerMessage);
++			if (msg != nullptr) {
++				msg[MA::MA_MSG_STEP]       = float(currentStep.load());
++				msg[MA::MA_MSG_LOOP]       = float(steps);
++				msg[MA::MA_MSG_RUN]        = running ? 1.f : 0.f;
++				msg[MA::MA_MSG_REC]        = recording ? 1.f : 0.f;
++				msg[MA::MA_MSG_NCHAN]      = float(std::max(1, inputs[VOCT_INPUT].getChannels()));
++				msg[MA::MA_MSG_EVCOUNT]    = float(outEventCount);
++				msg[MA::MA_MSG_TOTALNOTES] = float(unit.totalNotes());
++				const int n = std::min(outEventCount, MA::MA_MSG_EVENTS);
++				for (int i = 0; i < n; ++i)
++					for (int k = 0; k < MA::MA_MSG_EV_STRIDE; ++k)
++						msg[MA::MA_MSG_EV_BASE + i * MA::MA_MSG_EV_STRIDE + k] = outEvents[i][k];
++				rightExpander.module->leftExpander.messageFlipRequested = true;
++			}
++
++			// 读回扩展器那边的东西（只在确认接上时读指针）
++			const float* const back = (const float*)rightExpander.consumerMessage;
++			snapExpanderNotes.store(back != nullptr ? int(back[MA::MA_MSG_TOTALNOTES] + 0.5f) : 0);
++		} else {
++			snapExpanderNotes.store(0);
++		}
++
++		// 本时间步的事件已经发完，清空等下一批
++		outEventCount = 0;
++	}
++
++	json_t* dataToJson() override {
++		json_t* const root = json_object();
++		json_object_set_new(root, "arranger", unit.toJson());
++		json_object_set_new(root, "running", json_boolean(running));
++		json_object_set_new(root, "currentStep", json_integer(currentStep.load()));
++		return root;
++	}
++
++	void dataFromJson(json_t* const rootJ) override {
++		if (rootJ == nullptr)
++			return;
++
++		json_t* const a = json_object_get(rootJ, "arranger");
++		if (a != nullptr)
++			unit.fromJson(a);
++
++		json_t* j = json_object_get(rootJ, "running");
++		if (j != nullptr) running = json_is_true(j);
++
++		j = json_object_get(rootJ, "currentStep");
++		if (j != nullptr) currentStep.store(int(json_integer_value(j)));
++
++		dirty = true;
++		lastEditTrack = -1;   // 强制下一帧回灌
++		lastLayer = -1;
++	}
++};
++
++// ---------------------------------------------------------------------------
++// 面板
++//
++// 坐标单位 = mm（与 res/MiniArranger.svg 的 viewBox 同一坐标系）。
++// 面板 203.2mm = 40HP x 147.3mm（435px = 29 个 RACK_GRID_HEIGHT 格）。
++// ⚠️ 高度只能改 res/MiniArranger.svg 的 height + viewBox + 那三块底板矩形；
++//    螺丝孔必须用 box.size.y（见下），不要写死 RACK_GRID_HEIGHT —— 面板一加高就错位。
++//
++// 分区：
++//   x 8-60    共享输入（8 口，一列）+ 共享输出（5 口，一列）
++//   x 70-196  主区：轨静音列 / 总览时间轴 / 编辑旋钮 / 轨道输出
++// ---------------------------------------------------------------------------
++struct StarseaMiniArrangerWidget : ModuleWidget {
++	// 端口列
++	static constexpr float IN_X  = 14.f;
++	static constexpr float OUT_X = 44.f;
++	// 主区
++	static constexpr float MUTE_X = 79.f;
++	static constexpr float OV_X0 = 92.f, OV_X1 = 196.f;
++	static constexpr float OV_Y0 = 17.f, OV_ROW = 9.f;
++	// 编辑区
++	static constexpr float EDIT_Y = 74.f;
++	// 输出区
++	static constexpr float TRK_X0 = 104.f, TRK_DX = 24.f;
++	static constexpr float TRK_Y0 = 96.f,  TRK_DY = 13.f;
++
++	StarseaMiniArrangerWidget(StarseaMiniArrangerModule* module) {
++		setModule(module);
++		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/MiniArranger.svg")));
++		// 底部螺丝挂在「面板真实高度」上：Rack 把 ModuleWidget::box.size.y 焊死为
++		// RACK_GRID_HEIGHT(380)，面板 SVG 加高后 box.size.y 不变，用它会悬在面板中间。
++		widget::Widget* panel = getPanel();
++		float panelBottom = panel ? (panel->box.size.y - RACK_GRID_WIDTH) : (box.size.y - RACK_GRID_WIDTH);
++		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, 0)));
++		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
++		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, panelBottom)));
++		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, panelBottom)));
++
++		// ---- 共享输入（8）----
++		const float inY[8] = {26.f, 39.f, 52.f, 65.f, 78.f, 91.f, 104.f, 117.f};
++		for (int i = 0; i < 8; ++i)
++			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(IN_X, inY[i])),
++			                                        module, StarseaMiniArrangerModule::CLOCK_INPUT + i));
++
++		// ---- 共享输出（5）----
++		const float outY[5] = {26.f, 39.f, 52.f, 65.f, 78.f};
++		for (int i = 0; i < 5; ++i)
++			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(OUT_X, outY[i])),
++			                                          module, StarseaMiniArrangerModule::CLOCK_OUTPUT + i));
++
++		// ---- 试听输出（2）----
++		// 位置：紧跟共享输出那一列下方（面板脚本 AUD_Y0=91）；编号却在最后（17/18），
++		// 所以老机架的接线编号一个不受影响。
++		const float audY[2] = {91.f, 104.f};
++		for (int i = 0; i < 2; ++i)
++			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(OUT_X, audY[i])),
++			                                          module, StarseaMiniArrangerModule::AUDITION_VOCT_OUTPUT + i));
++
++		// ---- 静音开关（总览区左侧，每轨一个）----
++		for (int t = 0; t < MA::MA_TRACKS; ++t)
++			addParam(createParamCentered<CKSS>(mm2px(Vec(MUTE_X, OV_Y0 + OV_ROW * t + OV_ROW * 0.5f)),
++			                                   module, StarseaMiniArrangerModule::MUTE1_PARAM + t));
++
++		// ---- 编辑区 ----
++		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(76.f, EDIT_Y)),
++		                                                 module, StarseaMiniArrangerModule::STEP_PARAM));
++		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(94.f, EDIT_Y)),
++		                                                 module, StarseaMiniArrangerModule::LAYER_PARAM));
++		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(112.f, EDIT_Y)),
++		                                                 module, StarseaMiniArrangerModule::TRACK_EDIT_PARAM));
++		for (int t = 0; t < MA::MA_TRACKS; ++t)
++			addParam(createParamCentered<MA::StarseaSmartKnob<RoundBlackKnob, StarseaMiniArrangerModule>>(mm2px(Vec(140.f + t * 17.f, EDIT_Y)),
++			                                                        module, StarseaMiniArrangerModule::VALUE1_PARAM + t));
++
++		// ---- RUN / REC 按钮（自带，不用再外接 Button 模块）----
++		addParam(createParamCentered<TL1105>(mm2px(Vec(158.f, 7.f)),
++		                                     module, StarseaMiniArrangerModule::RUN_BUTTON_PARAM));
++		addParam(createParamCentered<TL1105>(mm2px(Vec(184.f, 7.f)),
++		                                     module, StarseaMiniArrangerModule::REC_BUTTON_PARAM));
++		addChild(createLightCentered<MediumLight<GreenLight>>(mm2px(Vec(167.f, 7.f)),
++		                                                      module, StarseaMiniArrangerModule::RUN_LIGHT));
++		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(193.f, 7.f)),
++		                                                    module, StarseaMiniArrangerModule::RECORD_LIGHT));
++
++		// ---- 每轨 3 口 ----
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			const float x = TRK_X0 + t * TRK_DX;
++			for (int o = 0; o < 3; ++o)
++				addOutput(createOutputCentered<PJ301MPort>(
++					mm2px(Vec(x, TRK_Y0 + o * TRK_DY)),
++					module,
++					StarseaMiniArrangerModule::TRACK1_VOCT_OUTPUT + t * 3 + o));
++		}
++	}
++
++	// 面板点击：总览区跳步 / 行首选轨
++	void onButton(const event::Button& e) override {
++		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
++			StarseaMiniArrangerModule* const m = dynamic_cast<StarseaMiniArrangerModule*>(module);
++
++			const bool inOvX = (e.pos.x >= mm2px(OV_X0)) && (e.pos.x <= mm2px(OV_X1));
++			const bool inOvY = (e.pos.y >= mm2px(OV_Y0)) && (e.pos.y <= mm2px(OV_Y0 + OV_ROW * MA::MA_TRACKS));
++
++			if (m != nullptr && inOvX && inOvY) {
++				const float rel = (e.pos.x - mm2px(OV_X0)) / (mm2px(OV_X1) - mm2px(OV_X0));
++				const int steps = std::max(1, m->snapSteps.load());
++				int s = int(rel * float(steps));
++				s = clamp(s, 0, steps - 1);
++				m->stepJump.store(s);
++
++				// 顺手把编辑轨也切到点中的那一行
++				const int row = int((e.pos.y - mm2px(OV_Y0)) / mm2px(OV_ROW));
++				if (row >= 0 && row < MA::MA_TRACKS)
++					m->params[StarseaMiniArrangerModule::TRACK_EDIT_PARAM].setValue(float(row));
++
++				e.consume(this);
++				return;
++			}
++
++			// 静音列左侧的窄条 = 选轨
++			const bool inMuteX = (e.pos.x >= mm2px(70.f)) && (e.pos.x < mm2px(OV_X0));
++			if (m != nullptr && inMuteX && inOvY) {
++				const int row = int((e.pos.y - mm2px(OV_Y0)) / mm2px(OV_ROW));
++				if (row >= 0 && row < MA::MA_TRACKS)
++					m->params[StarseaMiniArrangerModule::TRACK_EDIT_PARAM].setValue(float(row));
++				e.consume(this);
++				return;
++			}
++		}
++		ModuleWidget::onButton(e);
++	}
++
++	// 右键菜单：Portable Sequence 导入 / 导出（社区标准剪贴板格式）
++	void appendContextMenu(Menu* const menu) override {
++		StarseaMiniArrangerModule* const m = dynamic_cast<StarseaMiniArrangerModule*>(module);
++
++		menu->addChild(new MenuSeparator);
++		menu->addChild(createMenuLabel("Portable Sequence (system clipboard)"));
++
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			menu->addChild(createMenuItem(
++				string::f("Import clipboard -> track %d  (replaces it)", t + 1), "",
++				[m, t]() {
++					if (m != nullptr)
++						m->uiImportToTrack(t);
++				}));
++		}
++
++		menu->addChild(new MenuSeparator);
++
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			menu->addChild(createMenuItem(
++				string::f("Track %d -> clipboard  (%d notes)", t + 1,
++				          m != nullptr ? m->snapNoteCount[t].load() : 0), "",
++				[m, t]() {
++					if (m != nullptr)
++						m->uiExportTrack(t);
++				}));
++		}
++
++		menu->addChild(new MenuSeparator);
++		menu->addChild(createMenuItem("Clear all notes", "", [m]() {
++			if (m != nullptr)
++				m->requestClearAll();
++		}));
++	}
++
++	void draw(const DrawArgs& args) override {
++		ModuleWidget::draw(args);
++
++		// 面板 SVG 用 nanosvg 渲染，而 nanosvg 不画 <text>，
++		// 所以所有文字标记都得在这里用 nvg 画。
++		std::shared_ptr<Font> font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
++		if (font)
++			nvgFontFaceId(args.vg, font->handle);
++		nvgTextLetterSpacing(args.vg, 0.f);
++
++		// 局部小工具：以 mm 坐标画文字
++		const auto put = [&](const float x, const float y, const float size,
++		                     const int align, const NVGcolor col, const char* txt) {
++			nvgFontSize(args.vg, size);
++			nvgTextAlign(args.vg, align | NVG_ALIGN_MIDDLE);
++			nvgFillColor(args.vg, col);
++			nvgText(args.vg, mm2px(x), mm2px(y), txt, NULL);
++		};
++
++		const NVGcolor cWarm = nvgRGB(0x9f, 0xd8, 0xf0);  // 淡青
++		const NVGcolor cDim  = nvgRGB(0x6c, 0x7f, 0x90);  // 灰蓝
++		const NVGcolor cHot  = nvgRGB(0xf0, 0xc0, 0x70);  // 琥珀
++		const NVGcolor cPale = nvgRGB(0xd8, 0xe4, 0xec);
++		const NVGcolor cBar  = nvgRGB(0x2b, 0x33, 0x3d);
++
++		// 轨道配色（一眼分出哪条轨）
++		const NVGcolor trackCol[MA::MA_TRACKS] = {
++			nvgRGB(0x5f, 0xd0, 0xc8),   // 青
++			nvgRGB(0xf0, 0xb0, 0x60),   // 琥珀
++			nvgRGB(0x8f, 0xd0, 0x70),   // 绿
++			nvgRGB(0xb8, 0x9c, 0xe8)    // 紫
++		};
++
++		// ---- 标题 ----
++		put(110.f, 6.5f, 11.f, NVG_ALIGN_CENTER, nvgRGB(0x0e, 0x12, 0x16), "MINI ARRANGER");
++		put(158.f, 12.5f, 6.f, NVG_ALIGN_CENTER, cDim, "RUN");
++		put(184.f, 12.5f, 6.f, NVG_ALIGN_CENTER, cDim, "REC");
++
++		// ---- 分区标题 ----
++		put(IN_X,  20.f, 8.f, NVG_ALIGN_CENTER, cWarm, "IN");
++		put(OUT_X, 20.f, 8.f, NVG_ALIGN_CENTER, cWarm, "OUT");
++
++		// ---- 共享输入标签 ----
++		const char* inNames[8] = {"CLOCK", "RESET", "RUN", "REC",
++		                          "VOCT", "GATE", "RETRIG", "VEL"};
++		for (int i = 0; i < 8; ++i)
++			put(IN_X + 6.f, 26.f + i * 13.f, 7.f, NVG_ALIGN_LEFT, cDim, inNames[i]);
++
++		// ---- 共享输出标签 ----
++		const char* outNames[5] = {"CLOCK", "RESET", "RUN", "REC", "END"};
++		for (int i = 0; i < 5; ++i)
++			put(OUT_X + 6.f, 26.f + i * 13.f, 7.f, NVG_ALIGN_LEFT, cDim, outNames[i]);
++
++		// ---- 试听输出标签（琥珀色，跟上面那组灰蓝的共享输出区分开）----
++		put(OUT_X + 6.f, 91.f,  7.f, NVG_ALIGN_LEFT, cHot, "AUD V");
++		put(OUT_X + 6.f, 104.f, 7.f, NVG_ALIGN_LEFT, cHot, "AUD G");
++
++		StarseaMiniArrangerModule* const m = dynamic_cast<StarseaMiniArrangerModule*>(module);
++
++		// ---- 总览时间轴 ----
++		const float ovW = OV_X1 - OV_X0;
++		const float ovH = OV_ROW * MA::MA_TRACKS;
++
++		nvgBeginPath(args.vg);
++		nvgRect(args.vg, mm2px(OV_X0), mm2px(OV_Y0), mm2px(ovW), mm2px(ovH));
++		nvgFillColor(args.vg, nvgRGB(0x0d, 0x14, 0x1a));
++		nvgFill(args.vg);
++		nvgStrokeColor(args.vg, cBar);
++		nvgStrokeWidth(args.vg, 1.f);
++		nvgStroke(args.vg);
++
++		if (m != nullptr) {
++			const int steps = std::max(1, m->snapSteps.load());
++			const int cur = m->snapStep.load();
++			const int editTrk = m->snapEditTrack.load();
++			const float cellW = ovW / float(steps);
++
++			// 每轨一行的小节分隔 + 音符块
++			for (int t = 0; t < MA::MA_TRACKS; ++t) {
++				const float y0 = OV_Y0 + OV_ROW * t;
++
++				// 当前编辑轨那一行加一层底
++				if (t == editTrk) {
++					nvgBeginPath(args.vg);
++					nvgRect(args.vg, mm2px(OV_X0 + 0.4f), mm2px(y0 + 0.4f),
++					        mm2px(ovW - 0.8f), mm2px(OV_ROW - 0.8f));
++					nvgFillColor(args.vg, nvgRGBA(0x9f, 0xd8, 0xf0, 26));
++					nvgFill(args.vg);
++				}
++
++				// 每 16 格画一条小节线
++				for (int s = 0; s < steps; s += MA::MA_STEPS_PER_MEASURE) {
++					const float x = OV_X0 + float(s) * cellW;
++					nvgBeginPath(args.vg);
++					nvgMoveTo(args.vg, mm2px(x), mm2px(y0 + 1.f));
++					nvgLineTo(args.vg, mm2px(x), mm2px(y0 + OV_ROW - 1.f));
++					nvgStrokeColor(args.vg, nvgRGBA(0x6c, 0x7f, 0x90, 70));
++					nvgStrokeWidth(args.vg, 0.6f);
++					nvgStroke(args.vg);
++				}
++
++				// 音符块
++				if (m->snapMute[t].load()) {
++					// 静音的轨画成暗灰，一眼看出它不出声
++					nvgBeginPath(args.vg);
++					for (int s = 0; s < steps; ++s) {
++						if (m->overview[t][s] == 0)
++							continue;
++						nvgRect(args.vg, mm2px(OV_X0 + float(s) * cellW), mm2px(y0 + 2.2f),
++						        mm2px(std::max(cellW, 0.35f)), mm2px(OV_ROW - 4.4f));
++					}
++					nvgFillColor(args.vg, nvgRGBA(0x6c, 0x7f, 0x90, 90));
++					nvgFill(args.vg);
++				} else {
++					nvgBeginPath(args.vg);
++					for (int s = 0; s < steps; ++s) {
++						if (m->overview[t][s] == 0)
++							continue;
++						nvgRect(args.vg, mm2px(OV_X0 + float(s) * cellW), mm2px(y0 + 2.2f),
++						        mm2px(std::max(cellW, 0.35f)), mm2px(OV_ROW - 4.4f));
++					}
++					nvgFillColor(args.vg, trackCol[t]);
++					nvgFill(args.vg);
++				}
++			}
++
++			// 播放游标
++			const float cx = OV_X0 + (float(cur) + 0.5f) * cellW;
++			nvgBeginPath(args.vg);
++			nvgMoveTo(args.vg, mm2px(cx), mm2px(OV_Y0));
++			nvgLineTo(args.vg, mm2px(cx), mm2px(OV_Y0 + ovH));
++			nvgStrokeColor(args.vg, nvgRGB(0xff, 0x66, 0x66));
++			nvgStrokeWidth(args.vg, 1.4f);
++			nvgStroke(args.vg);
++
++			// 总览区标题（压在框上沿外侧）
++			put(OV_X0, 14.f, 6.5f, NVG_ALIGN_LEFT, cDim,
++			    string::f("SONG  %d/%d  %d NOTES",
++			              cur + 1, steps, m->snapTotalNotes.load()).c_str());
++		}
++
++		// ---- 轨号（静音列左侧）----
++		for (int t = 0; t < MA::MA_TRACKS; ++t)
++			put(72.f, OV_Y0 + OV_ROW * t + OV_ROW * 0.5f, 8.f, NVG_ALIGN_CENTER, cWarm,
++			    string::f("%d", t + 1).c_str());
++
++		// ---- 编辑区标签 ----
++		put(76.f,  62.f, 6.5f, NVG_ALIGN_CENTER, cDim, "STEP");
++		put(94.f,  62.f, 6.5f, NVG_ALIGN_CENTER, cDim, "LAYER");
++		put(112.f, 62.f, 6.5f, NVG_ALIGN_CENTER, cDim, "EDIT");
++		for (int t = 0; t < MA::MA_TRACKS; ++t)
++			put(140.f + t * 17.f, 62.f, 6.5f, NVG_ALIGN_CENTER, trackCol[t],
++			    string::f("TRK %d", t + 1).c_str());
++
++		if (m != nullptr) {
++			// 当前层名
++			static const char* layerNames[MA::MA_NUM_LAYERS] = {"PITCH", "LENGTH", "VEL"};
++			const int lay = clamp(m->snapLayer.load(), 0, MA::MA_NUM_LAYERS - 1);
++			put(112.f, 88.f, 6.5f, NVG_ALIGN_CENTER, cHot, layerNames[lay]);
++
++			// 每轨当前步的值
++			for (int t = 0; t < MA::MA_TRACKS; ++t) {
++				const float x = 140.f + t * 17.f;
++				if (!m->snapHasNote[t].load()) {
++					put(x, 88.f, 6.5f, NVG_ALIGN_CENTER, cDim, "--");
++					continue;
++				}
++				const int p = m->snapPitch[t].load();
++				const int l = m->snapLength[t].load();
++				const float vv = m->snapVel[t].load();
++				// 注意：必须用 std::string 接住，不能存 .c_str() ——
++				// string::f() 的返回值是临时对象，出语句即析构，指针会悬垂
++				std::string txt;
++				switch (lay) {
++					case MA::MA_LAYER_PITCH:  txt = MA::noteNameOf(p); break;
++					case MA::MA_LAYER_LENGTH: txt = string::f("%d", l); break;
++					default:                  txt = string::f("%.0f%%", vv * 100.f); break;
++				}
++				put(x, 88.f, 6.5f, NVG_ALIGN_CENTER, cPale, txt.c_str());
++			}
++
++			// STEP 旋钮下方显示当前步号
++			put(76.f, 88.f, 6.5f, NVG_ALIGN_CENTER, cHot,
++			    string::f("%d", m->snapStep.load() + 1).c_str());
++			// EDIT 旋钮下方显示轨号
++			put(94.f, 88.f, 6.5f, NVG_ALIGN_CENTER, cDim,
++			    m->snapRecording.load() ? "REC" : (m->snapRunning.load() ? "PLAY" : "STOP"));
++		}
++
++		// ---- 输出区 ----
++		const char* rowNames[3] = {"VOCT", "GATE", "VEL"};
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			const float x = TRK_X0 + t * TRK_DX;
++			put(x, 90.f, 7.f, NVG_ALIGN_CENTER, trackCol[t], string::f("TRK %d", t + 1).c_str());
++			for (int o = 0; o < 3; ++o)
++				put(x + 5.f, TRK_Y0 + o * TRK_DY, 6.f, NVG_ALIGN_LEFT, cDim, rowNames[o]);
++		}
++
++		// ---- 底部状态行：扩展器 / 剪贴板提示 ----
++		if (m != nullptr) {
++			if (m->snapExpander.load()) {
++				put(76.f, 122.f, 6.5f, NVG_ALIGN_LEFT, cWarm,
++				    string::f("EXT: %d NOTES", m->snapExpanderNotes.load()).c_str());
++			} else {
++				put(76.f, 122.f, 6.5f, NVG_ALIGN_LEFT, cDim, "EXT: none");
++			}
++
++			if (m->importFlash.load() > 0.f) {
++				const int c = m->importFlashCount.load();
++				std::string msg;
++				if (c == -1)      msg = "CLIPBOARD: NOT A PORTABLE SEQUENCE";
++				else if (c == -2) msg = "CLIPBOARD: NO NOTES";
++				else if (c == -3) msg = "COPY TO CLIPBOARD FAILED";
++				else              msg = string::f("CLIPBOARD: %d NOTES", c);
++				put(196.f, 122.f, 6.5f, NVG_ALIGN_RIGHT, cHot, msg.c_str());
++			}
++		}
++	}
++
++	// -----------------------------------------------------------------------
++};
++
++// ---------------------------------------------------------------------------
++// 注册（还要在 plugin.hpp 加 extern 声明、在 plugins.cpp 的
++// initStatic__Starsea() 里 addModel）
++// ---------------------------------------------------------------------------
++Model* modelStarseaMiniArranger =
++	createModel<StarseaMiniArrangerModule, StarseaMiniArrangerWidget>("Starsea-MiniArranger");
+diff --git a/plugins/Starsea/src/MiniArrangerExpander.cpp b/plugins/Starsea/src/MiniArrangerExpander.cpp
+new file mode 100755
+index 0000000..9bfa7d6
+--- /dev/null
++++ b/plugins/Starsea/src/MiniArrangerExpander.cpp
+@@ -0,0 +1,536 @@
++/*
++ * Starsea plugin for Cardinal
++ * Module: MiniArrangerExpander - 给 MiniArranger 再加 4 条轨
++ *
++ * 为什么是扩展器
++ * --------------
++ * 「轨数越大越好」的正解不是把主面板做宽，而是主模块管 4 轨、每接一块扩展器
++ * 再加 4 轨 —— 面板永不失控（2026-09-21 李拍板）。
++ *
++ * 数据放哪
++ * --------
++ * 乙案：数据分散在各块。每块扩展器持有自己那 4 轨的音符，主模块只管发
++ *       「走带状态 + 键盘事件」。好处：拔掉扩展器，它那 4 轨跟着走，主模块不受影响。
++ *
++ * 怎么通信
++ * --------
++ * 走 Rack 的扩展器双缓冲消息（leftExpander / rightExpander），零拷贝，
++ * 1 个时间步延迟。协议见 ArrangerData.hpp 的 MaMsgIndex。
++ * ⚠️ 不通过消息传时钟边沿 —— 延迟是「时间步」级的，边沿会被吞掉。
++ *    主模块把「当前步号」直接发过来，本模块跟随，不自己步进。
++ * ⚠️ 不缓存 leftExpander.module 指针，每帧重取并校验 model
++ *    （Rack 2.4.1 删邻居模块时 onExpanderChange 不触发）。
++ *
++ * 面板（24HP = 121.92mm x 128.5mm）
++ * --------------------------------
++ *   左：4 轨 x 3 口输出（VOCT / GATE / VEL）
++ *   右：4 个编辑旋钮（2x2）+ TRACK / LAYER 选择 + 3 个状态灯
++ *
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ */
++
++#include "plugin.hpp"
++#include "ArrangerData.hpp"
++
++#include <atomic>
++
++namespace MA = StarseaArranger;
++
++// 录制最多跟踪几个复音声道
++static const int MAE_REC_CHAN = MA::MA_TRACKS;
++
++struct StarseaMiniArrangerExpander : Module {
++	enum ParamIds {
++		VALUE1_PARAM,        // 每轨当前步的值（0..1 归一化）
++		VALUE2_PARAM,
++		VALUE3_PARAM,
++		VALUE4_PARAM,
++		TRACK_EDIT_PARAM,    // 编辑 / 录制落在自己哪条轨
++		LAYER_PARAM,         // 编辑哪个字段：PITCH / LENGTH / VELOCITY
++		NUM_PARAMS
++	};
++	enum OutputIds {
++		TRACK1_VOCT_OUTPUT, TRACK1_GATE_OUTPUT, TRACK1_VEL_OUTPUT,
++		TRACK2_VOCT_OUTPUT, TRACK2_GATE_OUTPUT, TRACK2_VEL_OUTPUT,
++		TRACK3_VOCT_OUTPUT, TRACK3_GATE_OUTPUT, TRACK3_VEL_OUTPUT,
++		TRACK4_VOCT_OUTPUT, TRACK4_GATE_OUTPUT, TRACK4_VEL_OUTPUT,
++		NUM_OUTPUTS
++	};
++	enum LightIds {
++		LINK_LIGHT,     // 左边接上主模块了
++		RUN_LIGHT,      // 主模块在走带
++		RECORD_LIGHT,   // 主模块在录音
++		NUM_LIGHTS
++	};
++
++	// ---- 数据：本块自己那 4 轨 ----
++	MA::MaUnit unit;
++
++	// ---- 扩展器消息缓冲（长度必须与主模块一致；母模块会往 producer 里写）----
++	float leftMessages[2][MA::MA_MSG_SIZE] = {{0.f}};
++
++	// ---- 从主模块收到的走带状态 ----
++	int  remoteStep  = 0;
++	int  remoteLoop  = MA::MA_STEPS_PER_MEASURE * 4;
++	bool remoteRun   = false;
++	bool remoteRec   = false;
++	int  remoteNChan = 1;
++	bool linked      = false;
++
++	// ---- 录制跟踪（按声道，与主模块同名同义）----
++	bool  recActive[MAE_REC_CHAN] = {false};
++	int   recStep[MAE_REC_CHAN]   = {0};
++	int   recPitch[MAE_REC_CHAN]  = {60};
++	float recVel[MAE_REC_CHAN]    = {0.8f};
++
++	// ---- 编辑竞态 ----
++	alignas(std::atomic<bool>) std::atomic<bool> isEditing[MA::MA_TRACKS];
++	float lastKnobValue[MA::MA_TRACKS] = {0.f};
++
++	// ---- 给 UI 的快照 ----
++	std::atomic<int>   snapStep{0};
++	std::atomic<int>   snapLayer{0};
++	std::atomic<int>   snapEditTrack{0};
++	std::atomic<int>   snapTotalNotes{0};
++	std::atomic<bool>  snapHasNote[MA::MA_TRACKS];
++	std::atomic<int>   snapPitch[MA::MA_TRACKS];
++	std::atomic<int>   snapLength[MA::MA_TRACKS];
++	std::atomic<float> snapVel[MA::MA_TRACKS];
++	std::atomic<bool>  snapLinked{false};
++	std::atomic<bool>  snapRun{false};
++	std::atomic<bool>  snapRec{false};
++
++	// ---- 内部 ----
++	bool  dirty = true;
++	int   lastStep = -1;
++	int   lastLoop = -1;
++	int   lastEditTrack = -1;
++	int   lastLayer = -1;
++	float outVoct[MA::MA_TRACKS] = {0.f};
++	float outGate[MA::MA_TRACKS] = {0.f};
++	float outVel[MA::MA_TRACKS]  = {0.f};
++
++	StarseaMiniArrangerExpander() {
++		config(NUM_PARAMS, 0, NUM_OUTPUTS, NUM_LIGHTS);
++
++		// 消息缓冲挂到 leftExpander（母模块在左边）
++		leftExpander.producerMessage = leftMessages[0];
++		leftExpander.consumerMessage = leftMessages[1];
++		for (int i = 0; i < MA::MA_MSG_SIZE; ++i) {
++			leftMessages[0][i] = 0.f;
++			leftMessages[1][i] = 0.f;
++		}
++
++		for (int i = 0; i < MA::MA_TRACKS; ++i) {
++			configParam(VALUE1_PARAM + i, 0.f, 1.f, 0.f,
++			            string::f("Track %d value", i + 1));
++			isEditing[i].store(false);
++			snapHasNote[i].store(false);
++			snapPitch[i].store(-1);
++			snapLength[i].store(0);
++			snapVel[i].store(0.f);
++
++			configOutput(TRACK1_VOCT_OUTPUT + i * 3, string::f("Track %d V/Oct", i + 1));
++			configOutput(TRACK1_GATE_OUTPUT + i * 3, string::f("Track %d gate", i + 1));
++			configOutput(TRACK1_VEL_OUTPUT  + i * 3, string::f("Track %d velocity", i + 1));
++		}
++
++		configSwitch(TRACK_EDIT_PARAM, 0.f, float(MA::MA_TRACKS - 1), 0.f,
++		             "Edit / record track", {"1", "2", "3", "4"});
++		configSwitch(LAYER_PARAM, 0.f, float(MA::MA_NUM_LAYERS - 1), 0.f,
++		             "Edit layer", {"PITCH", "LENGTH", "VELOCITY"});
++
++		// 轨名带 E 前缀，跟主模块的 1-4 区分开
++		for (int i = 0; i < MA::MA_TRACKS; ++i)
++			unit.tracks[i].label = string::f("E%d", i + 1);
++	}
++
++	// -----------------------------------------------------------------------
++	// 工具
++	// -----------------------------------------------------------------------
++	// 复音阶梯：单声道线 -> 录到面板选的轨；多声道线 -> 第 c 声道录第 c 轨
++	// （与主模块 recTrackFor 同一套规则）
++	int recTrackFor(const int c) const {
++		if (remoteNChan <= 1)
++			return clamp(unit.editTrack, 0, MA::MA_TRACKS - 1);
++		return clamp(c, 0, MA::MA_TRACKS - 1);
++	}
++
++	// 吃一条主模块发来的键盘事件
++	void applyRemoteEvent(const int type, const int chan, const int pitch,
++	                      const float vel, const int step) {
++		const int c = clamp(chan, 0, MAE_REC_CHAN - 1);
++
++		if (!remoteRec) {
++			recActive[c] = false;
++			return;
++		}
++
++		if (type == MA::MA_EV_NOTE_ON) {
++			recActive[c] = true;
++			recStep[c]   = step;
++			recPitch[c]  = pitch;
++			recVel[c]    = clamp(vel, 0.f, 1.f);
++		} else if (type == MA::MA_EV_NOTE_OFF) {
++			if (!recActive[c])
++				return;
++
++			int len = step - recStep[c];
++			if (len < 1) len = 1;
++
++			MA::MaNote n;
++			n.step     = recStep[c];
++			n.length   = len;
++			n.pitch    = recPitch[c];
++			n.velocity = recVel[c];
++			n.clampValues();
++
++			const int track = recTrackFor(c);
++			unit.tracks[track].clearAt(n.step);
++			unit.tracks[track].pushNote(n);
++			unit.tracks[track].sortNotes();
++
++			recActive[c] = false;
++			dirty = true;
++		}
++	}
++
++	// -----------------------------------------------------------------------
++	// 输出 / 快照
++	// -----------------------------------------------------------------------
++	void refreshOutputs() {
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			const int idx = unit.tracks[t].indexSounding(remoteStep);
++			if (idx >= 0 && !unit.tracks[t].mute) {
++				const MA::MaNote& n = unit.tracks[t].notes[size_t(idx)];
++				outVoct[t] = float(n.pitch - 60) / 12.f;
++				outGate[t] = 10.f;
++				outVel[t]  = n.velocity * 10.f;
++			} else {
++				// 与主模块一致：门关了但音高不断，免得外部 VCO 每次跳音
++				outGate[t] = 0.f;
++				outVel[t]  = 0.f;
++			}
++		}
++	}
++
++	void updateSnapshot() {
++		snapStep.store(remoteStep);
++		snapLayer.store(clamp(int(std::round(params[LAYER_PARAM].getValue())),
++		                      0, MA::MA_NUM_LAYERS - 1));
++		snapEditTrack.store(unit.editTrack);
++		snapTotalNotes.store(unit.totalNotes());
++		snapLinked.store(linked);
++		snapRun.store(remoteRun);
++		snapRec.store(remoteRec);
++
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			const int idx = unit.tracks[t].indexSounding(remoteStep);
++			if (idx >= 0) {
++				const MA::MaNote& n = unit.tracks[t].notes[size_t(idx)];
++				snapHasNote[t].store(true);
++				snapPitch[t].store(n.pitch);
++				snapLength[t].store(n.length);
++				snapVel[t].store(n.velocity);
++			} else {
++				snapHasNote[t].store(false);
++				snapPitch[t].store(-1);
++				snapLength[t].store(0);
++				snapVel[t].store(0.f);
++			}
++		}
++	}
++
++	// -----------------------------------------------------------------------
++	// 主循环
++	// -----------------------------------------------------------------------
++	void process(const ProcessArgs& args) override {
++		// ---------- 1. 从主模块收消息 ----------
++		// 每帧重取指针 + 校验 model（不缓存）
++		const bool motherPresent = (leftExpander.module != nullptr) &&
++		                           (leftExpander.module->model == modelStarseaMiniArranger);
++		linked = motherPresent;
++
++		if (motherPresent) {
++			const float* const msg = (const float*)leftExpander.consumerMessage;
++			if (msg != nullptr) {
++				const int maxStep = MA::MA_MAX_MEASURES * MA::MA_STEPS_PER_MEASURE;
++				const int newStep = clamp(int(msg[MA::MA_MSG_STEP] + 0.5f), 0, maxStep - 1);
++				remoteLoop  = clamp(int(msg[MA::MA_MSG_LOOP] + 0.5f), 1, maxStep);
++				remoteRun   = msg[MA::MA_MSG_RUN] > 0.5f;
++				remoteRec   = msg[MA::MA_MSG_REC] > 0.5f;
++				remoteNChan = clamp(int(msg[MA::MA_MSG_NCHAN] + 0.5f), 1, MAE_REC_CHAN);
++
++				if (newStep != remoteStep) {
++					remoteStep = newStep;
++					dirty = true;   // 位置变了，输出与快照都要刷
++				}
++
++				const int evCount = clamp(int(msg[MA::MA_MSG_EVCOUNT] + 0.5f), 0, MA::MA_MSG_EVENTS);
++				for (int i = 0; i < evCount; ++i) {
++					const float* const e = &msg[MA::MA_MSG_EV_BASE + i * MA::MA_MSG_EV_STRIDE];
++					applyRemoteEvent(int(e[0] + 0.5f), int(e[1] + 0.5f),
++					                 int(e[2] + 0.5f), e[3], int(e[4] + 0.5f));
++				}
++			}
++
++			// 回传：我这边有多少音符（主模块面板会显示）
++			float* const toMother = (float*)leftExpander.module->rightExpander.producerMessage;
++			if (toMother != nullptr) {
++				toMother[MA::MA_MSG_TOTALNOTES] = float(unit.totalNotes());
++				leftExpander.module->rightExpander.messageFlipRequested = true;
++			}
++		} else {
++			// 主模块被拔了：手上按着的音符直接作废，别留下悬空的录音
++			for (int c = 0; c < MAE_REC_CHAN; ++c)
++				recActive[c] = false;
++			remoteRun = false;
++			remoteRec = false;
++			remoteStep = 0;
++		}
++
++		// ---------- 2. 面板开关落到数据层 ----------
++		unit.editTrack = clamp(int(std::round(params[TRACK_EDIT_PARAM].getValue())),
++		                       0, MA::MA_TRACKS - 1);
++		const int layer = clamp(int(std::round(params[LAYER_PARAM].getValue())),
++		                        0, MA::MA_NUM_LAYERS - 1);
++
++		// ---------- 3. 编辑：回灌 + 写回 ----------
++		const bool stepChanged = (remoteStep != lastStep) || (remoteLoop != lastLoop);
++		const bool trackChanged = (unit.editTrack != lastEditTrack);
++		const bool layerChanged = (layer != lastLayer);
++
++		if (stepChanged || trackChanged || layerChanged) {
++			for (int t = 0; t < MA::MA_TRACKS; ++t) {
++				if (isEditing[t].load())
++					continue;   // 正在拧，别覆盖
++				const float v = unit.readLayerNorm(t, layer, remoteStep);
++				params[VALUE1_PARAM + t].setValue(v);
++				lastKnobValue[t] = v;
++			}
++		}
++
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			const float v = params[VALUE1_PARAM + t].getValue();
++			if (std::fabs(v - lastKnobValue[t]) > 1e-6f) {
++				lastKnobValue[t] = v;
++				unit.writeLayerNorm(t, layer, remoteStep, v, 60);
++				dirty = true;
++			}
++		}
++
++		// ---------- 4. 数据或位置变了 -> 刷输出与快照 ----------
++		const bool dataChanged = dirty;
++		if (dirty) {
++			dirty = false;
++			refreshOutputs();
++			updateSnapshot();
++		}
++
++		lastStep = remoteStep;
++		lastLoop = remoteLoop;
++		lastEditTrack = unit.editTrack;
++		lastLayer = layer;
++
++		// ---------- 5. 输出 ----------
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			outputs[TRACK1_VOCT_OUTPUT + t * 3].setVoltage(outVoct[t]);
++			outputs[TRACK1_GATE_OUTPUT + t * 3].setVoltage(outGate[t]);
++			outputs[TRACK1_VEL_OUTPUT  + t * 3].setVoltage(outVel[t]);
++		}
++
++		// ---------- 6. 灯 ----------
++		lights[LINK_LIGHT].setBrightness(motherPresent ? 1.f : 0.f);
++		lights[RUN_LIGHT].setBrightness(remoteRun ? 1.f : 0.f);
++		lights[RECORD_LIGHT].setBrightness(remoteRec ? 1.f : 0.f);
++	}
++
++	json_t* dataToJson() override {
++		json_t* const root = json_object();
++		json_object_set_new(root, "arranger", unit.toJson());
++		return root;
++	}
++
++	void dataFromJson(json_t* const rootJ) override {
++		if (rootJ == nullptr)
++			return;
++
++		json_t* const a = json_object_get(rootJ, "arranger");
++		if (a != nullptr)
++			unit.fromJson(a);
++
++		for (int i = 0; i < MA::MA_TRACKS; ++i)
++			unit.tracks[i].label = string::f("E%d", i + 1);
++
++		dirty = true;
++		lastStep = -1;        // 强制下一帧回灌
++		lastEditTrack = -1;
++		lastLayer = -1;
++	}
++};
++
++// ---------------------------------------------------------------------------
++// 面板
++//
++// 坐标单位 = mm（与 res/MiniArrangerExpander.svg 同一坐标系）。
++// 面板 121.92mm = 24HP x 128.5mm。
++//
++//   x 6-70    输出区：4 列（每轨一列）x 3 行（VOCT / GATE / VEL）
++//   x 78-118  编辑区：4 个编辑旋钮（2 x 2）+ TRACK / LAYER
++// ---------------------------------------------------------------------------
++struct StarseaMiniArrangerExpanderWidget : ModuleWidget {
++	// 输出口
++	static constexpr float OUT_X0 = 20.f, OUT_DX = 14.f;
++	static constexpr float OUT_Y0 = 44.f, OUT_DY = 16.f;
++	// 编辑旋钮（2 列 x 2 行）
++	static constexpr float EDIT_X0 = 88.f, EDIT_DX = 18.f;
++	static constexpr float EDIT_Y0 = 50.f, EDIT_DY = 28.f;
++
++	StarseaMiniArrangerExpanderWidget(StarseaMiniArrangerExpander* module) {
++		setModule(module);
++		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/MiniArrangerExpander.svg")));
++
++		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, 0)));
++		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
++		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
++		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
++
++		// ---- 每轨 3 个输出口 + 4 个编辑旋钮 ----
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			for (int o = 0; o < 3; ++o)
++				addOutput(createOutputCentered<PJ301MPort>(
++					mm2px(Vec(OUT_X0 + t * OUT_DX, OUT_Y0 + o * OUT_DY)),
++					module,
++					StarseaMiniArrangerExpander::TRACK1_VOCT_OUTPUT + t * 3 + o));
++
++			const float mx = EDIT_X0 + (t % 2) * EDIT_DX;
++			const float my = EDIT_Y0 + (t / 2) * EDIT_DY;
++			addParam(createParamCentered<MA::StarseaSmartKnob<RoundBlackKnob, StarseaMiniArrangerExpander>>(
++				mm2px(Vec(mx, my)), module, StarseaMiniArrangerExpander::VALUE1_PARAM + t));
++		}
++
++		// ---- 轨选择 / 层选择 ----
++		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(EDIT_X0, 106.f)),
++		                                                 module, StarseaMiniArrangerExpander::TRACK_EDIT_PARAM));
++		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(EDIT_X0 + EDIT_DX, 106.f)),
++		                                                 module, StarseaMiniArrangerExpander::LAYER_PARAM));
++
++		// ---- 状态灯 ----
++		addChild(createLightCentered<SmallLight<GreenLight>>(mm2px(Vec(36.f, 15.f)),
++		                                                     module, StarseaMiniArrangerExpander::LINK_LIGHT));
++		addChild(createLightCentered<SmallLight<GreenLight>>(mm2px(Vec(60.f, 15.f)),
++		                                                     module, StarseaMiniArrangerExpander::RUN_LIGHT));
++		addChild(createLightCentered<SmallLight<RedLight>>(mm2px(Vec(84.f, 15.f)),
++		                                                   module, StarseaMiniArrangerExpander::RECORD_LIGHT));
++	}
++
++	void draw(const DrawArgs& args) override {
++		ModuleWidget::draw(args);
++
++		std::shared_ptr<Font> font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
++		if (font)
++			nvgFontFaceId(args.vg, font->handle);
++		nvgTextLetterSpacing(args.vg, 0.f);
++
++		const auto put = [&](const float x, const float y, const float size,
++		                     const int align, const NVGcolor col, const char* txt) {
++			nvgFontSize(args.vg, size);
++			nvgTextAlign(args.vg, align | NVG_ALIGN_MIDDLE);
++			nvgFillColor(args.vg, col);
++			nvgText(args.vg, mm2px(x), mm2px(y), txt, NULL);
++		};
++
++		const NVGcolor cWarm = nvgRGB(0x9f, 0xd8, 0xf0);
++		const NVGcolor cDim  = nvgRGB(0x6c, 0x7f, 0x90);
++		const NVGcolor cHot  = nvgRGB(0xf0, 0xc0, 0x70);
++		const NVGcolor cPale = nvgRGB(0xd8, 0xe4, 0xec);
++
++		const NVGcolor trackCol[MA::MA_TRACKS] = {
++			nvgRGB(0x5f, 0xd0, 0xc8),
++			nvgRGB(0xf0, 0xb0, 0x60),
++			nvgRGB(0x8f, 0xd0, 0x70),
++			nvgRGB(0xb8, 0x9c, 0xe8)
++		};
++
++		// ---- 标题 / 灯标 ----
++		put(61.f, 8.f, 10.f, NVG_ALIGN_CENTER, nvgRGB(0x0e, 0x12, 0x16), "MINI ARRANGER EXP");
++		put(40.f, 15.f, 5.5f, NVG_ALIGN_LEFT, cDim, "LINK");
++		put(64.f, 15.f, 5.5f, NVG_ALIGN_LEFT, cDim, "RUN");
++		put(88.f, 15.f, 5.5f, NVG_ALIGN_LEFT, cDim, "REC");
++
++		// ---- 分区标题 ----
++		put(41.f, 27.f, 8.f, NVG_ALIGN_CENTER, cWarm, "OUT");
++		put(98.f, 27.f, 8.f, NVG_ALIGN_CENTER, cWarm, "EDIT");
++
++		// ---- 输出区：列号 + 行标签 ----
++		for (int t = 0; t < MA::MA_TRACKS; ++t)
++			put(OUT_X0 + t * OUT_DX, 35.f, 7.f, NVG_ALIGN_CENTER, trackCol[t],
++			    string::f("%d", t + 1).c_str());
++
++		const char* rowNames[3] = {"VOCT", "GATE", "VEL"};
++		for (int o = 0; o < 3; ++o)
++			put(13.f, OUT_Y0 + o * OUT_DY, 6.f, NVG_ALIGN_RIGHT, cDim, rowNames[o]);
++
++		StarseaMiniArrangerExpander* const m =
++			dynamic_cast<StarseaMiniArrangerExpander*>(module);
++
++		// ---- 编辑区：轨号 + 当前值 ----
++		for (int t = 0; t < MA::MA_TRACKS; ++t) {
++			const float x = EDIT_X0 + (t % 2) * EDIT_DX;
++			const float y = EDIT_Y0 + (t / 2) * EDIT_DY;
++			put(x, y - 10.f, 7.f, NVG_ALIGN_CENTER, trackCol[t],
++			    string::f("TRK %d", t + 1).c_str());
++
++			if (m == nullptr) {
++				put(x, y + 11.f, 6.5f, NVG_ALIGN_CENTER, cDim, "--");
++				continue;
++			}
++
++			if (!m->snapHasNote[t].load()) {
++				put(x, y + 11.f, 6.5f, NVG_ALIGN_CENTER, cDim, "--");
++				continue;
++			}
++
++			const int lay = clamp(m->snapLayer.load(), 0, MA::MA_NUM_LAYERS - 1);
++			const int p = m->snapPitch[t].load();
++			const int l = m->snapLength[t].load();
++			const float vv = m->snapVel[t].load();
++			// 必须用 std::string 接住：string::f() 返回临时对象，存 .c_str() 会悬垂
++			std::string txt;
++			switch (lay) {
++				case MA::MA_LAYER_PITCH:  txt = MA::noteNameOf(p); break;
++				case MA::MA_LAYER_LENGTH: txt = string::f("%d", l); break;
++				default:                  txt = string::f("%.0f%%", vv * 100.f); break;
++			}
++			put(x, y + 11.f, 6.5f, NVG_ALIGN_CENTER, cPale, txt.c_str());
++		}
++
++		// ---- TRACK / LAYER 选择 ----
++		put(EDIT_X0, 97.f, 6.f, NVG_ALIGN_CENTER, cDim, "TRACK");
++		put(EDIT_X0 + EDIT_DX, 97.f, 6.f, NVG_ALIGN_CENTER, cDim, "LAYER");
++
++		if (m != nullptr) {
++			put(EDIT_X0, 117.f, 6.5f, NVG_ALIGN_CENTER, cHot,
++			    string::f("%d", m->snapEditTrack.load() + 1).c_str());
++			static const char* layerNames[MA::MA_NUM_LAYERS] = {"PITCH", "LENGTH", "VEL"};
++			put(EDIT_X0 + EDIT_DX, 117.f, 6.5f, NVG_ALIGN_CENTER, cHot,
++			    layerNames[clamp(m->snapLayer.load(), 0, MA::MA_NUM_LAYERS - 1)]);
++
++			// 底部状态：跟随 / 脱离 + 本块音符数
++			if (m->snapLinked.load()) {
++				put(61.f, 124.f, 6.f, NVG_ALIGN_CENTER, cWarm,
++				    string::f("%d NOTES", m->snapTotalNotes.load()).c_str());
++			} else {
++				put(61.f, 124.f, 6.f, NVG_ALIGN_CENTER, cDim, "NO MASTER");
++			}
++		}
++	}
++};
++
++// ---------------------------------------------------------------------------
++// 注册（还要在 plugin.hpp 加 extern 声明、在 plugins.cpp 的
++// initStatic__Starsea() 里 addModel）
++// ---------------------------------------------------------------------------
++Model* modelStarseaMiniArrangerExpander =
++	createModel<StarseaMiniArrangerExpander, StarseaMiniArrangerExpanderWidget>(
++		"Starsea-MiniArrangerExpander");
+diff --git a/plugins/Starsea/src/PortableSequence.hpp b/plugins/Starsea/src/PortableSequence.hpp
+new file mode 100755
+index 0000000..6c4da68
+--- /dev/null
++++ b/plugins/Starsea/src/PortableSequence.hpp
+@@ -0,0 +1,238 @@
++/*
++ * Starsea plugin for Cardinal
++ * Portable Sequence: 读写社区剪贴板格式
++ *
++ * 这是什么
++ * --------
++ * VCV Rack 社区（Richie Hindle / Bruce Frazer / Marc Boule，2020-02 提出）约定的
++ * 剪贴板 JSON 格式，用来在**不同厂商的音序器之间复制粘贴音符**。不是官方标准，
++ * 但被 Aria 与 Impromptu 两家的十几个音序器支持。
++ *
++ * 格式（纯 JSON，顶层键 "vcvrack-sequence"）：
++ *   { "vcvrack-sequence": {
++ *       "length": 4.0,
++ *       "notes": [ {"type":"note","start":0.0,"pitch":0.0,"length":0.25,
++ *                   "velocity":8.0,"playProbability":1.0} ] } }
++ *
++ * 单位（最容易搞错的地方）
++ * ------------------------
++ *   start / length : 1.0 = 一个四分音符。我们是 16 分音符制，换算乘 stepsPerQuarter
++ *   pitch          : V/Oct（0.0 = C4 = MIDI 60），可以为负
++ *   velocity       : 0.0 ~ 10.0（我们的内部是 0~1，乘 10）
++ *   playProbability: 0.0 ~ 1.0，选填（我们不用，读到了也原样带出去）
++ *
++ * 与本文件的来源关系
++ * ------------------
++ * 主体抄自 AriaModules/src/portablesequence.hpp（作者 Richie Hindle），
++ * 原文件许可是 WTFPL，可自由复制与修改。这里做了三处改动：
++ *   1. 不 include 别家的 plugin.hpp（那个头文件里有 using namespace rack，
++ *      会把别人的全局命名空间并进来，编译错误会指向莫名其妙的文件）
++ *   2. 增加 toString / fromString，方便在没有窗口的环境下测试
++ *   3. length 用 double 存（float 在几百个音符的曲子上会累积误差）
++ *   4. 清理 json 引用计数（原版 toJson 用 json_object_set 会漏引用）
++ *
++ * SPDX-License-Identifier: WTFPL
++ *
++ *             DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
++ *                     Version 2, December 2004
++ *
++ *  Copyright (C) 2004 Sam Hocevar <sam@hocevar.net>
++ *
++ *  Everyone is permitted to copy and distribute verbatim or modified
++ *  copies of this license document, and changing it is allowed as long
++ *  as the name is changed.
++ *
++ *             DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
++ *    TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
++ *
++ *   0. You just DO WHAT THE FUCK YOU WANT TO.
++ */
++
++#pragma once
++
++#include "plugin.hpp"
++
++#include <algorithm>
++#include <string>
++#include <vector>
++
++namespace StarseaPortableSequence {
++
++struct Note {
++	// 必填。1.0 = 一个四分音符
++	float start = 0.f;
++	// 必填。V/Oct，可以为负
++	float pitch = 0.f;
++	// 必填。1.0 = 一个四分音符
++	float length = 0.f;
++	// 选填。0~10，越界就不往 JSON 里写
++	float velocity = -1.f;
++	// 选填。0~1，越界就不往 JSON 里写
++	float playProbability = -1.f;
++
++	bool hasVelocity() const { return velocity >= 0.f; }
++	bool hasPlayProbability() const { return playProbability >= 0.f; }
++
++	void clampValues() {
++		if (start < 0.f) start = 0.f;
++		if (pitch < -10.f) pitch = -10.f;
++		if (pitch > 10.f) pitch = 10.f;
++		if (length < 0.f) length = 0.f;
++		if (velocity >= 0.f) {
++			if (velocity > 10.f) velocity = 10.f;
++		}
++		if (playProbability >= 0.f) {
++			if (playProbability > 1.f) playProbability = 1.f;
++		}
++	}
++
++	json_t* toJson() const {
++		json_t* const o = json_object();
++		json_object_set_new(o, "type", json_string("note"));
++		json_object_set_new(o, "start", json_real(start));
++		json_object_set_new(o, "pitch", json_real(pitch));
++		json_object_set_new(o, "length", json_real(length));
++		if (hasVelocity())
++			json_object_set_new(o, "velocity", json_real(velocity));
++		if (hasPlayProbability())
++			json_object_set_new(o, "playProbability", json_real(playProbability));
++		return o;
++	}
++
++	static Note fromJson(json_t* const o) {
++		Note n;
++		if (o == nullptr)
++			return n;
++
++		json_t* j = json_object_get(o, "start");
++		if (j != nullptr) n.start = float(json_real_value(j));
++		j = json_object_get(o, "pitch");
++		if (j != nullptr) n.pitch = float(json_real_value(j));
++		j = json_object_get(o, "length");
++		if (j != nullptr) n.length = float(json_real_value(j));
++
++		j = json_object_get(o, "velocity");
++		n.velocity = (j != nullptr) ? float(json_real_value(j)) : -1.f;
++		j = json_object_get(o, "playProbability");
++		n.playProbability = (j != nullptr) ? float(json_real_value(j)) : -1.f;
++		return n;
++	}
++};
++
++struct Sequence {
++	double length = 0.0;
++	std::vector<Note> notes;
++
++	void clear() {
++		length = 0.0;
++		notes.clear();
++	}
++
++	void addNote(const Note& note) {
++		notes.push_back(note);
++	}
++
++	void clampValues() {
++		for (size_t i = 0; i < notes.size(); ++i)
++			notes[i].clampValues();
++	}
++
++	void sort() {
++		std::stable_sort(notes.begin(), notes.end(),
++		                 [](const Note& a, const Note& b) { return a.start < b.start; });
++	}
++
++	// 没写全局 length 时，用最后一个音符的结束时间兜底
++	double calculatedLength() const {
++		double m = length;
++		for (size_t i = 0; i < notes.size(); ++i) {
++			const double end = double(notes[i].start) + double(notes[i].length);
++			if (end > m)
++				m = end;
++		}
++		return m;
++	}
++
++	json_t* toJson() const {
++		json_t* const inner = json_object();
++		json_t* const arr = json_array();
++		for (size_t i = 0; i < notes.size(); ++i)
++			json_array_append_new(arr, notes[i].toJson());
++		json_object_set_new(inner, "length", json_real(length));
++		json_object_set_new(inner, "notes", arr);
++
++		json_t* const root = json_object();
++		json_object_set_new(root, "vcvrack-sequence", inner);
++		return root;
++	}
++
++	// 解析失败返回 false；调用方自己决定怎么提示用户
++	bool fromJson(const char* const text) {
++		if (text == nullptr)
++			return false;
++
++		json_error_t error;
++		json_t* const root = json_loads(text, 0, &error);
++		if (root == nullptr)
++			return false;
++
++		json_t* const inner = json_object_get(root, "vcvrack-sequence");
++		if (inner == nullptr) {
++			json_decref(root);
++			return false;
++		}
++
++		json_t* const arr = json_object_get(inner, "notes");
++		if (arr == nullptr) {
++			json_decref(root);
++			return false;
++		}
++
++		notes.clear();
++		const size_t n = json_array_size(arr);
++		for (size_t i = 0; i < n; ++i)
++			notes.push_back(Note::fromJson(json_array_get(arr, i)));
++
++		json_t* const lenJ = json_object_get(inner, "length");
++		length = (lenJ != nullptr) ? double(json_real_value(lenJ)) : calculatedLength();
++
++		json_decref(root);
++		return true;
++	}
++
++	std::string toString() const {
++		json_t* const root = toJson();
++		char* const c = json_dumps(root, JSON_INDENT(2) | JSON_REAL_PRECISION(9));
++		std::string s;
++		if (c != nullptr) {
++			s = c;
++			free(c);
++		}
++		json_decref(root);
++		return s;
++	}
++
++	bool fromString(const std::string& s) {
++		return fromJson(s.c_str());
++	}
++
++	// 写进系统剪贴板。GLFW 要求在主线程调用 => 只能在 UI 线程（右键菜单）里用
++	bool toClipboard() const {
++		if (APP == nullptr || APP->window == nullptr)
++			return false;
++		const std::string s = toString();
++		if (s.empty())
++			return false;
++		glfwSetClipboardString(APP->window->win, s.c_str());
++		return true;
++	}
++
++	bool fromClipboard() {
++		if (APP == nullptr || APP->window == nullptr)
++			return false;
++		const char* const c = glfwGetClipboardString(APP->window->win);
++		return fromJson(c);
++	}
++};
++
++} // namespace StarseaPortableSequence
+diff --git a/plugins/Starsea/src/Sketch.cpp b/plugins/Starsea/src/Sketch.cpp
+new file mode 100755
+index 0000000..6a966b9
+--- /dev/null
++++ b/plugins/Starsea/src/Sketch.cpp
+@@ -0,0 +1,72 @@
++/*
++ * Starsea plugin for Cardinal
++ * Module: Sketch - plugin skeleton, used to verify the
++ * "write code -> rebuild -> see it in Cardinal" pipeline.
++ *
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ */
++
++#include <cmath>
++
++#include "plugin.hpp"
++
++struct StarseaSketchModule : Module {
++    enum ParamIds {
++        GAIN_PARAM,
++        NUM_PARAMS
++    };
++    enum InputIds {
++        IN_INPUT,
++        NUM_INPUTS
++    };
++    enum OutputIds {
++        OUT_OUTPUT,
++        NUM_OUTPUTS
++    };
++    enum LightIds {
++        LEVEL_LIGHT,
++        NUM_LIGHTS
++    };
++
++    StarseaSketchModule() {
++        config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
++
++        configParam(GAIN_PARAM, 0.f, 1.f, 0.5f, "Gain", "%", 0.f, 100.f);
++        configInput(IN_INPUT, "Audio");
++        configOutput(OUT_OUTPUT, "Audio");
++    }
++
++    void process(const ProcessArgs& args) override {
++        const float in = inputs[IN_INPUT].getVoltage();
++        const float gain = params[GAIN_PARAM].getValue();
++        const float out = in * gain;
++
++        outputs[OUT_OUTPUT].setVoltage(out);
++        lights[LEVEL_LIGHT].setBrightnessSmooth(std::fabs(out) / 10.f, args.sampleTime);
++    }
++};
++
++struct StarseaSketchWidget : ModuleWidget {
++    StarseaSketchWidget(StarseaSketchModule* module) {
++        setModule(module);
++        setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/Sketch.svg")));
++
++        addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, 0)));
++        addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
++        addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
++        addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
++
++        addParam(createParamCentered<RoundBigBlackKnob>(mm2px(Vec(22.86f, 38.f)),
++                                                       module, StarseaSketchModule::GAIN_PARAM));
++
++        addChild(createLightCentered<MediumLight<GreenLight>>(mm2px(Vec(22.86f, 60.f)),
++                                                             module, StarseaSketchModule::LEVEL_LIGHT));
++
++        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(14.f, 95.f)),
++                                                module, StarseaSketchModule::IN_INPUT));
++        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(31.f, 95.f)),
++                                                  module, StarseaSketchModule::OUT_OUTPUT));
++    }
++};
++
++Model* modelStarseaSketch = createModel<StarseaSketchModule, StarseaSketchWidget>("Starsea-Sketch");
+diff --git a/plugins/Starsea/src/plugin.hpp b/plugins/Starsea/src/plugin.hpp
+new file mode 100755
+index 0000000..a0f4769
+--- /dev/null
++++ b/plugins/Starsea/src/plugin.hpp
+@@ -0,0 +1,22 @@
++/*
++ * Starsea plugin for Cardinal
++ * Personal music tools.
++ *
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ */
++
++#pragma once
++
++#include "rack.hpp"
++
++using namespace rack;
++
++// NOTE: the symbol name `pluginInstance` is rewritten at compile time via
++// -DpluginInstance=pluginInstance__Starsea (see plugins/Makefile), so that each
++// plugin package gets its own instance. Same trick Cardinal uses for its
++// built-in plugins.
++extern Plugin* pluginInstance;
++
++extern Model* modelStarseaSketch;
++extern Model* modelStarseaMiniArranger;
++extern Model* modelStarseaMiniArrangerExpander;

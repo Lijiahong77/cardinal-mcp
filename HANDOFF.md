@@ -40,8 +40,8 @@
 | 项 | 状态 |
 |---|---|
 | **Git 推送** | ✅ 本地 `main` 与 `origin/main` **完全同步**（2026-10-21 11:20 推了 `1f0c718`，含 E3 + E8 解锁一批）。⚠️ 推送方法已变：**光「清代理 + 直连」会超时**，必须**指定能通的 GitHub 边缘 IP** —— 见 §2.1 |
-| **WSL 源码树** | ✅ **已是「带 OSC 的可编译状态」**（2026-10-21 10:50 实测复核）。`src/CardinalCommon.cpp` 里 **28 个端点注册全在**，`CARDINAL_OSC_METHODS` X-macro 在、`/modules-page` 在，`src/override/MenuBar.cpp` 的延后 120 帧补丁也在 ⇒ **改完直接编即可，不必重跑 A→B→C→D 注入**。⚠️ 但它**不在任何注入器的可重放清单里**——`git checkout .` 会把 OSC 改动全冲掉（`MenuBar.cpp` 的补丁尤其危险，它不在任何注入器中） |
-| **WSL 里的 MenuBar 自动开 OSC 补丁** | **仍在**（未提交，`src/override/MenuBar.cpp`）。它**不在任何注入器里**，整树 `git checkout .` 会丢掉 → 见 §2.3 |
+| **WSL 源码树** | ✅ **已是「带 OSC 的可编译状态」**（2026-10-21 10:50 实测复核）。`src/CardinalCommon.cpp` 里 **28 个端点注册全在**，`CARDINAL_OSC_METHODS` X-macro 在、`/modules-page` 在，`src/override/MenuBar.cpp` 的延后 120 帧补丁也在 ⇒ **改完直接编即可**。<br>✅ **2026-10-21 11:40 已解决「改动会丢」这个风险**：全部改动的真相已导出成 `tools/osc_patch/patches/*.patch` 进本仓库（git 跟踪），由 `replay_osc.py` 统一重放 —— 实测在干净 upstream 副本上重放后与现状 **22/22 文件逐字节一致**、端点 28/28、幂等零破坏 ⇒ **`git checkout .` 也不怕了**（重放即可恢复）。详见 `tools/osc_patch/README.md` |
+| **WSL 里的 MenuBar 自动开 OSC 补丁** | ✅ **已解决**（2026-10-21 11:40）。它原先**不在任何注入器里**、整树 `git checkout .` 就丢 ⇒ 现在已包含在 `tools/osc_patch/patches/01-osc-core.patch` 里（git 跟踪），`replay_osc.py` 一跑就恢复 ⇒ 不用再手工贴（§2.3.1 只留作兜底） |
 | **E 组（协议级）** | **E1 三段式响应 ✅ / E2 分页 ✅ / E3 注册表抽函数 ✅ 全部完工**（E3 为纯重构：27 端点行为指纹与重构前逐条一致） |
 | **其他待拍板** | life1 三修法、段落编排规格、`.mid` 导出 —— 见 §6 |
 | **`.bak-*` 残留** | 已全清（41 个，WSL 树现 0 个） |
@@ -156,65 +156,76 @@ netstat -ano | findstr 2228
 
 ---
 
-### 2.3 第三步：要重编（把 OSC 改动重新注入源码树）
+### 2.3 第三步：要重编（把 OSC 改动放回源码树）
 
-> 只有「改了 C++ / 要新 OSC 端点 / 要新编译产物」才需要这一步。**注入器必须在 WSL 里跑**（它写的是 `/home/lijia/...`）。
+> ⚠️ **2026-10-21 重大变更**：改动的**真相**现在以 `tools/osc_patch/patches/*.patch`
+> 存在本仓库（git 跟踪），由 **`replay_osc.py`** 统一重放。
+> 旧的 6 个注入器（`inject_osc_*.py`）**已降级为历史记录**，不再是重放路径 ——
+> 理由见 `tools/osc_patch/README.md` §五（最关键的一条：注入器**覆盖不全**，
+> E1 的 `cardinalOscReply` helper 与 MenuBar 补丁都不在里面，跑完也凑不出现在的树）。
 
-**① 进 WSL，确认树是干净的：**
-
-```bash
-wsl.exe -e bash -lc '
-  cd ~/Cardinal &&
-  git -C . status --short src/CardinalCommon.cpp src/CardinalCommon.hpp src/override/Window.cpp src/override/Engine.cpp &&
-  git -C src/Rack status --short include/settings.hpp src/settings.cpp src/patch.cpp &&
-  echo "(以上应为空 = 干净)"
-'
-```
-
-**② 按 A → B → C → D 顺序注入（顺序不能乱，后一组依赖前一组）：**
+**① 进 WSL，把 patch 拷进去：**
 
 ```bash
 wsl.exe -e bash -lc '
-  cd ~/Cardinal &&
-  python3 /mnt/d/Cardinal/tools/osc_patch/inject_osc_read.py &&
-  python3 /mnt/d/Cardinal/tools/osc_patch/inject_osc_b.py &&
-  python3 /mnt/d/Cardinal/tools/osc_patch/inject_osc_c.py &&
-  python3 /mnt/d/Cardinal/tools/osc_patch/inject_osc_d.py
+  mkdir -p /home/lijia/_patches &&
+  cp /mnt/d/Cardinal/tools/osc_patch/patches/*.patch /home/lijia/_patches/ &&
+  ls -la /home/lijia/_patches/
 '
 ```
 
-**③ 验证（四条都应是 OK / 已注入 True）：**
+**② 预检（不改任何东西）：**
 
 ```bash
 wsl.exe -e bash -lc '
-  python3 /mnt/d/Cardinal/tools/osc_patch/inject_osc_read.py --check &&
-  python3 /mnt/d/Cardinal/tools/osc_patch/inject_osc_b.py --check &&
-  python3 /mnt/d/Cardinal/tools/osc_patch/inject_osc_c.py --check &&
-  python3 /mnt/d/Cardinal/tools/osc_patch/inject_osc_d.py --check
+  cd /home/lijia &&
+  CARDINAL_ROOT=/home/lijia/Cardinal CARDINAL_PATCH_DIR=/home/lijia/_patches \
+    python3 /mnt/d/Cardinal/tools/osc_patch/replay_osc.py --check
 '
 ```
 
-`inject_osc_d.py --check` 的正确输出大致是：
-
-```
-全部就位、无重复、副本一致 ✔
-```
-
-> 重复跑是安全的：A/B/C 看到 marker 会 `[skip]`；D 是幂等的（已存在即跳过）。
-> 要撤销某一组：给对应脚本加 `--rollback`（按文件 stem 取最新备份还原）。
-
-**④ 如果整棵树被 `git checkout .` 重置过，补回「启动自动开 OSC」补丁**（它不在注入器里）：
-
-先检查：
+**③ 重放（幂等；已应用过的组会自动跳过）：**
 
 ```bash
-wsl.exe -e bash -lc 'grep -c "oscAutostartEnabled" ~/Cardinal/src/override/MenuBar.cpp'
+wsl.exe -e bash -lc '
+  cd /home/lijia &&
+  CARDINAL_ROOT=/home/lijia/Cardinal CARDINAL_PATCH_DIR=/home/lijia/_patches \
+    python3 /mnt/d/Cardinal/tools/osc_patch/replay_osc.py
+'
 ```
 
-- 输出 `1`（或更大）→ 补丁还在，跳过本步。
-- 输出 `0` → 需要重贴。补丁内容见 §2.3.1，贴进 `src/override/MenuBar.cpp` 的三处位置。
+期望输出：
 
-#### 2.3.1 MenuBar 自动开 OSC 补丁（原样）
+```
+✔ 已应用      01-osc-core.patch            OSC 核心：28 端点实现 + 注册 + MenuBar 自动开 OSC + 截图落盘
+✔ 已应用      02-rack-osc.patch            [src/Rack] Rack 子模块：oscLoadActive + fromJson 弹窗条件化
+✔ 已应用      03-build-env.patch           构建环境：Starsea 注册 + Makefile + immintrin 兼容 + 删 lv2export
+✔ 已应用      04-starsea-plugin.patch      Starsea 自建插件包（10 个文件，新增）
+
+端点数     : 28 / 28
+✅ 校验通过：28 端点 + 所有标记齐全
+```
+
+**④ 只校验现状（不重放）：**
+
+```bash
+wsl.exe -e bash -lc '
+  cd /home/lijia &&
+  CARDINAL_ROOT=/home/lijia/Cardinal CARDINAL_PATCH_DIR=/home/lijia/_patches \
+    python3 /mnt/d/Cardinal/tools/osc_patch/replay_osc.py --verify
+'
+```
+
+> 🔴 **冲突时脚本会立刻停下并报错，绝不 `--reject` 硬塞**（upstream 变了 patch 可能失效，
+> 需人工看差异）。详见 `tools/osc_patch/README.md` §六的三个坑
+> （`git apply` 静默跳过、幂等判据、E3 后端点数不能数 `add_method`）。
+
+#### 2.3.1 MenuBar 自动开 OSC 补丁（原样 · **手工兜底，正常不用了**）
+
+> ⚠️ **这段补丁现在已被 `01-osc-core.patch` 覆盖** ⇒ 正常重放 §2.3 就会自动带上它，
+> **不需要手工贴**。本节保留作**兜底**：万一 upstream 变了导致 patch 冲突，
+> 可以照这里手工贴三处。
+
 
 ```diff
 --- a/src/override/MenuBar.cpp
@@ -561,7 +572,7 @@ DISPLAY=:0 CARDINAL_OSC_AUTOSTART=1 wine bin/CardinalNative.exe
 
 | # | 事项 | 说明 |
 |---|---|---|
-| B1 | **把 OSC 改动纳入版本控制** | 28 个端点的 C++ 改动**目前不在 git 里**（WSL 树上是工作区修改）。⇒ 一次 `git checkout .` 就全没了。**风险最高的一项**。做法：把 A→B→C→D→E1→E2→E3 全部收敛成**一个可重放脚本**（现在有 6 个分散的注入器） |
+| B1 | ~~**把 OSC 改动纳入版本控制**~~ ✅ **已完成**（2026-10-21 11:40） | 28 个端点的 C++ 改动 + Starsea 插件包（10 文件）已导出成 **4 组 patch** 进 git（`tools/osc_patch/patches/`），由 `replay_osc.py` 统一重放。**实测**：干净 upstream 副本重放后与现状 **22/22 文件逐字节一致**、端点 28/28、幂等重跑零破坏 ⇒ `git checkout .` 不再是灾难 |
 | B2 | **`/cables` 分页** | `/modules` 有分页（E2）了，`/cables` 还是全量返回。机架大时 payload 会爆（`CardinalCommon.cpp:544` 注释明说 poly 16 通道能撑爆） |
 | B3 | **撤销/复制粘贴** | `cardinal_undo`/`cardinal_redo` 已有（走 history）；**复制粘贴模块**没有 —— VCV 文件里复制一个模块 = 改 id + 重挂线 |
 | B4 | **每轨独立长度** | MiniArranger 4+4 循环是**固定 8 小节**；每轨独立长度（李录的和弦长度不一）没做 |
@@ -572,7 +583,7 @@ DISPLAY=:0 CARDINAL_OSC_AUTOSTART=1 wine bin/CardinalNative.exe
 
 | # | 事项 |
 |---|---|
-| C1 | **`MenuBar.cpp` 自动开 OSC 补丁不在任何注入器里** ⇒ 整树 `git checkout .` 会丢，只能手工重打 |
+| C1 | ~~**`MenuBar.cpp` 自动开 OSC 补丁不在任何注入器里**~~ ✅ **已解**（2026-10-21 11:40）| 该补丁连同全部 28 端点改动已导出成 `tools/osc_patch/patches/01-osc-core.patch` 进 git，由 `replay_osc.py` 重放 ⇒ 整树 `git checkout .` 后跑一次脚本即可完全恢复。⚠️ 注意：**patch 相对 upstream `8aa0fc7`**，upstream 变了会冲突（脚本会停下报错，不会硬塞） |
 | C2 | **`/load` 的 `skipped` 列表拿不到**（引擎刻意避免，TODO-BACKLOG E4）⇒ 接线侧静默失败仍不可见 |
 | C3 | **Cardinal 日志进程内读不到**（`logger.cpp:110` 直 fprintf）⇒ 要读必须加环形缓冲 hook |
 | C4 | **liblo 收不了 string 参数** ⇒ 需文本/JSON 的操作一律走 JS 脚本文件 + 数值索引 |
@@ -621,7 +632,10 @@ HostMIDI 复音 8 声道分轨录和弦，4+4 循环，每轨独立音色链。
 | `tools/osc_patch/inject_osc_c.py` | C 组注入器（9 个操作 + 2 个 JS 端点） |
 | `tools/osc_patch/inject_osc_d.py` | D 组注入器（`/screenshot` + `/load` 回 warningLog） |
 | `tools/osc_patch/inject_osc_e2.py` | E2 注入器（`/modules-page` 分页，依赖 E1+A 组） |
-| `tools/osc_patch/inject_osc_e3.py` | E3 注入器（端点注册表抽 X-macro 单一真源；依赖 A/B/C/D/E1/E2） |
+| `tools/osc_patch/inject_osc_e3.py` | E3 注入器（端点注册表抽 X-macro 单一真源；依赖 A/B/C/D/E1/E2）——⚠️ **已降级为历史记录**，不再是重放路径 |
+| `tools/osc_patch/replay_osc.py` | ⭐ **统一重放脚本**（唯一入口）：把 `patches/*.patch` 放回源码树，幂等 + 自动校验 28 端点 |
+| `tools/osc_patch/patches/*.patch` | ⭐ **改动的真相**（4 组，git 跟踪）：OSC 核心 / Rack 子模块 / 构建环境 / Starsea 插件 |
+| `tools/osc_patch/README.md` | 重放说明 + 基线 + 三个踩过的坑 |
 | `tools/osc_patch/*.inc` | 注入用的 C++ handler 源码 |
 | `tools/rackgen.py` | 机架生成 DSL（新机架一律走它） |
 | `tools/layout_patch.py` | 排班 + 门禁（`check` / `guard` / `apply` / `widths`） |
