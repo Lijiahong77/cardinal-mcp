@@ -6,7 +6,8 @@
 > - 批次 A（A1–A11）✅ 全部完成
 > - 批次 B（B1–B5）✅ 完成 · C 组 ✅ 完成 · F 组 QuickJS ✅ 完成 · D 组（D1/D2）✅ 完成
 > - **E 组三批（E1/E2/E3）✅ 全部完工**
-> - **待办总表已清空** —— 原有三项待办（`.mid` 导出 / 段落编排规格 / life1 三修法）均已由李在 10-21 裁决结案，见第七节。
+> - **待办总表已清空** —— 原有三项待办（`.mid` 导出 / 段落编排规格 / life1 三修法）均已由李在 10-21 裁决结案，见第六节。
+> - **但「后面还有的工作」不等于空** —— 10-21 11:20 重新盘点：协议层（A/B/C/D/E 五组）已全完工，剩下的全是「缺真机验收」或「缺李的拍板」或「我独立能做的收尾」。**完整清单见 `HANDOFF.md` §6.1b**（分 A 需要李在场 / B 我能独立做 / C 已知技术债 三栏）。
 > - 开工入口 → 根目录 `HANDOFF.md`（状态 + 命令）；本文件只管「还有什么没做」
 >
 > 用途：把所有待办集中在这里。开工时按「批次」推进，每批做完整再进下一批。
@@ -15,13 +16,14 @@
 
 ## 一、当前资产（已完工，不是待办）
 
-**MCP 工具 53 个**（`tools/cardinal_mcp.py`，截至 2026-10-20 D 组完工）
+**MCP 工具 55 个**（`tools/cardinal_mcp.py`，截至 2026-10-21 E3+E8 完工）
 - 原有 17：连通/存档/按编号操作/音乐配方/5 个未编译探针
 - 10-19 白天新增 13：4 个模块检索 · 1 个接线拓扑 · 3 个序列器音符 · 4 个采样槽 · 1 个交互索引
 - 批次 A 新增 6：`set_param_by_name` · `cardinal_audit` · `cardinal_deploy`+`cardinal_diff` · `cardinal_port_semantics` · `cardinal_export_abc`
 - 批次 B 第一批新增 5：`build_info` · `cables` · `transport` · `engine_info` · `plugins`
 - 批次 B 第二批（C 组 + QuickJS）新增 11：`param_set_by_display` · `cable_add` · `cable_remove` · `undo` · `redo` · `module_json` · `module_remove` · `module_move` · `midi_out` · `js_run` · `js_list`
 - D 组新增 1：`cardinal_screenshot`
+- E8 解锁新增 1：`cardinal_set_params_batch`（批量按名设参）
 
 **新写的 Python 模块**（`tools/`）
 | 文件 | 作用 |
@@ -58,7 +60,7 @@
 | A7 | ~~`tools/rackgen.py`~~ ✅ 完成 | 已提炼：cable/mod/clone/note/track/Row/save + place/LAYOUT（布局主权归李）+ midi/build_notes/pattern + sanitize/_guard（血泪注释逐字保留）。验收 8 项全绿：与 make_quadeca(_auto) 原实现逐字段等价、悬空面包屑清除、空色值清除、同口多线拦截、Mix8 MUTE 拦截、save 写 tmp 回读。测试在 `tools/_test_rackgen.py`。**存量 12 个 make_* 不迁移**（已验收，宪法：改错比不改更糟）；新机架一律走 rackgen | 无 |
 | A8 | ~~修 `apply_recipe` 的 `mods[0]` 缺陷~~ ✅ 完成 | 🔴 `musiclib.py:544` 是 `mod = mods[0]` ⇒ **同型号模块只改第一个**。机架里常有 2 个 VCA-1。不修就做 A9 的强度混合，会改错模块。⚠️ 宪法：「绝不覆盖李手工调的机架布局」——改错模块比不改更糟 | 无 |
 | A9 | ~~recipe 强度混合~~ ✅ 完成（weight 0..1 插值 + clamp 已验证） | `apply_recipe` 从「整套套用」升级为**带权重的参数目标**：weight 0..1 在「当前值 ↔ recipe 目标值」间插值（0.5 = 各半），越界自动 clamp 并报告实际生效值。⚠️ 借鉴 YuE2 的 LoRA 权重思想（-10..+10），但我们用 0..1 更直观。**必须先做 A8** | 无 |
-| A10 | ~~乐谱导出~~ ✅ 完成（李授权选 .abc） | 读机架里的 pianoroll / MiniArranger 音符 → 导出可编辑乐谱。⭐ **`seq.py` 的 `read_notes` + `edit_note` 已在**，只差序列化器。格式待李拍板（见第六节） | 无 |
+| A10 | ~~乐谱导出~~ ✅ 完成（李授权选 .abc） | 读机架里的 pianoroll / MiniArranger 音符 → 导出可编辑乐谱。⭐ **`seq.py` 的 `read_notes` + `edit_note` 已在**，只差序列化器。格式已由李拍板为 `.abc`（`.mid` 作废） | 无 |
 | A11 | ~~风格 schema 化~~ ✅ 完成 | 产出 `docs/STYLE-SCHEMA.md` + `tools/style_schema.py`。字段：BPM 区间 / **分层职责**（哪层担当鼓、贝斯、和声、旋律）/ 混响尺寸与衰减 / 滤波开合 / **参考模块选型**。样板验证：拿已验收的 `yorushika_shura/hana` + `quadeca_life1_wdtg` 回填两份，**验证 schema 装得下真实决策**。⚠️ 抄 YuE2 的关键：风格字段要**可编辑、可存 JSON 在工具间流转**，不是写死的散文 | 无 |
 
 ---
@@ -184,7 +186,7 @@
 | E5 | Cardimal 日志**进程内读不到**（`logger.cpp:110` 直接 fprintf，Cardinal 走 DPF 路径 `logPath` 为空 ⇒ 输出到 stderr）。要读必须加环形缓冲 hook | 确认 |
 | E6 | XRUN/getCpuLoad **完全不存在**（Cardinal 不用 JACK，跑在宿主回调里）；替代 = `processCounter` 增长速率 | 确认 |
 | E7 | 电压读数**可能撕裂**：Engine 的 SharedMutex（`Engine.cpp:227`）**不保护 Port 电压**，音频线程无锁直写。但 Cardinal 自己 UI 线程也是无锁读，属既定设计，不会崩 | 确认 |
-| **E8** | 🔴 **死锁：A3 的验证闭环被编译阻塞** | 已核实。链条：`apply_recipe`/OSC 改的是 **param** → 改完读回来验证 → 唯一能读 param 实时值的探针是 `get_param`（走 `getDisplayValue()`）→ **该探针未编译**（`param-get` 在二进制里 = 0）。`read_live` 也不行：它读 autosave，而 autosave **只在 `/load` 和 GUI Ctrl+S 落盘，`/param` 改动永不落盘** ⇒ 读到的永远是旧值。<br>⇒ **要么把 A3 降级为「只验证结构不验证参数」，要么把它推到编译之后。** 我倾向后者——**验证闭环本来就是编译才有意义的**。<br>⚠️ 注意：绝不可以用「返回成功但数据为空」来掩盖（会变成假阳性诊断） | **需李定** |
+| **E8** | 🔴 **死锁：A3 的验证闭环被编译阻塞** | 已核实。链条：`apply_recipe`/OSC 改的是 **param** → 改完读回来验证 → 唯一能读 param 实时值的探针是 `get_param`（走 `getDisplayValue()`）→ **该探针未编译**（`param-get` 在二进制里 = 0）。`read_live` 也不行：它读 autosave，而 autosave **只在 `/load` 和 GUI Ctrl+S 落盘，`/param` 改动永不落盘** ⇒ 读到的永远是旧值。<br>⇒ **要么把 A3 降级为「只验证结构不验证参数」，要么把它推到编译之后。** 我倾向后者——**验证闭环本来就是编译才有意义的**。<br>⚠️ 注意：绝不可以用「返回成功但数据为空」来掩盖（会变成假阳性诊断） | ✅ **已解（10-21 零编译绕过）**：`/param-get` 探针仍未编进 exe，但**引擎 `Manager::saveAutosave()` 用 `toJson()` 落盘 ⇒ autosave 必然带 params**，`/load` 会触发落盘 ⇒ 可用「文件 vs autosave」做**参数级 diff**。已落地为 `cardinal_diff` 的参数层 + `cardinal_deploy` 的参数级读回（工具 55）。⚠️ autosave 只在 `/load` 与 GUI Ctrl+S 落盘 ⇒ **纯 `/param` 改动仍不落盘**，参数级 diff 只在「部署后」有意义 |
 | **E9** | 🟡 **YuE2 计划里的样板机架路径写错** | 计划第 78 行写 `yorushika_shura/hana`，实际文件是 `patches/yorushika_hana.vcv`（无目录层级）。已核对全部样板机架的真实文件名（见第四节），**开工时按实际路径用**。**记忆（MEMORY.md）里也有一处同类写法**（写 `yorushika_shura/hana`），建议一并订正 | 已核实 |
 | **E10** | ~~与 SONG-TO-PATCH-WORKFLOW.md 重叠/矛盾~~ ✅ 已裁决已落地（李 10-19：统一英文） | ① SONG-TO-PATCH-WORKFLOW.md 头部已标「已并入本表，不再单独维护」② 选型段落改为 modbrowser 英文用法 ③ modbrowser 内置中文词表做翻译层（一个入口），modsearch 降级为速查表 CLI | 已闭环 |
 
