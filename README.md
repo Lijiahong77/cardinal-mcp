@@ -177,6 +177,7 @@ Behind the scenes it calls `cardinal_list_patches` + `cardinal_patch_info`.
 | `cardinal_load_patch` | push a .vcv into running Cardinal (incl. zoom + gridOffset) | let the AI switch tones |
 | `cardinal_set_param` | turn any module's knob: `moduleId + paramId + value` | change cutoff / release / etc. |
 | `cardinal_set_param_by_name` | set one knob by param NAME, refuses reserved/removed slots, multi-instance aware | "set the VCF cutoff" without looking up ids |
+| `cardinal_set_params_batch` | set MANY knobs in one call (by param name), one read + one write, per-item receipt | adjust a whole chain of knobs in one shot |
 | `cardinal_set_host_param` | change one of Cardinal's 24 host params | audio device / sample rate / etc. |
 | `cardinal_save_live` | persist current GUI state to a .vcv | user's manual changes vanish on close otherwise |
 
@@ -197,7 +198,7 @@ Behind the scenes it calls `cardinal_list_patches` + `cardinal_patch_info`.
 |---|---|---|
 | `cardinal_audit` | run ALL five pre-load audits in one call, verdict FAIL/WARN/PASS | gate before every `/load` |
 | `cardinal_deploy` | backup → audit → load → read-back structure diff, refuses on FAIL | one-click safe deploy |
-| `cardinal_diff` | on-disk .vcv vs. what the engine actually instantiated | catch silently dropped modules |
+| `cardinal_diff` | on-disk .vcv vs. what the engine actually instantiated — **structure AND knob values** | catch silently dropped modules, and knobs that don't match |
 
 ### Live read probes (need the patched Cardinal build; degrade gracefully without it)
 

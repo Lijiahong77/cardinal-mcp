@@ -247,6 +247,22 @@ T2 diagnose_silence → issue:"load_failed", confidence:1.0, evidence.source:"lo
 **实现要点**：走 `paramlib.resolve_name()`（`paramlib.py:834-861`）打分取最高分（内部已做中文口语展开 `:846-849`）。⛔ **必须拒绝 `kind=="reserved"` 的槽**：`paramlib.py:673-686` 为「enum 里有但无 `configParam`」的槽生成占位（VCF 1 号、Clocked 14 号）—— 设进去不报错但**没有任何效果**，是最难查的哑弹；命中时返回 `{"error":"reserved_slot","pid":N}`，**不回退次高分**（次高分同样是错的）。`resolve_name` 空 → `{"error":"no_match","candidates":[前5个已有 param 名]}` 帮 LLM 换词重试。`undoable:false` 因现有 `/param`（`CardinalCommon.cpp:760-790`）走 `Engine::setParamValue`（`Engine.hpp:186`）**绕过 history**；编译后改用 H7 即为 true。
 **验收**：`name:"起音"` → `pid:1 "Attack"`；VCF `name:"1"` → `{"error":"reserved_slot"}`，**不是**静默成功。
 
+## T9b. `cardinal_set_params_batch(patch, sets[])` — 批量设参（✅ 已实现 2026-10-21）
+
+**入参** `{ "patch":"<name>", "sets":[{"module":"VCO","param":"Frequency","value":8.0,"instance":0}], "load_after":false }`
+**返回** `{ "ok":true, "written":true, "applied":2, "requested":3, "failed":1, "backup":"<patch>.bak-param", "results":[{ "index":0, "ok":true, "module":"Bogaudio/Bogaudio-VCO", "module_id":..., "param_id":0, "param_name":"Frequency", "value":8.0, "warnings":[...] }] }`
+
+**实现要点**：一次读盘、一次备份、一次写盘（不是循环调 T9）。每条**独立** try/except ⇒ 一条失败不打断其余，失败条目仍回执。复用 T9 的 `reserved` 守门、越界警告（照写不裁剪）、多实例提示。⛔ **全部失败 ⇒ 不写盘**（`written:false`，原文件 mtime 不变）。
+**验收**：3 条里 2 成功 1 失败 ⇒ 成功的已落盘、失败条目带 `error`；reserved 槽被拒；全失败时 `written:false`。
+
+## T9c. `cardinal_diff(name, check_params=true)` — 参数级差异（✅ 已实现 2026-10-21，E8 解锁）
+
+**入参** `{ "name":"<name>", "check_params":true }`
+**返回** `{ "match":true, "params_match":false, "params_checked":595, "params":{ "params_compared":595, "params_unserialized":0, "params_mismatched":1, "tolerance":0.0001 }, "param_mismatches":[{ "module_id":..., "module":"Bogaudio/Bogaudio-VCO", "param_id":0, "file_value":8.0, "live_value":3.5, "delta":-4.5 }] }`
+
+**实现要点**：**结构层与参数层分开报告**（两者可信度不同，参数层受引擎序列化规则影响）。live 侧取 Cardinal 的 autosave（`Manager::saveAutosave()` 用 `toJson()` ⇒ 必然带 params）。🔴 **三条误报防护**：① 引擎跳过不序列化的无界参数（`!isBounded()`）⇒ 归 `params_unserialized`，**不判错**；② 值比较带容差 `1e-4`（吸收 float32 量化误差 ~6e-9）；③ 模块整体缺失归结构层，不在参数层重复报。
+**验收**：改 live 端一个参数 ⇒ `params_match=false` 且恰好 1 条不一致；只改结构 ⇒ `match=false` 而 `params_match=true`。
+
 ## T10. `cardinal_audit(patch, checks[])` — 聚合审计
 
 **入参** `{ "patch":"live"|"<name>", "checks":["ports","flow","values","chain"] }`

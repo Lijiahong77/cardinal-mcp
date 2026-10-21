@@ -16,6 +16,7 @@ What it exposes (12 semantic tools)
                               to set any parameter)
   cardinal_load_patch         load a .vcv into the running Cardinal
   cardinal_set_param          turn any module's knob (moduleId + paramId + value)
+  cardinal_set_params_batch   set MANY knobs in one call (by param name)
   cardinal_set_host_param     set one of Cardinal's 24 host parameters
   cardinal_read_live          read the patch Cardinal is currently running
                               (via the live autosave file, NOT OSC)
@@ -323,15 +324,18 @@ def _resolve_param_id(entry, param):
         note = None
         if len(exact) > 1:
             note = f"有 {len(exact)} 个同名参数槽，取最小的 id {min(exact)}；" \
-                   f"要选别的请用数字 param。全部同名 id: {sorted(except0) if False else sorted(exact)}"
+                   f"要选别的请用数字 param。全部同名 id: {sorted(exact)}"
         return min(exact), params.get(str(min(exact))), note
-    part = [int(pid) for pid, v in params.items()
-            if want in (v.get("name") or "").lower()]
-    if not exact and not [pid for pid, v in params.items() if want in (v.get("name") or "").lower()]:
+    # 🔴 2026-10-21 修：子串匹配分支原先写 `min(exact or partial)`，
+    # 但 partial 从未定义 ⇒ 任何「非精确名」的按名字设参都会抛 NameError
+    # （例：param="level" 匹配 "Channel 1 level"）。此路径此前从未被测到。
+    partial = [int(pid) for pid, v in params.items()
+               if want in (v.get("name") or "").lower()]
+    if not partial:
         return None, None, f"找不到参数「{param}」"
-    pid = min(exact or partial)
+    pid = min(partial)
     info = params.get(str(pid))
-    note = (f"没有精确同名参数，按子串匹配命中" if not exact else None)
+    note = "没有精确同名参数，按子串匹配命中"
     return pid, info, note
 
 
@@ -404,6 +408,132 @@ def set_param_by_name(patch, module, param, value, instance=0, load_after=False)
         out["note_instances"] = f"机架里有 {len(hits)} 个 {mod['model']}，本次改的是 instance={instance}"
     if warnings:
         out["warnings"] = warnings
+    if load_after:
+        out["loaded"] = load_patch(p)
+    return out
+
+
+# ★ 2026-10-21 批次 A12：批量设参。
+# 为什么需要：set_param_by_name 一次只能改一个旋钮。改一台 MiniArranger
+# 的 8 轨音色链（每轨 3-4 个旋钮）= 30+ 次调用，每次都要重新读文件、
+# 重新写文件、重新备份 —— 慢，且中途失败会留下半改状态。
+# 批量版：一次读盘、一次备份、一次写盘，逐条独立回执。
+#
+# 🔴 沿用 set_param_by_name 的全部防线，一条都不许放松：
+#   1. reserved 废弃槽拒绝写（写进去不报错但没效果 = 静默失败）
+#   2. 同型号多实例必须显式 instance，且回执里永远报「共几个/挑了哪个」
+#   3. 越界值照写不裁剪，但必须警告
+#   4. 某一条失败**不影响其它条**（逐条独立），但整体 ok 字段如实反映
+#   5. 全部条目都失败 ⇒ 不写盘（避免把好文件改成空）
+def set_params_by_name_batch(patch, sets, load_after=False):
+    """一次改多个旋钮（按名字），逐条独立回执。
+
+    Args:
+      patch  patch 文件名
+      sets   list of {module, param, value, instance?}
+             module  = 型号名，如 "VCO" 或 "plugin/model"
+             param   = 参数名（如 "Cutoff frequency"）或数字 param_id
+             value   = 目标值
+             instance= 同型号的第几个（0 起），默认 0
+      load_after  改完是否 /load 热加载
+
+    失败策略：**部分成功也是成功**。每条独立 try/except，一条挂了就
+    记 failed，其余照改。全部失败时**不写盘**（防止把好文件写坏）。
+    """
+    import paramlib as pl
+    p = resolve(patch)
+    if not os.path.exists(p):
+        return {"error": f"patch not found: {p}"}
+    if not isinstance(sets, list) or not sets:
+        return {"error": "sets must be a non-empty list",
+                "expected": '[{"module": "VCO", "param": "Frequency", "value": 0.5}]'}
+
+    d = patchio.read_patch(p)
+    results = []
+    applied = 0
+
+    for idx, item in enumerate(sets):
+        rec = {"index": idx}
+        try:
+            if not isinstance(item, dict):
+                raise ValueError("条目必须是对象")
+            module = item.get("module")
+            param = item.get("param")
+            value = item.get("value")
+            instance = int(item.get("instance", 0) or 0)
+            if module is None or param is None or value is None:
+                raise ValueError("缺 module / param / value")
+            value = float(value)
+
+            hits, all_mods = _find_module_instances(d, module)
+            if not hits:
+                raise ValueError(f"机架里没有「{module}」")
+            if not 0 <= instance < len(hits):
+                raise ValueError(
+                    f"机架里有 {len(hits)} 个 {hits[0]['model']}，instance={instance} 越界")
+            mod = hits[instance]
+
+            entry = pl.lookup(mod["plugin"], mod["model"])
+            if not entry:
+                raise ValueError(f"{mod['plugin']}/{mod['model']} 不在参数字典里")
+            pid, info, note = _resolve_param_id(entry, param)
+            if pid is None:
+                raise ValueError(note)
+
+            # 🔴 核心守门：reserved 槽拒绝写（与单条版同一把锁）
+            if (info or {}).get("kind") == "reserved":
+                raise ValueError(
+                    f"param {pid} 是废弃占位槽（{info.get('enum')}），"
+                    f"写了也没有任何效果，已拒绝")
+
+            lo, hi = (info or {}).get("min"), (info or {}).get("max")
+            warnings = []
+            if lo is not None and hi is not None and not (lo <= value <= hi):
+                warnings.append(f"值 {value} 超出该参数范围 {lo}..{hi}，照写不裁剪")
+            if note:
+                warnings.append(note)
+
+            params = mod.setdefault("params", [])
+            for q in params:
+                if q.get("id") == pid:
+                    q["value"] = value
+                    break
+            else:
+                params.append({"id": pid, "value": value})
+
+            rec.update({"ok": True,
+                        "module": f"{mod['plugin']}/{mod['model']}",
+                        "module_id": mod["id"], "param_id": pid,
+                        "param_name": (info or {}).get("name"),
+                        "kind": (info or {}).get("kind"),
+                        "value": value})
+            if len(hits) > 1:
+                rec["note_instances"] = (
+                    f"机架里有 {len(hits)} 个 {mod['model']}，本次改的是 instance={instance}")
+            if warnings:
+                rec["warnings"] = warnings
+            applied += 1
+        except Exception as e:  # noqa: BLE001 — 一条失败不影响其余
+            rec.update({"ok": False, "error": str(e),
+                        "requested": item if isinstance(item, dict) else str(item)})
+        results.append(rec)
+
+    # 全部失败 ⇒ 不写盘（别把好文件写坏）
+    if applied == 0:
+        return {"ok": False, "patch": os.path.basename(p),
+                "written": False, "applied": 0, "requested": len(sets),
+                "results": results,
+                "note": "没有一条成功 ⇒ 未写盘（原文件未改动）"}
+
+    bak = p + ".bak-param"
+    shutil.copy2(p, bak)
+    patchio.write_patch(p, d)
+
+    out = {"ok": True, "patch": os.path.basename(p), "backup": bak,
+           "written": True, "applied": applied, "requested": len(sets),
+           "failed": len(sets) - applied, "results": results}
+    if applied != len(sets):
+        out["note"] = f"{applied} 条成功、{len(sets) - applied} 条失败 —— 成功的已写入，失败的见对应条目"
     if load_after:
         out["loaded"] = load_patch(p)
     return out
@@ -634,11 +764,80 @@ def cardinal_port_semantics(module=None, patch=None, module_id=None):
             **({"note": note} if note else {})}
 
 
-def cardinal_diff(name):
-    """比对磁盘上的 .vcv 与运行中 Cardinal 的结构（模块 + 接线）。
+def _params_map(module):
+    """把一个 module 的 params 列表压成 {param_id: value}。
 
-    只验结构不验参数（E8 降级）。stale=true 说明 autosave 是上一会话
-    的残留，结果不可当真 —— 绝不用空数据掩盖。
+    .vcv 与引擎 autosave 的 params 都是 [{"id":N,"value":V}, ...] 形态，
+    且 value 同量纲（都是 ParamQuantity::getValue() 的存储值，非显示值），
+    所以可以直接逐项比。
+    """
+    out = {}
+    for q in (module.get("params") or []):
+        if not isinstance(q, dict):
+            continue
+        pid = q.get("id")
+        if pid is None:
+            continue
+        try:
+            out[int(pid)] = float(q.get("value", 0.0))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _diff_params(d_file, d_live, tol=1e-4):
+    """逐模块比对参数值。返回 (mismatch 列表, 统计 dict)。
+
+    🔴 误报防护（这条项目上栽过多次，务必守住）：
+    1. **文件里有、引擎里没有的槽，不算错** —— 引擎 `paramsToJson()`
+       明确跳过「无界参数」（`!isBounded()`），那类槽本就不该被序列化。
+       引擎侧没有 ⇒ 归为 `unserialized`（不判错、不算 mismatch）。
+    2. **值比较必须带容差** —— 引擎 `setImmediateValue` 会按 min/max
+       归一化并量化，文件里写的 0.4 回读可能是 0.4000000059604645。
+       没有容差会把「引擎正常量化」误报成「参数没生效」。
+    3. **模块整体缺失**归结构层（missing_modules），这里不重复报。
+    """
+    live_by_id = {m["id"]: m for m in d_live.get("modules", [])}
+    mismatches = []
+    compared = 0
+    unserialized = 0
+    for mf in d_file.get("modules", []):
+        ml = live_by_id.get(mf["id"])
+        if ml is None:
+            continue                      # 模块没加载 ⇒ 结构层已报
+        pf = _params_map(mf)
+        pl = _params_map(ml)
+        for pid, vfile in pf.items():
+            if pid not in pl:
+                unserialized += 1           # 无界参数被引擎跳过，不算错
+                continue
+            compared += 1
+            vlive = pl[pid]
+            if abs(vfile - vlive) > tol:
+                mismatches.append({
+                    "module_id": mf["id"],
+                    "module": "%s/%s" % (mf.get("plugin"), mf.get("model")),
+                    "param_id": pid,
+                    "file_value": vfile,
+                    "live_value": vlive,
+                    "delta": round(vlive - vfile, 6),
+                })
+    stats = {"params_compared": compared,
+             "params_unserialized": unserialized,
+             "params_mismatched": len(mismatches),
+             "tolerance": tol}
+    return mismatches, stats
+
+
+def cardinal_diff(name, check_params=True):
+    """比对磁盘上的 .vcv 与运行中 Cardinal（模块 + 接线 + 参数值）。
+
+    两个结论**分开报告**，因为可信度不同：
+    - `match`            结构层：模块集合 + 接线表一致
+    - `params_match`     参数层：旋钮值一致（E8 已解锁，2026-10-21）
+
+    ⚠️ stale=true 说明 autosave 是上一会话的残留，结果不可当真 ——
+    绝不用空数据掩盖。
     """
     p = resolve(name)
     if not os.path.exists(p):
@@ -664,13 +863,38 @@ def cardinal_diff(name):
     extra_c = cab_l - cab_f
     started = cardinal_proc_start()
     stale = bool(started and os.path.getmtime(live_path) + 1.0 < started)
+
+    # --- 参数层（E8 解锁：/param-get 探针已编译，可读实时值） -------------
+    param_mismatches, param_stats = ([], {"params_compared": 0,
+                                           "params_unserialized": 0,
+                                           "params_mismatched": 0,
+                                           "tolerance": 1e-4})
+    params_checked = False
+    if check_params:
+        try:
+            param_mismatches, param_stats = _diff_params(d_file, d_live)
+            params_checked = True
+        except Exception as e:  # noqa: BLE001 — 参数层失败不许连累结构层
+            param_stats = {"error": "参数比对失败: %s" % e}
+
     note = ("autosave 比进程还旧 ⇒ 上一会话残留，结果不可当真" if stale else
-            "结构比对基于 live autosave；参数值不在比对范围（E8 降级）")
+            "结构比对基于 live autosave")
+    if not check_params:
+        note += "；参数层未检查（check_params=False）"
+    else:
+        note += ("；参数层已检查（%d 项比对，%d 项不一致，%d 项因引擎不序列化无界参数而跳过）"
+                 % (param_stats.get("params_compared", 0),
+                    param_stats.get("params_mismatched", 0),
+                    param_stats.get("params_unserialized", 0)))
     if started is None:
         note += "；⚠️ 未检测到运行中的 Cardinal 进程 —— 比对对象可能是残留 autosave"
     return {
         "patch": os.path.basename(p),
         "match": not (miss_m or extra_m or miss_c or extra_c),
+        "params_match": (not param_mismatches) if params_checked else None,
+        "params_checked": params_checked,
+        "params": param_stats,
+        "param_mismatches": param_mismatches,
         "modules_file": len(mods_f), "modules_live": len(mods_l),
         "cables_file": len(cab_f), "cables_live": len(cab_l),
         "missing_modules": sorted("%s/%s(#%s)" % (pl, md, i) for i, pl, md in miss_m),
@@ -682,10 +906,18 @@ def cardinal_diff(name):
 
 
 def cardinal_deploy(name, load_after=True):
-    """一键部署：备份 → 五项审计（FAIL 拒发）→ /load → 结构读回比对。
+    """一键部署：备份 → 五项审计（FAIL 拒发）→ /load → 读回比对（结构 + 参数）。
 
     顺序即防线：崩类问题被审计拦在加载前；diff 证明「文件里的东西
-    引擎真的都装上了」。参数值不在比对范围（E8 降级，编译后补全）。
+    引擎真的都装上了」。
+
+    ✅ E8 已解锁（2026-10-21）：当年因 `/param-get` 探针没编译，只能验结构。
+    现在探针已进 exe，且引擎 autosave 与 .vcv 同量纲 ⇒ **参数层也能验**：
+    旋钮值没真正生效（被引擎钳位、被静默丢弃、被模块版本改写）现在会被抓出来。
+
+    ⚠️ 但参数层的可信度依赖 autosave 是新鲜的：`/load` 会触发一次
+    autosave 落盘，所以 deploy 路径上参数层是可靠的；若是别的场景
+    （比如只改了文件没 load），autosave 可能是旧的 ⇒ 看 `stale` 标志。
     """
     p = resolve(name)
     if not os.path.exists(p):
@@ -703,8 +935,15 @@ def cardinal_deploy(name, load_after=True):
                 "load_result": loaded}
     time.sleep(1.0)          # 引擎装载 + autosave 落盘需要一点时间
     diff = cardinal_diff(name)
-    return {"ok": True, "deployed": os.path.basename(p), "backup": bak,
-            "audit_verdict": au.get("verdict"), "diff": diff}
+    out = {"ok": True, "deployed": os.path.basename(p), "backup": bak,
+           "audit_verdict": au.get("verdict"), "diff": diff}
+    # 参数层不通过 ⇒ 整体不算完全成功，但**不掩盖**：结构层与参数层分开报
+    if diff.get("params_checked") and diff.get("params_match") is False:
+        out["ok"] = False
+        out["why"] = ("结构层一致，但参数层有 %d 项与文件不符 —— "
+                      "引擎没真正吃下这些旋钮值"
+                      % len(diff.get("param_mismatches") or []))
+    return out
 
 
 def ping():
@@ -1904,6 +2143,48 @@ TOOLS = [
                         "idempotentHint": True, "openWorldHint": False},
     },
     {
+        "name": "cardinal_set_params_batch",
+        "description": "Set MANY knobs on a patch in one call (by param name), with a "
+                       "per-item receipt. Use this instead of calling "
+                       "cardinal_set_param_by_name in a loop: one file read, one backup, "
+                       "one write. Each item is independent — one failure does not abort "
+                       "the others, and every item gets its own ok/error receipt. "
+                       "🔴 Refuses reserved/removed slots per item (writing them succeeds "
+                       "silently but does NOTHING). If the rack has several modules of the "
+                       "same model, pass 'instance' (0-based) — the count is always reported. "
+                       "If EVERY item fails, nothing is written.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string", "description": "patch file name"},
+                "sets": {
+                    "type": "array", "minItems": 1,
+                    "description": "list of knob changes, applied in order",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "module": {"type": "string",
+                                       "description": "model name, e.g. VCO (or plugin/model)"},
+                            "param": {"type": "string",
+                                      "description": "param name like 'Cutoff frequency', or a number"},
+                            "value": {"type": "number"},
+                            "instance": {"type": "integer", "minimum": 0,
+                                         "description": "which of several same-model modules (0-based, default 0)"},
+                        },
+                        "required": ["module", "param", "value"],
+                        "additionalProperties": False,
+                    },
+                },
+                "load_after": {"type": "boolean", "default": False},
+            },
+            "required": ["patch", "sets"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": True, "openWorldHint": False},
+    },
+    {
         "name": "cardinal_set_host_param",
         "description": "Set one of Cardinal's 24 host parameters (port 0-23), used with the "
                        "Host Parameters / Host Parameters Map modules.",
@@ -2086,9 +2367,12 @@ TOOLS = [
         "name": "cardinal_deploy",
         "description": "One-click deploy: backup the .vcv, run all five audits (refuse to "
                        "load on FAIL — crash-class problems are stopped BEFORE /load), push "
-                       "into the running Cardinal, wait, then read back and diff STRUCTURE "
-                       "(modules + cables). Parameter values are NOT compared (E8: /param "
-                       "writes never reach the autosave until the patched build exists).",
+                       "into the running Cardinal, wait, then read back and diff. The diff "
+                       "checks STRUCTURE (modules + cables) AND KNOB VALUES (E8 unlocked: "
+                       "the /param-get probe is now in the build, so a knob that never took "
+                       "effect gets caught instead of passing silently). If the knob layer "
+                       "fails, ok=false with the reason in `why` — the structure verdict is "
+                       "still reported separately.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2105,14 +2389,23 @@ TOOLS = [
     },
     {
         "name": "cardinal_diff",
-        "description": "Compare the on-disk .vcv against what Cardinal is actually running "
-                       "(module set + every cable endpoint). missing_modules = present in the "
-                       "file but silently dropped by the engine. Structure only — parameter "
-                       "values are excluded by design (E8), and the result carries a `stale` "
-                       "flag because the autosave only flushes on /load or a GUI save.",
+        "description": "Compare the on-disk .vcv against what Cardinal is actually running. "
+                       "Reports TWO verdicts separately, because they differ in trustworthiness: "
+                       "`match` = structure (module set + every cable endpoint; "
+                       "missing_modules = present in the file but silently dropped by the "
+                       "engine) and `params_match` = knob values (param_mismatches lists every "
+                       "knob whose live value differs from the file, with file_value / "
+                       "live_value / delta). The result carries a `stale` flag because the "
+                       "autosave only flushes on /load or a GUI save — check it before "
+                       "trusting either verdict. Set check_params=false to skip the knob "
+                       "comparison.",
         "inputSchema": {
             "type": "object",
-            "properties": {"name": {"type": "string", "description": "patch file name or path"}},
+            "properties": {
+                "name": {"type": "string", "description": "patch file name or path"},
+                "check_params": {"type": "boolean", "default": True,
+                                 "description": "also compare knob values (default true)"},
+            },
             "required": ["name"],
             "additionalProperties": False,
         },
@@ -2797,6 +3090,8 @@ DISPATCH = {
     "cardinal_set_param_by_name": lambda a: set_param_by_name(
         a["patch"], a["module"], a["param"], a["value"],
         a.get("instance", 0), a.get("load_after", False)),
+    "cardinal_set_params_batch": lambda a: set_params_by_name_batch(
+        a["patch"], a["sets"], a.get("load_after", False)),
     "cardinal_set_host_param": lambda a: set_host_param(a["port"], a["value"]),
     "cardinal_read_live": lambda a: read_live(),
     "cardinal_save_live": lambda a: save_live(a["name"], a.get("overwrite", True)),
@@ -2811,7 +3106,7 @@ DISPATCH = {
         a["name"], a.get("checks")),
     "cardinal_deploy": lambda a: cardinal_deploy(
         a["name"], a.get("load_after", True)),
-    "cardinal_diff": lambda a: cardinal_diff(a["name"]),
+    "cardinal_diff": lambda a: cardinal_diff(a["name"], a.get("check_params", True)),
     "cardinal_port_semantics": lambda a: cardinal_port_semantics(
         a.get("module"), a.get("patch")),
     # --- OSC read probes (patched build only; see live_modules docstring) ---

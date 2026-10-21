@@ -170,6 +170,7 @@ Get-NetUDPEndpoint -LocalPort 2228 -ErrorAction SilentlyContinue
 | `cardinal_load_patch` | 把某个 .vcv 推给 Cardinal（含 zoom + gridOffset） | 让 AI 切音色 |
 | `cardinal_set_param` | 拧任意模块的旋钮：`moduleId + paramId + value` | 改 cutoff / release / 等 |
 | `cardinal_set_param_by_name` | 按参数名设值，拒绝废弃槽，多实例精准分流 | 「设 VCF cutoff」不用先查编号 |
+| `cardinal_set_params_batch` | 一次调用设多个旋钮（按参数名），只读一次盘只写一次盘，逐条回执 | 一次调一整条音色的旋钮 |
 | `cardinal_set_host_param` | 改 Cardinal 内置的 24 个宿主参数 | 调音频接口/采样率等 |
 | `cardinal_save_live` | 把当前 GUI 状态落盘成 .vcv | 用户手动改完不存档就丢 |
 
@@ -190,7 +191,7 @@ Get-NetUDPEndpoint -LocalPort 2228 -ErrorAction SilentlyContinue
 |---|---|---|
 | `cardinal_audit` | 一次调用跑完五道审计，给 FAIL/WARN/PASS 裁决 | 每次 `/load` 前的门禁 |
 | `cardinal_deploy` | 备份 → 审计 → 加载 → 读回结构比对，FAIL 拒绝加载 | 一键安全部署 |
-| `cardinal_diff` | 磁盘 .vcv vs 引擎实际实例化的模块 | 抓被静默丢弃的模块 |
+| `cardinal_diff` | 磁盘 .vcv vs 引擎实际实例化的模块**和旋钮值** | 抓被静默丢弃的模块，以及对不上的旋钮 |
 
 ### 实时只读探针（需 patched 构建；没有则优雅降级）
 

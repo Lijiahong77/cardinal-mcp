@@ -1,6 +1,6 @@
 # HANDOFF · Cardinal MCP 项目交接 / 开工说明书
 
-> **最后更新：2026-10-20 17:05**（D 组收尾 + 注入器修复 + WSL 树回退 + `.bak` 清理）
+> **最后更新：2026-10-21 10:52**（E3 完工 + 待办总表清空 + WSL 树状态复核订正 + `.bak` 清理）
 >
 > **用途**：新会话、压缩后的上下文、或任何一个第一次接手的人，**只读这一份就能开工**。
 > 细节都指向 `docs/` 里的权威文档，这里只放「结论 + 可直接照抄的命令」。
@@ -13,9 +13,9 @@
 
 | 问题 | 答案 |
 |---|---|
-| **这是什么项目** | 给 Cardinal 模块化合成器加一套 **MCP 遥控能力**（53 个工具）+ **OSC 端点**（22 个 + D 组 `/screenshot`），让 AI 能在软件里读状态、改机架、加模块、导出乐谱。 |
-| **现在能用吗** | **能。** 部署的 `D:\Cardinal\win64\CardinalNative.exe` 已通过真机验收，53 个 MCP 工具里除少数未编译探针外全部可用。 |
-| **最需要注意什么** | ① `D:\Cardinal` 是你的 fork（可 push）；WSL 的 `~/Cardinal` 是上游 clone（**绝不能 push**）。<br>② WSL 源码树**现在是干净的**（无 OSC 改动），要重编必须先重注入 A→B→C→D。<br>③ 改 `.vcv` 只写文件**李看不见**，要走 OSC `/load` 推送。 |
+| **这是什么项目** | 给 Cardinal 模块化合成器加一套 **MCP 遥控能力**（**54 个工具**）+ **OSC 端点**（**28 个**），让 AI 能在软件里读状态、改机架、加模块、导出乐谱。 |
+| **现在能用吗** | **能。** 部署的 `D:\Cardinal\win64\CardinalNative.exe` 已通过真机验收（10-21 10:08 构建，含 E1 三段式 + E2 分页 + E3 注册表抽函数）。 |
+| **最需要注意什么** | ① `D:\Cardinal` 是你的 fork（可 push）；WSL 的 `~/Cardinal` 是上游 clone（**绝不能 push**）。<br>② WSL 源码树**已经是「带 OSC 的可编译状态」**（10-21 实测：28 端点注册全在）⇒ 改完直接编；但 `git checkout .` 会把 OSC 改动冲掉（`MenuBar.cpp` 的自动开 OSC 补丁不在任何注入器里，**尤其别丢**）。<br>③ 改 `.vcv` 只写文件**李看不见**，要走 OSC `/load` 推送。 |
 | **明天第一件事** | 把本地那个还没推的提交推上去：`cd /d/Cardinal && git push origin main`（见 §2.1）。 |
 | **最权威的三份文档** | `HANDOFF.md`（本文件，怎么开工）· `docs/TODO-BACKLOG.md`（还有什么没做）· `docs/CARDINAL-MCP-CAPABILITY-MAP.md`（每个工具/端点对应哪段源码） |
 
@@ -28,8 +28,8 @@
 | 项 | 实际状态 / 位置 |
 |---|---|
 | **MCP 工具** | **54 个**（`tools/cardinal_mcp.py`，TOOLS == DISPATCH 已校验） |
-| **OSC 端点** | 三批共 22 个（A 组读数 / B 组零 hook / C 组模拟人类操作 + QuickJS）；D 组再加 `/screenshot` 并改写 `/load` 回包 |
-| **部署的 exe** | `D:\Cardinal\win64\CardinalNative.exe`，**103,001,088 B**，MD5 `f27a7dfd2b697c24be837981a9c0090b`，构建于 10-21 09:32（含 E1 三段式 + E2 分页 + 自动开 OSC 延后） |
+| **OSC 端点** | **28 个**（A 组读数 5 / B 组零 hook 5 / C 组模拟人类操作 9 + QuickJS 2 / D 组 `/screenshot` 1 / E 组 E1 三段式 + E2 分页 1 + E3 注册表重构） |
+| **部署的 exe** | `D:\Cardinal\win64\CardinalNative.exe`，**103,001,088 B**，MD5 `608c94aaa22c48f17c85c8a90d6ff522`，构建于 10-21 10:08（含 E1 三段式 + E2 分页 + E3 注册表抽函数 + 自动开 OSC 延后） |
 | **OSC 自动开启** | 已生效（`CARDINAL_OSC_AUTOSTART` 未设或 ≠ `0` 时，启动即开 2228 端口，不用再手点菜单） |
 | **MCP 注册** | `C:\Users\lijia\.workbuddy\mcp.json`，server 名 `cardinal` |
 | **机架资产** | `patches/` 下 **53 个 `.vcv`**；已验收成品见 §6.3 |
@@ -39,10 +39,10 @@
 
 | 项 | 状态 |
 |---|---|
-| **Git 推送** | 本地 `main` 领先 `origin/main` **1 个提交**（`ef612be`），**尚未推送**（沙箱网络 502，需在本机推） |
-| **WSL 源码树** | 已回退到 **干净 upstream**（无 A/B/C/D 的 OSC 改动）。要重编带 OSC 的版本 → 走 §2.2 重新注入 |
+| **Git 推送** | 本地 `main` 已与 `origin/main` 同步（2026-10-21 推了 `ef612be` + `6fd95f7`）。⚠️ 沙箱内 push 会被代理 502 挡住，需在沙箱外「清代理 + 直连」推（见 §2.1） |
+| **WSL 源码树** | ✅ **已是「带 OSC 的可编译状态」**（2026-10-21 10:50 实测复核）。`src/CardinalCommon.cpp` 里 **28 个端点注册全在**，`CARDINAL_OSC_METHODS` X-macro 在、`/modules-page` 在，`src/override/MenuBar.cpp` 的延后 120 帧补丁也在 ⇒ **改完直接编即可，不必重跑 A→B→C→D 注入**。⚠️ 但它**不在任何注入器的可重放清单里**——`git checkout .` 会把 OSC 改动全冲掉（`MenuBar.cpp` 的补丁尤其危险，它不在任何注入器中） |
 | **WSL 里的 MenuBar 自动开 OSC 补丁** | **仍在**（未提交，`src/override/MenuBar.cpp`）。它**不在任何注入器里**，整树 `git checkout .` 会丢掉 → 见 §2.3 |
-| **E 组（协议级）** | **E1 三段式响应 ✅ 已完工**（WINE 14/14 + MCP 端到端）；**E2 分页 ✅ 已完工**（WINE 15/15 + MCP 端到端）；**E3 注册表抽函数未做** |
+| **E 组（协议级）** | **E1 三段式响应 ✅ / E2 分页 ✅ / E3 注册表抽函数 ✅ 全部完工**（E3 为纯重构：27 端点行为指纹与重构前逐条一致） |
 | **其他待拍板** | life1 三修法、段落编排规格、`.mid` 导出 —— 见 §6 |
 | **`.bak-*` 残留** | 已全清（41 个，WSL 树现 0 个） |
 
@@ -69,6 +69,8 @@
 - 部署的 exe **不受影响**（来自更早的干净构建，仍带 OSC）。
 - `MenuBar.cpp`、`plugins/`、各 submodule 等无关改动 **保留未动**。
 
+> ⚠️ **上面这段是 10-20 的历史叙述，现状已经变了** —— 10-21 E2/E3 注入时又把 A→B→C→D→E1→E2→E3 全部打进 WSL 树，**现在那棵树是带 OSC 的可编译状态**（实测 28 端点注册全在）。⇒ **下次重编不用重注入**。但它**不在任何注入器的可重放清单里**：`git checkout .` 会把 OSC 改动冲光，其中 `src/override/MenuBar.cpp` 的自动开 OSC 补丁**任何注入器都不会给你装回去**，只能手工重打。
+
 ---
 
 ## 2. 明天开工 SOP（命令可直接照抄）
@@ -84,23 +86,21 @@
 
 ---
 
-### 2.1 第一步：把没推的提交推上去（约 10 秒）
+### 2.1 推送（沙箱内会 502，务必在沙箱外清代理直连）
+
+**前提**：沙箱内 `https_proxy=127.0.0.1:13115` 只放行 `api.github.com`、挡 `github.com:443`（CONNECT 502）；`unset` 代理后沙箱内直连又会超时。所以要**在沙箱外**执行：
 
 ```bash
 cd /d/Cardinal
-git status -sb          # 应显示 ## main...origin/main [ahead 1]
+git status -sb          # 应显示 ## main...origin/main [ahead N]
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 git push origin main
-git status -sb          # 成功后会变成 [ahead 0] / 不显示 ahead
+git status -sb          # 成功后会变成不显示 ahead
 ```
 
-**如果一直 502 / `CONNECT tunnel failed`**：是代理/网关问题，不是提交问题。先重试三次；仍不行就在 GitHub Desktop 里推，或临时清掉代理再推：
-
-```bash
-cd /d/Cardinal
-GIT_TRACE=1 git push origin main   # 看卡在哪一步
-```
-
-> 提交内容：`docs/TODO-BACKLOG.md` + `tools/cardinal_mcp.py`（新增 `cardinal_screenshot`）+ `tools/osc_patch/inject_osc_d.py`。
+> ssh 22 端口通，但本机没配公钥（`Permission denied (publickey)`），SSH 通道走不通。
+> `gh` CLI 只连 `api.github.com`，能 `gh repo view` 但不能替 `git push`。
+> 所以唯一可靠路径 = 走 `/commit-push-pr` 命令（它会挑沙箱外直连），或手动在 GitHub Desktop / 本机终端推。
 
 ---
 
@@ -111,7 +111,7 @@ GIT_TRACE=1 git push origin main   # 看卡在哪一步
 ```bash
 cd /d/Cardinal
 
-# 列工具（应看到 53 个）
+# 列工具（应看到 54 个）
 "C:/Users/lijia/.workbuddy/binaries/python/envs/music-ai/Scripts/python.exe" \
   D:/Cardinal/tools/cardinal_mcp.py --tools
 
@@ -518,17 +518,23 @@ DISPLAY=:0 CARDINAL_OSC_AUTOSTART=1 wine bin/CardinalNative.exe
 |---|---|---|
 | **E1 · 三段式响应** | 采用**追加式** `/resp (tag, payload, status)`：payload 位置不动，旧客户端零破坏；status = `ok` / `err:<CODE>`（9 个码） | ✅ 已完工（WINE 14/14 + MCP 端到端） |
 | **E2 · 分页** | 新增 `/modules-page "ii"`（offset, limit），旧 `/modules` 保留全量；payload = `<returned>/<total>\|<items>`，limit 上限 64 | ✅ 已完工（WINE 15/15 + MCP 端到端） |
-| **E3 · 注册表抽函数** | `CardinalCommon_RegisterOscMethods()` 一处实现两处调用（thread / 非 thread） | 未做（风险最高，单独一批） |
-| **`.mid` 导出** | 现在只有 `.abc`（A10）；要不要加 MIDI | 待李定 |
-| **段落编排规格** | MiniArranger 的段落/循环编排规则 | 未定 |
+| **E3 · 注册表抽函数** | 端点表抽成 **X-macro 单一真源**（`CARDINAL_OSC_METHODS(REG)`），thread/plain 各一个薄封装；两版入口后 3 参类型一致、只有第 1 参不同 ⇒ **零类型强转** | ✅ 已完工（纯重构：27 端点行为指纹与重构前逐条一致） |
 
-### 6.2 待李拍板（决定权在李，别替他定）
+> ⚠️ **E 组没有 E4**。`TODO-BACKLOG.md` 第三章出现的 E4~E10 是**另一套编号**（「已知错误与待澄清」：E4 = `/load` 的 skipped 列表拿不到、E8 = A3 死锁、E10 = 文档重复），**不是 E 组批次**，别看混。
 
-- **life1 三修法**：三种修改方案待选。
-- **`.mid` vs `.abc`**：是否需要 MIDI 格式。
-- **E 组优先级**：现在做还是等有需求再做。
+### 6.2 已由李结案（2026-10-21 裁决，**不是待办**）
 
-### 6.3 机架资产（文件名别写错）
+| 事项 | 裁决 | 备注 |
+|---|---|---|
+| **`.mid` 导出** | ⛔ 作废 | 李：「废了就不管它」。`.abc`（A10）已覆盖乐谱导出需求 |
+| **段落编排规格（Song 模式）** | ⏸ 暂缓 | 李：「暂时也不用管，后面需要的时候我会再让你做」。⇒ MiniArranger **至今没有 Song 模式**（只有 pattern 循环）。⚠️ 将来开工前必须先问清三件事：段落表语法 / 和弦跨段落延续 / 段落切换时音色轨怎么变 —— 李没答过，**不得自行假设** |
+| **life1 三修法** | ⛔ 不修 | 李：「Life1 那个不用修了」。且 10-17 已选**方案 B**（休止符+短时值）并交付 `quadeca_life1_wdtg.vcv`（李已确认有声）⇒ 记账上的「待选」是过时条目。残留备案：三层 `duration` 全 `None`（方案 B 的「短时值」那半未做）+ 混响仍是 `Feline`（纪律是 `Plateau`）—— 本批不做，且**不得重跑生成器**（会冲掉李手工调的布局） |
+
+### 6.3 待李拍板（决定权在李，别替他定）
+
+- **E 组优先级**：现在做还是等有需求再做（E1/E2/E3 已全完工，暂无 E4 候选）。
+
+### 6.4 机架资产（文件名别写错）
 
 ```
 patches/yorushika_hana.vcv        ✅ 已验收
@@ -541,7 +547,7 @@ patches/demo_S5_fullkit.vcv       🟡 待验收
 
 > ⚠️ 旧文档里写的 `yorushika_shura/hana` 是**错的**，实际是 `patches/yorushika_hana.vcv`（无目录层级）。
 
-### 6.4 主线方向
+### 6.5 主线方向
 
 **键盘即兴 + 风格自动伴奏**，核心是 **MiniArranger**：
 HostMIDI 复音 8 声道分轨录和弦，4+4 循环，每轨独立音色链。
@@ -553,12 +559,13 @@ HostMIDI 复音 8 声道分轨录和弦，4+4 循环，每轨独立音色链。
 
 | 路径 | 作用 |
 |---|---|
-| `tools/cardinal_mcp.py` | **MCP 服务主体**，53 个工具 + 命令行入口 |
+| `tools/cardinal_mcp.py` | **MCP 服务主体**，**54 个工具** + 命令行入口 |
 | `tools/osc_patch/inject_osc_read.py` | A 组注入器（5 个读数端点） |
 | `tools/osc_patch/inject_osc_b.py` | B 组注入器（5 个零 hook 端点） |
 | `tools/osc_patch/inject_osc_c.py` | C 组注入器（9 个操作 + 2 个 JS 端点） |
 | `tools/osc_patch/inject_osc_d.py` | D 组注入器（`/screenshot` + `/load` 回 warningLog） |
 | `tools/osc_patch/inject_osc_e2.py` | E2 注入器（`/modules-page` 分页，依赖 E1+A 组） |
+| `tools/osc_patch/inject_osc_e3.py` | E3 注入器（端点注册表抽 X-macro 单一真源；依赖 A/B/C/D/E1/E2） |
 | `tools/osc_patch/*.inc` | 注入用的 C++ handler 源码 |
 | `tools/rackgen.py` | 机架生成 DSL（新机架一律走它） |
 | `tools/layout_patch.py` | 排班 + 门禁（`check` / `guard` / `apply` / `widths`） |
