@@ -1,18 +1,26 @@
 # 待办总表 · 统一开工用
 
-> 建立：2026-10-19 · 状态：**全部待开工**（李：「不急，把这些和之前的任务放到一起，到时候统一开工」）
+> 建立：2026-10-19 · **最后更新：2026-10-20 17:05**
 >
-> 用途：把 2026-10-19 这一天盘出来的所有待办集中在这里。
-> 开工时按「批次」推进，每批做完整再进下一批。
+> **当前状态（别再看旧结论）：**
+> - 批次 A（A1–A11）✅ 全部完成
+> - 批次 B（B1–B5）✅ 完成 · C 组 ✅ 完成 · F 组 QuickJS ✅ 完成 · D 组（D1/D2）✅ 完成
+> - **剩余：E 组（三段式响应 ✅ / 分页 ✅ / 注册表抽函数 ⏳）**、`.mid` 导出、段落编排规格
+> - 开工入口 → 根目录 `HANDOFF.md`（状态 + 命令）；本文件只管「还有什么没做」
+>
+> 用途：把所有待办集中在这里。开工时按「批次」推进，每批做完整再进下一批。
 
 ---
 
 ## 一、当前资产（已完工，不是待办）
 
-**MCP 工具 36 个**（`tools/cardinal_mcp.py`，10-19 批次 A 完工后）
+**MCP 工具 53 个**（`tools/cardinal_mcp.py`，截至 2026-10-20 D 组完工）
 - 原有 17：连通/存档/按编号操作/音乐配方/5 个未编译探针
 - 10-19 白天新增 13：4 个模块检索 · 1 个接线拓扑 · 3 个序列器音符 · 4 个采样槽 · 1 个交互索引
 - 批次 A 新增 6：`set_param_by_name` · `cardinal_audit` · `cardinal_deploy`+`cardinal_diff` · `cardinal_port_semantics` · `cardinal_export_abc`
+- 批次 B 第一批新增 5：`build_info` · `cables` · `transport` · `engine_info` · `plugins`
+- 批次 B 第二批（C 组 + QuickJS）新增 11：`param_set_by_display` · `cable_add` · `cable_remove` · `undo` · `redo` · `module_json` · `module_remove` · `module_move` · `midi_out` · `js_run` · `js_list`
+- D 组新增 1：`cardinal_screenshot`
 
 **新写的 Python 模块**（`tools/`）
 | 文件 | 作用 |
@@ -97,10 +105,34 @@
 | D2 | `/load` 回 warningLog | ✅ 2026-10-20 完工并 WINE 运行级实测。**四处改动**：① `settings.hpp/.cpp` 加 `oscLoadActive` 开关（不进 settings.json）；② `patch.cpp fromJson` 末尾弹窗+清空改条件化（OSC 模式保留 warningLog 不弹窗）；③ `override/Engine.cpp:1260/:1289` 取消两处 `APP->patch->log(e.what())` 注释（A5 实锤的「两处」——模块级异常原本被静默）；④ `osc_load_handler` 置位开关 + 回 `ok`/`warn <文本>`/`fail <文本>`，回完清空。回包契约：`ok` / `warn <文本>` / `fail <文本>`（截断 400B）。MCP 侧 `load_patch` 已同步解析 `warnings` 字段。⚠️ 只改了 `src/CardinalNative/CardinalCommon.cpp` 一份，其余两份 CardinalCommon.cpp 待 E 组注册表抽函数时收敛 |
 
 **E 组 · 协议级（编完再改要 C++ + Python 双返工，必须一次定死）**
-- 统一三段式响应 `/resp "tag" "ok"|"err" "<code>|<msg>"`，8 个固定小写错误码。⚠️ 会改动现有 5 探针行为（`/param-get` 对不存在 module 回空串，无法区分「没这个参数」与「值就是空」）
-- 分页契约：列表类统一 `<path> <offset> <limit>`，回复带 `<returned>/<total>`，limit 上限 64（`/modules` 现在无上限拼接，200+ 模块必爆 MTU）。⚠️ **仍未做**：实测 200+ 模块的 `/modules` 已能返回但偏大，是待补的债
-- ⭐ **注册表抽函数** `CardinalCommon_RegisterOscMethods(server, self)`，一处实现两处调用。现状 thread 版 `:1135-1145` + 非 thread 版 `:1152-1160`，× build 变体 = **2×2 四处**，只改一处会**静默失效**。三个注入器都在**两处**注册，但仍是三份代码各写一遍
-- `/screenshot` 注册必须包在 `#ifdef CARDINAL_WINDOW_CAN_GENERATE_SCREENSHOTS` 内（`override/Window.cpp:45`）否则 Mini/GLES 编不过
+
+- **E1 · 三段式响应 ✅ 2026-10-21 完工并 WINE 运行级验证**
+  - **采用「追加式」而不是原规格的顺序**：`/resp` 从 `(tag, payload)` 变为 `(tag, payload, status)`。
+    status 放**第三段**，payload 位置不变 ⇒ 现有 53 个工具零改动即可继续工作，新旧 exe/MCP 混用也不会炸。
+  - status 取值：`"ok"` 或 `"err:<CODE>"`。错误码共 9 个（8 语义 + 1 兜底）：
+    `E_NO_PLUGIN` / `E_NO_MODULE` / `E_BAD_PARAM` / `E_NO_CABLE` / `E_BAD_PORT`
+    / `E_NOTHING` / `E_BAD_ARGS` / `E_DISABLED` / `E_INTERNAL`
+  - C++ 侧：A 组 inc 里新增 `cardinalOscReply(source, server, tag, payload, status)`，全部 handler 改走它（共 42 处调用）。
+  - MCP 侧：新增 `_ask_status()`（两段旧包自动视为 `ok`）、`_STATUS_NOTES`；`get_param` / `get_light` / `get_ports` 现在能区分
+    「模块不存在」「参数越界」「值就是空」。
+  - **验证**：WINE 探针 14/14 PASS；Windows MCP → WSL Cardinal 端到端也通过（`err:E_BAD_PARAM` / `err:E_NO_MODULE` 正确）。
+  - ⚠️ **坑（已修）**：MenuBar 的「启动自动开 OSC」原来在首帧调 `startRemoteServer()`，Wine 下会撞 glibc robust mutex 断言崩溃。
+    已改为**约 120 帧（≈2s）后**再启动。补丁原文见 `HANDOFF.md` §2.3.1。
+- **E2 · 分页 ✅ 2026-10-21 完工并 WINE 运行级验证**
+  - **新增端点 `/modules-page "ii"`（offset, limit）**，旧 `/modules` 保留全量 ⇒ 零破坏。
+  - 回包 payload = `"<returned>/<total>|<items>"`，items 与 `/modules` 同构（`id:plugin|model`）；limit 上限 64。
+  - 越界语义：offset 超 total → returned=0 但 total 仍报真实总数（status=ok）；
+    offset<0 / limit<=0 / limit>64 → status=err:E_BAD_ARGS。
+  - 注入器：`tools/osc_patch/inject_osc_e2.py`（依赖 E1 的 `cardinalOscReply` + A 组的 `/modules`，只改顶层 CardinalCommon.cpp，6 变体是符号链接）。
+  - MCP 侧：新增 `cardinal_modules_page`（offset/limit）工具 + `modules_page()`，工具数 53→54。
+  - **验证**：WINE 探针 15/15 PASS（分页不重叠/可拼全集/越界/三种非法参数/limit=64）；
+    Windows MCP → WSL Cardinal 端到端也通过（`returned/total/has_more` 全对、`err:E_BAD_ARGS` 正确）。
+  - ⚠️ 实测校正：当前 `modules` 217 条 ≈ 4 KB、`cables` 307 条 ≈ 5 KB，**离 UDP 65 KB 上限很远**，
+    所以分页是防未来，不是救火。
+- **E3 · 注册表抽函数 ⏳ 未做（风险最高）**：`CardinalCommon_RegisterOscMethods(server, self)`，一处实现两处调用。
+  现状 thread 版 + 非 thread 版各写一遍，× build 变体 = 2×2，只改一处会**静默失效**。
+  要删掉现有 2×21 行注册，删错不报错、只是端点消失 ⇒ 必须靠计数断言验证。
+- `/screenshot` 注册必须包在 `#ifdef CARDINAL_WINDOW_CAN_GENERATE_SCREENSHOTS` 内（`override/Window.cpp:45`）否则 Mini/GLES 编不过 —— ✅ **D 组已做到**
 
 **F 组 · QuickJS 绑定** —— ✅ 2026-10-20 完工并运行级实测
 

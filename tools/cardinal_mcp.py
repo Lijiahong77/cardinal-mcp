@@ -732,18 +732,46 @@ PROBE_UNSUPPORTED = {
 }
 
 
-def _ask(tag, address, args=()):
-    """Send one probe and parse the two-string `/resp` ("tag", "payload").
+def _ask_status(tag, address, args=()):
+    """Send one probe and parse `/resp` ("tag", "payload"[, "status"]).
 
-    Returns None when the peer did not answer, which is how we detect an
-    unpatched build (its fallback handler silently drops unknown paths).
+    E1 (2026-10-21) appended a third string: "ok" or "err:<CODE>". Builds that
+    predate E1 send only two strings; those are treated as "ok", so old and new
+    exe both work with this client.
+
+    Returns (payload, status), or (None, None) when the peer did not answer.
     """
     res = link().ask(address, args, timeout=1.5)
     if res is None or len(res) < 2:
-        return None
+        return None, None
     if str(res[0]) != tag:
-        return None
-    return str(res[1])
+        return None, None
+    payload = str(res[1])
+    status = str(res[2]) if len(res) > 2 else "ok"
+    return payload, status
+
+
+def _ask(tag, address, args=()):
+    """Payload-only view of `_ask_status` (keeps existing call sites unchanged)."""
+    payload, _status = _ask_status(tag, address, args)
+    return payload
+
+
+_STATUS_NOTES = {
+    "err:E_NO_PLUGIN": "Cardinal's OSC bridge has no plugin instance yet (still starting up?)",
+    "err:E_NO_MODULE": "no module with that id exists in the running rack",
+    "err:E_BAD_PARAM": "module exists but the param/light index is out of range",
+    "err:E_NO_CABLE": "no cable with that id exists",
+    "err:E_BAD_PORT": "port index out of range",
+    "err:E_NOTHING": "nothing to undo/redo",
+    "err:E_BAD_ARGS": "bad request arguments (e.g. script index)",
+    "err:E_DISABLED": "feature disabled by environment (CARDINAL_JS_MODE)",
+    "err:E_INTERNAL": "Cardinal internal failure",
+}
+
+
+def _status_note(status):
+    return _STATUS_NOTES.get(status, "unexpected status: %s" % status)
 
 
 def live_modules():
@@ -769,6 +797,50 @@ def live_modules():
     return {"ok": True, "count": len(mods), "modules": mods}
 
 
+def modules_page(offset=0, limit=32):
+    """Read one PAGE of running modules (E2, 2026-10-21).
+
+    `/modules` returns everything in one datagram; this is the paged twin for
+    when a rack grows large. Wire payload is `<returned>/<total>|<items>` where
+    items use the same `id:plugin|model` shape as live_modules.
+
+      offset  — 0-based start index into the module list
+      limit   — page size, capped at 64 by the server
+
+    Overshooting offset returns empty items but still reports the real total.
+    """
+    payload, status = _ask_status(
+        "modules-page", "/modules-page",
+        [("i", int(offset)), ("i", int(limit))])
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    if status.startswith("err"):
+        return {"ok": False, "offset": int(offset), "limit": int(limit),
+                "status": status, "raw": payload, "note": _status_note(status)}
+    # payload = "<returned>/<total>|<items>"
+    try:
+        head, items = payload.split("|", 1)
+        returned_s, total_s = head.split("/", 1)
+        returned, total = int(returned_s), int(total_s)
+    except ValueError:
+        return {"ok": False, "offset": int(offset), "limit": int(limit),
+                "status": status, "raw": payload, "note": "unparseable page payload"}
+    mods = []
+    for item in items.split(","):
+        if not item.strip():
+            continue
+        try:
+            mid, rest = item.split(":", 1)
+            plug, model = rest.split("|", 1)
+            mods.append({"module_id": int(mid), "plugin": plug, "model": model})
+        except ValueError:
+            continue
+    return {"ok": True, "offset": int(offset), "limit": int(limit),
+            "returned": returned, "total": total,
+            "has_more": int(offset) + returned < total,
+            "count": len(mods), "modules": mods, "status": status}
+
+
 def get_param(module_id, param_id):
     """Read back one knob's DISPLAY value (the physical number, not the stored one).
 
@@ -776,16 +848,21 @@ def get_param(module_id, param_id):
     275 ms; Bogaudio-VCO.Frequency stores 6.0 octaves but shows 220 Hz). The
     patched build returns getDisplayValue(), i.e. the number a human can judge.
     """
-    payload = _ask("param", "/param-get", [("h", int(module_id)), ("i", int(param_id))])
+    payload, status = _ask_status(
+        "param", "/param-get", [("h", int(module_id)), ("i", int(param_id))])
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status.startswith("err"):
+        return {"ok": False, "module_id": int(module_id), "param_id": int(param_id),
+                "status": status, "raw": payload, "note": _status_note(status)}
     try:
         val = float(payload)
     except (TypeError, ValueError):
         return {"ok": False, "module_id": module_id, "param_id": param_id,
-                "raw": payload, "note": "empty = module or param slot not found"}
+                "status": status, "raw": payload,
+                "note": "the slot exists but reports no numeric display value"}
     return {"ok": True, "module_id": int(module_id), "param_id": int(param_id),
-            "display_value": val}
+            "display_value": val, "status": status}
 
 
 def _parse_ports(payload):
@@ -826,9 +903,12 @@ def module_ports(module_id):
         channels > 0, all voltages 0 -> wired but silent at this instant
         any voltage != 0   -> signal present
     """
-    payload = _ask("ports", "/ports", [("h", int(module_id))])
+    payload, status = _ask_status("ports", "/ports", [("h", int(module_id))])
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status.startswith("err"):
+        return {"ok": False, "module_id": int(module_id), "status": status,
+                "note": _status_note(status)}
     ports = _parse_ports(payload)
     wired = [p for p in ports if p["connected"]]
     live = [p for p in wired if p["peak"] > 1e-4]
@@ -839,6 +919,7 @@ def module_ports(module_id):
         "wired": len(wired),
         "live": len(live),
         "silent": len(wired) - len(live),
+        "status": status,
     }
 
 
@@ -866,15 +947,19 @@ def scan_signal(threshold=1e-4):
 
 def get_light(module_id, light_id):
     """Read an LED's brightness — e.g. Clocked's RUN lamp tells you if it is running."""
-    payload = _ask("light", "/light", [("h", int(module_id)), ("i", int(light_id))])
+    payload, status = _ask_status(
+        "light", "/light", [("h", int(module_id)), ("i", int(light_id))])
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status.startswith("err"):
+        return {"ok": False, "module_id": int(module_id), "light_id": int(light_id),
+                "status": status, "raw": payload, "note": _status_note(status)}
     try:
         return {"ok": True, "module_id": int(module_id), "light_id": int(light_id),
-                "brightness": float(payload)}
+                "brightness": float(payload), "status": status}
     except (TypeError, ValueError):
         return {"ok": False, "module_id": module_id, "light_id": light_id,
-                "raw": payload}
+                "status": status, "raw": payload}
 
 
 # ============================================================ B 组读数（2026-10-20）
@@ -2066,6 +2151,26 @@ TOOLS = [
         "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
+        "name": "cardinal_modules_page",
+        "description": "★ READ one PAGE of running modules (offset + limit) instead of the "
+                       "whole list at once — the counterpart to cardinal_live_modules for a "
+                       "large rack. Returns returned/total/has_more + the page's modules. "
+                       "If the running Cardinal predates this endpoint it degrades to "
+                       "probe_not_supported (fall back to cardinal_live_modules).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "offset": {"type": "integer", "minimum": 0, "default": 0,
+                           "description": "0-based start index into the module list"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 64, "default": 32,
+                          "description": "page size (server caps at 64)"},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
         "name": "cardinal_get_param",
         "description": "★ READ one knob's current DISPLAY value from the running Cardinal "
                        "(the physical number shown on the panel, e.g. 275 for 275 ms — not the "
@@ -2711,6 +2816,8 @@ DISPATCH = {
         a.get("module"), a.get("patch")),
     # --- OSC read probes (patched build only; see live_modules docstring) ---
     "cardinal_live_modules": lambda a: live_modules(),
+    "cardinal_modules_page": lambda a: modules_page(
+        a.get("offset", 0), a.get("limit", 32)),
     "cardinal_get_param": lambda a: get_param(a["module_id"], a["param_id"]),
     "cardinal_module_ports": lambda a: module_ports(a["module_id"]),
     "cardinal_scan_signal": lambda a: scan_signal(),

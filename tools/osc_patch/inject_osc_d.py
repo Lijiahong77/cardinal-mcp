@@ -138,6 +138,7 @@ def rules_for_common():
             "{\n"
             "    d_debug(\"osc_screenshot_handler()\");\n"
             "    std::string result;\n"
+            "    const char* status = \"ok\";\n"
             "\n"
             "    if (CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance)\n"
             "    {\n"
@@ -150,11 +151,12 @@ def rules_for_common():
             "        result = path;\n"
             "    } else {\n"
             "        result = \"fail\";\n"
+            "        status = \"err:E_INTERNAL\";\n"
             "    }\n"
             "\n"
             "    const lo_address source = lo_message_get_source(m);\n"
             "    const lo_server server = static_cast<Initializer*>(self)->oscServer;\n"
-            "    lo_send_from(source, server, LO_TT_IMMEDIATE, \"/resp\", \"ss\", \"screenshot\", result.c_str());\n"
+            "    cardinalOscReply(source, server, \"screenshot\", result, status);\n"
             "    return 0;\n"
             "}\n",
         ),
@@ -420,7 +422,7 @@ D2_LOAD_HANDLER_NEW = (
     "\n"
     "    const lo_address source = lo_message_get_source(m);\n"
     "    const lo_server server = static_cast<Initializer*>(self)->oscServer;\n"
-    "    lo_send_from(source, server, LO_TT_IMMEDIATE, \"/resp\", \"ss\", \"load\", payload.c_str());\n"
+    "    cardinalOscReply(source, server, \"load\", payload, ok ? \"ok\" : \"err:E_INTERNAL\");\n"
     "    return 0;\n"
     "}\n"
 )

@@ -75,7 +75,7 @@ static int osc_param_set_display_handler(const char*, const char* types, lo_arg*
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "param-set", "no-plugin");
+        cardinalOscReply(source, server, "param-set", "no-plugin", "err:E_NO_PLUGIN");
         return 0;
     }
     CardinalPluginContext* const context = plugin->context;
@@ -88,6 +88,7 @@ static int osc_param_set_display_handler(const char*, const char* types, lo_arg*
    #endif
 
     std::string payload;
+    const char* status = "ok";
     rack::engine::Module* const module = context->engine->getModule(moduleId);
     rack::engine::ParamQuantity* const pq = module != NULL
         ? module->getParamQuantity(paramId) : NULL;
@@ -106,14 +107,23 @@ static int osc_param_set_display_handler(const char*, const char* types, lo_arg*
     }
     else
     {
-        payload = module == NULL ? "no-module" : "bad-param";
+        if (module == NULL)
+        {
+            payload = "no-module";
+            status = "err:E_NO_MODULE";
+        }
+        else
+        {
+            payload = "bad-param";
+            status = "err:E_BAD_PARAM";
+        }
     }
 
    #ifdef CARDINAL_INIT_OSC_THREAD
     rack::contextSet(nullptr);
    #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "param-set", payload.c_str());
+    cardinalOscReply(source, server, "param-set", payload, status);
     return 0;
 }
 
@@ -132,7 +142,7 @@ static int osc_cable_add_handler(const char*, const char* types, lo_arg** argv, 
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "cable-add", "no-plugin");
+        cardinalOscReply(source, server, "cable-add", "no-plugin", "err:E_NO_PLUGIN");
         return 0;
     }
     CardinalPluginContext* const context = plugin->context;
@@ -146,16 +156,19 @@ static int osc_cable_add_handler(const char*, const char* types, lo_arg** argv, 
    #endif
 
     std::string payload;
+    const char* status = "ok";
     rack::engine::Module* const outM = context->engine->getModule(outMod);
     rack::engine::Module* const inM = context->engine->getModule(inMod);
     if (outM == NULL || inM == NULL)
     {
         payload = "no-module";
+        status = "err:E_NO_MODULE";
     }
     else if (outPort < 0 || outPort >= outM->getNumOutputs()
              || inPort < 0 || inPort >= inM->getNumInputs())
     {
         payload = "bad-port";
+        status = "err:E_BAD_PORT";
     }
     else
     {
@@ -189,7 +202,7 @@ static int osc_cable_add_handler(const char*, const char* types, lo_arg** argv, 
     rack::contextSet(nullptr);
    #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "cable-add", payload.c_str());
+    cardinalOscReply(source, server, "cable-add", payload, status);
     return 0;
 }
 
@@ -206,7 +219,7 @@ static int osc_cable_remove_handler(const char*, const char* types, lo_arg** arg
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "cable-remove", "no-plugin");
+        cardinalOscReply(source, server, "cable-remove", "no-plugin", "err:E_NO_PLUGIN");
         return 0;
     }
     CardinalPluginContext* const context = plugin->context;
@@ -217,6 +230,7 @@ static int osc_cable_remove_handler(const char*, const char* types, lo_arg** arg
    #endif
 
     std::string payload;
+    const char* status = "ok";
     if (context->engine->getCable(cableId) != NULL)
     {
         rack::history::CableRemove* a = new rack::history::CableRemove;
@@ -227,13 +241,14 @@ static int osc_cable_remove_handler(const char*, const char* types, lo_arg** arg
     else
     {
         payload = "no-cable";
+        status = "err:E_NO_CABLE";
     }
 
    #ifdef CARDINAL_INIT_OSC_THREAD
     rack::contextSet(nullptr);
    #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "cable-remove", payload.c_str());
+    cardinalOscReply(source, server, "cable-remove", payload, status);
     return 0;
 }
 
@@ -244,6 +259,7 @@ static int osc_undo_handler(const char*, const char*, lo_arg**, int, const lo_me
     const lo_address source = lo_message_get_source(m);
     const lo_server server = static_cast<Initializer*>(self)->oscServer;
     std::string payload;
+    const char* status = "ok";
     if (APP->history->canUndo())
     {
         payload = APP->history->getUndoName();
@@ -252,8 +268,9 @@ static int osc_undo_handler(const char*, const char*, lo_arg**, int, const lo_me
     else
     {
         payload = "nothing";
+        status = "err:E_NOTHING";
     }
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "undo", payload.c_str());
+    cardinalOscReply(source, server, "undo", payload, status);
     return 0;
 }
 
@@ -263,6 +280,7 @@ static int osc_redo_handler(const char*, const char*, lo_arg**, int, const lo_me
     const lo_address source = lo_message_get_source(m);
     const lo_server server = static_cast<Initializer*>(self)->oscServer;
     std::string payload;
+    const char* status = "ok";
     if (APP->history->canRedo())
     {
         payload = APP->history->getRedoName();
@@ -271,8 +289,9 @@ static int osc_redo_handler(const char*, const char*, lo_arg**, int, const lo_me
     else
     {
         payload = "nothing";
+        status = "err:E_NOTHING";
     }
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "redo", payload.c_str());
+    cardinalOscReply(source, server, "redo", payload, status);
     return 0;
 }
 
@@ -289,7 +308,7 @@ static int osc_module_json_handler(const char*, const char* types, lo_arg** argv
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "module-json", "no-plugin");
+        cardinalOscReply(source, server, "module-json", "no-plugin", "err:E_NO_PLUGIN");
         return 0;
     }
     CardinalPluginContext* const context = plugin->context;
@@ -300,10 +319,12 @@ static int osc_module_json_handler(const char*, const char* types, lo_arg** argv
    #endif
 
     std::string payload;
+    const char* status = "ok";
     rack::engine::Module* const module = context->engine->getModule(moduleId);
     if (module == NULL)
     {
         payload = "no-module";
+        status = "err:E_NO_MODULE";
     }
     else
     {
@@ -323,7 +344,7 @@ static int osc_module_json_handler(const char*, const char* types, lo_arg** argv
     rack::contextSet(nullptr);
    #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "module-json", payload.c_str());
+    cardinalOscReply(source, server, "module-json", payload, status);
     return 0;
 }
 
@@ -340,7 +361,7 @@ static int osc_module_remove_handler(const char*, const char* types, lo_arg** ar
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "module-remove", "no-plugin");
+        cardinalOscReply(source, server, "module-remove", "no-plugin", "err:E_NO_PLUGIN");
         return 0;
     }
     CardinalPluginContext* const context = plugin->context;
@@ -351,6 +372,7 @@ static int osc_module_remove_handler(const char*, const char* types, lo_arg** ar
    #endif
 
     std::string payload;
+    const char* status = "ok";
     if (context->engine->getModule(moduleId) != NULL)
     {
         rack::history::ModuleRemove* a = new rack::history::ModuleRemove;
@@ -361,13 +383,14 @@ static int osc_module_remove_handler(const char*, const char* types, lo_arg** ar
     else
     {
         payload = "no-module";
+        status = "err:E_NO_MODULE";
     }
 
    #ifdef CARDINAL_INIT_OSC_THREAD
     rack::contextSet(nullptr);
    #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "module-remove", payload.c_str());
+    cardinalOscReply(source, server, "module-remove", payload, status);
     return 0;
 }
 
@@ -384,7 +407,7 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "module-move", "no-plugin");
+        cardinalOscReply(source, server, "module-move", "no-plugin", "err:E_NO_PLUGIN");
         return 0;
     }
     CardinalPluginContext* const context = plugin->context;
@@ -397,6 +420,7 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
    #endif
 
     std::string payload;
+    const char* status = "ok";
     if (context->engine->getModule(moduleId) != NULL)
     {
         rack::history::ModuleMove* a = new rack::history::ModuleMove;
@@ -408,13 +432,14 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
     else
     {
         payload = "no-module";
+        status = "err:E_NO_MODULE";
     }
 
    #ifdef CARDINAL_INIT_OSC_THREAD
     rack::contextSet(nullptr);
    #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "module-move", payload.c_str());
+    cardinalOscReply(source, server, "module-move", payload, status);
     return 0;
 }
 
@@ -433,12 +458,13 @@ static int osc_midi_out_handler(const char*, const char* types, lo_arg** argv, i
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "midi-out", "no-plugin");
+        cardinalOscReply(source, server, "midi-out", "no-plugin", "err:E_NO_PLUGIN");
         return 0;
     }
     CardinalPluginContext* const context = plugin->context;
 
     std::string payload;
+    const char* status = "ok";
     if (context->bypassed)
     {
         payload = "skipped:bypassed";
@@ -454,6 +480,6 @@ static int osc_midi_out_handler(const char*, const char* types, lo_arg** argv, i
         payload = "sent";
     }
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "midi-out", payload.c_str());
+    cardinalOscReply(source, server, "midi-out", payload, status);
     return 0;
 }

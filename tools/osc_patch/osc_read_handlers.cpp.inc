@@ -33,6 +33,19 @@ static std::string fmtShort(float v)
     return std::string(buf);
 }
 
+// ---- E1 (2026-10-21): 统一三段式回包 -------------------------------------
+// /resp 的第三段 status = "ok" 或 "err:<CODE>"。
+// 追加式设计：旧客户端只读前两段 (tag, payload)，行为完全不变。
+// 错误码：E_NO_PLUGIN / E_NO_MODULE / E_BAD_PARAM / E_NO_CABLE / E_BAD_PORT
+//         / E_NOTHING / E_BAD_ARGS / E_DISABLED（语义）+ E_INTERNAL（兜底）
+static void cardinalOscReply(const lo_address source, const lo_server server,
+                             const char* const tag, const std::string& payload,
+                             const char* const status)
+{
+    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "sss",
+                 tag, payload.c_str(), status);
+}
+
 // ---------------------------------------------------------------- /modules
 // 回复: /resp "modules" "id:plugin/model,id:plugin/model,..."
 static int osc_modules_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
@@ -45,7 +58,7 @@ static int osc_modules_handler(const char*, const char*, lo_arg**, int, const lo
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "modules", "");
+        cardinalOscReply(source, server, "modules", "", "err:E_NO_PLUGIN");
         return 0;
     }
 
@@ -84,7 +97,7 @@ static int osc_modules_handler(const char*, const char*, lo_arg**, int, const lo
     rack::contextSet(nullptr);
 #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "modules", out.c_str());
+    cardinalOscReply(source, server, "modules", out, "ok");
     return 0;
 }
 
@@ -102,7 +115,7 @@ static int osc_param_get_handler(const char*, const char* types, lo_arg** argv, 
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == NULL)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "param", "");
+        cardinalOscReply(source, server, "param", "", "err:E_NO_PLUGIN");
         return 0;
     }
 
@@ -115,9 +128,18 @@ static int osc_param_get_handler(const char*, const char* types, lo_arg** argv, 
 #endif
 
     std::string result;
+    const char* status = "ok";
     rack::engine::Module* const module = context->engine->getModule(moduleId);
 
-    if (module != NULL && paramId >= 0 && paramId < module->getNumParams())
+    if (module == NULL)
+    {
+        status = "err:E_NO_MODULE";
+    }
+    else if (paramId < 0 || paramId >= module->getNumParams())
+    {
+        status = "err:E_BAD_PARAM";
+    }
+    else
     {
         // ★ 关键：用 getDisplayValue 而非 getValue。
         //   存 0.275 的 ADSR.Attack，getValue 给 0.275（无意义），
@@ -125,13 +147,15 @@ static int osc_param_get_handler(const char*, const char* types, lo_arg** argv, 
         rack::engine::ParamQuantity* const pq = module->getParamQuantity(paramId);
         if (pq != NULL)
             result = fmtShort(pq->getDisplayValue());
+        else
+            status = "err:E_INTERNAL";
     }
 
 #ifdef CARDINAL_INIT_OSC_THREAD
     rack::contextSet(nullptr);
 #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "param", result.c_str());
+    cardinalOscReply(source, server, "param", result, status);
     return 0;
 }
 
@@ -155,7 +179,7 @@ static int osc_ports_handler(const char*, const char* types, lo_arg** argv, int 
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == NULL)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "ports", "");
+        cardinalOscReply(source, server, "ports", "", "err:E_NO_PLUGIN");
         return 0;
     }
 
@@ -168,6 +192,7 @@ static int osc_ports_handler(const char*, const char* types, lo_arg** argv, int 
 
     std::string out;
     rack::engine::Module* const module = context->engine->getModule(moduleId);
+    const char* status = module != NULL ? "ok" : "err:E_NO_MODULE";
 
     if (module != NULL)
     {
@@ -211,7 +236,7 @@ static int osc_ports_handler(const char*, const char* types, lo_arg** argv, int 
     rack::contextSet(nullptr);
 #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "ports", out.c_str());
+    cardinalOscReply(source, server, "ports", out, status);
     return 0;
 }
 
@@ -231,7 +256,7 @@ static int osc_signal_handler(const char*, const char*, lo_arg**, int, const lo_
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == NULL)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "signal", "");
+        cardinalOscReply(source, server, "signal", "", "err:E_NO_PLUGIN");
         return 0;
     }
 
@@ -281,7 +306,7 @@ static int osc_signal_handler(const char*, const char*, lo_arg**, int, const lo_
     rack::contextSet(nullptr);
 #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "signal", out.c_str());
+    cardinalOscReply(source, server, "signal", out, "ok");
     return 0;
 }
 
@@ -300,7 +325,7 @@ static int osc_light_handler(const char*, const char* types, lo_arg** argv, int 
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == NULL)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "light", "");
+        cardinalOscReply(source, server, "light", "", "err:E_NO_PLUGIN");
         return 0;
     }
 
@@ -313,15 +338,20 @@ static int osc_light_handler(const char*, const char* types, lo_arg** argv, int 
 #endif
 
     std::string result;
+    const char* status = "ok";
     rack::engine::Module* const module = context->engine->getModule(moduleId);
 
-    if (module != NULL && lightId >= 0 && lightId < module->getNumLights())
+    if (module == NULL)
+        status = "err:E_NO_MODULE";
+    else if (lightId < 0 || lightId >= module->getNumLights())
+        status = "err:E_BAD_PARAM";
+    else
         result = fmtShort(module->lights[lightId].getBrightness());
 
 #ifdef CARDINAL_INIT_OSC_THREAD
     rack::contextSet(nullptr);
 #endif
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "light", result.c_str());
+    cardinalOscReply(source, server, "light", result, status);
     return 0;
 }

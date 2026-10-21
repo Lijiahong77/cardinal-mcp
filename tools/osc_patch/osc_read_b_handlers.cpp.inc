@@ -95,7 +95,7 @@ static int osc_build_info_handler(const char*, const char*, lo_arg**, int, const
         + "|safeMode=" + (rack::settings::safeMode ? "1" : "0")
         + "|caps=" + caps;
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "build-info", payload.c_str());
+    cardinalOscReply(source, server, "build-info", payload, "ok");
     return 0;
 }
 
@@ -111,7 +111,7 @@ static int osc_cables_handler_impl(const lo_message m, void* const self, bool fi
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "cables", "");
+        cardinalOscReply(source, server, "cables", "", "err:E_NO_PLUGIN");
         return 0;
     }
 
@@ -145,7 +145,7 @@ static int osc_cables_handler_impl(const lo_message m, void* const self, bool fi
 
     if (out.empty())
         out = "none";
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "cables", out.c_str());
+    cardinalOscReply(source, server, "cables", out, "ok");
     return 0;
 }
 
@@ -174,7 +174,7 @@ static int osc_transport_handler(const char*, const char*, lo_arg**, int, const 
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr || plugin->context == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "transport", "");
+        cardinalOscReply(source, server, "transport", "", "err:E_NO_PLUGIN");
         return 0;
     }
 
@@ -189,7 +189,7 @@ static int osc_transport_handler(const char*, const char*, lo_arg**, int, const 
         + "|ticksPerBeat=" + fmtB(context->ticksPerBeat)
         + "|bypassed=" + (context->bypassed ? "1" : "0");
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "transport", payload.c_str());
+    cardinalOscReply(source, server, "transport", payload, "ok");
     return 0;
 }
 
@@ -206,7 +206,7 @@ static int osc_engine_info_handler(const char*, const char*, lo_arg**, int, cons
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
     if (plugin == nullptr || plugin->context == nullptr)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "engine-info", "");
+        cardinalOscReply(source, server, "engine-info", "", "err:E_NO_PLUGIN");
         return 0;
     }
 
@@ -217,7 +217,7 @@ static int osc_engine_info_handler(const char*, const char*, lo_arg**, int, cons
         + "|cpuMax=" + fmtB(context->engine->getMeterMax())
         + "|cpuRefreshMs=1000";
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "engine-info", payload.c_str());
+    cardinalOscReply(source, server, "engine-info", payload, "ok");
     return 0;
 }
 
@@ -234,6 +234,7 @@ static int osc_plugins_list_handler(const char*, const char*, lo_arg**, int, con
     const lo_server server = static_cast<Initializer*>(self)->oscServer;
 
     std::string payload = std::string("safeMode=") + (rack::settings::safeMode ? "1" : "0");
+    const char* status = "ok";
 
     std::string list;
     CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
@@ -268,8 +269,12 @@ static int osc_plugins_list_handler(const char*, const char*, lo_arg**, int, con
         rack::contextSet(nullptr);
        #endif
     }
+    else
+    {
+        status = "err:E_NO_PLUGIN";
+    }
     payload += "|plugins=" + (list.empty() ? std::string("none") : list);
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "plugins", payload.c_str());
+    cardinalOscReply(source, server, "plugins", payload, status);
     return 0;
 }

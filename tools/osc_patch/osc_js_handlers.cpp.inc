@@ -473,8 +473,9 @@ static int osc_js_run_handler(const char*, const char* types, lo_arg** argv, int
     const std::string mode = modeEnv != nullptr ? std::string(modeEnv) : std::string("off");
     if (mode != "read" && mode != "write")
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "js",
-                     "disabled: set CARDINAL_JS_MODE=read or =write to enable");
+        cardinalOscReply(source, server, "js",
+                         "disabled: set CARDINAL_JS_MODE=read or =write to enable",
+                         "err:E_DISABLED");
         return 0;
     }
 
@@ -482,8 +483,9 @@ static int osc_js_run_handler(const char*, const char* types, lo_arg** argv, int
     std::string src;
     if (!oscJsReadScript(argv[0]->i, src))
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "js",
-                     "no-script: bad index (see /osc-js-list)");
+        cardinalOscReply(source, server, "js",
+                         "no-script: bad index (see /osc-js-list)",
+                         "err:E_BAD_ARGS");
         return 0;
     }
 
@@ -492,7 +494,7 @@ static int osc_js_run_handler(const char*, const char* types, lo_arg** argv, int
         const std::string diag = "mode=" + mode
             + " src_len=" + std::to_string(src.size())
             + " src_head=" + src.substr(0, 48);
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "js-diag", diag.c_str());
+        cardinalOscReply(source, server, "js-diag", diag, "ok");
     }
 
     // ---- runtime（不初始化 libc ⇒ 无 std/os）+ 墙钟执行预算 ----
@@ -500,7 +502,7 @@ static int osc_js_run_handler(const char*, const char* types, lo_arg** argv, int
     JSContext* const ctx = JS_NewContext(rt);
     if (rt == NULL || ctx == NULL)
     {
-        lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "js", "runtime-failed");
+        cardinalOscReply(source, server, "js", "runtime-failed", "err:E_INTERNAL");
         if (ctx) JS_FreeContext(ctx);
         if (rt) JS_FreeRuntime(rt);
         return 0;
@@ -563,7 +565,7 @@ static int osc_js_run_handler(const char*, const char* types, lo_arg** argv, int
     JS_FreeContext(ctx);
     JS_FreeRuntime(rt);
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "js", payload.c_str());
+    cardinalOscReply(source, server, "js", payload, "ok");
     return 0;
 }
 
@@ -584,6 +586,6 @@ static int osc_js_list_handler(const char*, const char*, lo_arg**, int, const lo
     if (out.empty())
         out = "none";
 
-    lo_send_from(source, server, LO_TT_IMMEDIATE, "/resp", "ss", "js-list", out.c_str());
+    cardinalOscReply(source, server, "js-list", out, "ok");
     return 0;
 }
