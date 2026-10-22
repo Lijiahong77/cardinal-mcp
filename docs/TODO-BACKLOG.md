@@ -16,7 +16,7 @@
 
 ## 一、当前资产（已完工，不是待办）
 
-**MCP 工具 55 个**（`tools/cardinal_mcp.py`，截至 2026-10-21 E3+E8 完工）
+**MCP 工具 60 个**（`tools/cardinal_mcp.py`，截至 2026-10-22 E3+E8+B2+B3+C3+C2+M1 完工）
 - 原有 17：连通/存档/按编号操作/音乐配方/5 个未编译探针
 - 10-19 白天新增 13：4 个模块检索 · 1 个接线拓扑 · 3 个序列器音符 · 4 个采样槽 · 1 个交互索引
 - 批次 A 新增 6：`set_param_by_name` · `cardinal_audit` · `cardinal_deploy`+`cardinal_diff` · `cardinal_port_semantics` · `cardinal_export_abc`
@@ -73,8 +73,12 @@
 > 含 A 组 3 个带参端点首次验证）。**C 组 + F 组（QuickJS）已于 2026-10-20 第二批
 > 完工并运行级验证**（R1 12/12、R2 5/5、R3 4/4）。⚠️ 坑 D 仍在：主构建断在
 > CardinalMini_dsp.dll，须单独补 `make -C CardinalNative`（既有问题，2026-09-20 起）。
-> ⚠️ **liblo 接收 string 参数在本 Cardinal 版上确认不通**（10-20 三轮实测：echo /
-> module-add / js-eval 全无应答）⇒ 需自由文本/JSON 的操作改走 JS 脚本路径。
+> ✅ **liblo 能正常接收 string 参数**（2026-10-21 深夜 C4 实验，推翻 10-20 旧结论）：
+> 注册 `"s"` 类型 handler 即可——ASCII / 带 `|` 分隔符 / 200 字符长串全部正确收到，
+> 类型不匹配时 liblo 正确忽略。🔴 旧结论实为**注册方式问题**（typespec 没注册 `"s"`
+> ⇒ liblo 不派发 ⇒ 表现为全哑），10-20 三轮实测的 echo/module-add/js-eval 大概率都栽在这。
+> ⇒ **文本类端点已解锁**：候选 `/module-add "ss"`（plugin|model slug + 位置）——
+> C2 当年下线的理由已不成立，**待李拍板**。JS 脚本路径保留可用。
 
 **B 组 · 零 hook 读数（数据全现成，只差 OSC 入口）**
 
@@ -84,21 +88,44 @@
 | B2 | ✅ `/cables`（全量+单模块双模式；默认机架实测 6 条线） | `Cable` 四字段全 public（`Cable.hpp:15-19`）+ `Engine::getCableIds()`（`:163`） |
 | B3 | ✅ `/transport`（零 hook；playing/bar/beat/bpm/tick/bypassed 实测） | `plugincontext.hpp:82-90` 已有 `playing/bar/beat/bpm/tick/tickClock` ⇒ 零 hook |
 | B4 | ✅ `/engine-info`（带 cpuRefreshMs=1000 诚实标注，age 不假装知道） | `getSampleRate`/`getMeterAverage`/`getMeterMax`。⚠️ CPU 值**每 1 秒才刷新**（`Engine.cpp:576`）⇒ 必须带 `cpuAgeMs` |
-| B5 | ✅ `/plugins`（运行列表+safeMode；单查移师 MCP 侧 PluginManifests——liblo string 接收不可靠，10-20 决策） | 「我拼写的 plugin 存不存在」的权威答案。⚠️ **必须同时暴露 `settings::safeMode`** —— 为 true 时 `plugin::init()`（`plugin.cpp:273-275`）直接 return，**零插件加载** |
+| B5 | ✅ `/plugins`（运行列表+safeMode；单查走 MCP 侧 PluginManifests 仍是合理选择，但「liblo string 不可靠」的旧理由已推翻，见文首 C4 订正） | 「我拼写的 plugin 存不存在」的权威答案。⚠️ **必须同时暴露 `settings::safeMode`** —— 为 true 时 `plugin::init()`（`plugin.cpp:273-275`）直接 return，**零插件加载** |
 
 **C 组 · 模拟人类操作（李定的核心方向）** —— 10-20 第二批全部 ✅，WINE 运行级实测
 
 | # | handler | 人类操作 | 实测结果 |
 |---|---|---|---|
 | C1 | ✅ `/param-set-by-display` | 右键旋钮输数值 | WINE 实测 `old=0 new=-54`。⚠️ **显示值域因模块而异且常为指数**（VCO 写 0.8 → 回读 11.56Hz 是正确换算），验收只能「回读值≠原值」，不能写死数字 |
-| C2 | ⛔ `/module-add` **下线，改走 JS `cardinal.addModule(slug,x,y)`** | 右键 Add module → 拖进机架 | OSC 版需 string 参数（plugin\|model slug）⇒ **liblo 收不了 string**。JS API 已实测 `addModule=[ok]` + undo 生效 |
-| C3 | ✅ `/cable-add` `/cable-remove` | 从输出口拖一条线到输入口 | WINE 实测 cable-add ok + undo 回 "add cable"。⚠️ **同一输入口只能接一根线** |
-| C7 | ✅ `/module-remove` | 右键模块 → Remove | 走 history，可 undo |
-| C8 | ✅ `/module-move` | 拖动模块改位置 | WINE 实测 ok + undo 回 "move module"。⚠️ **单位：x 是格、y 是行号**（.vcv 的 pos[0]/pos[1]） |
+| C2 | ⛔ `/module-add` **下线，改走 JS `cardinal.addModule(slug,x,y)`** | 右键 Add module → 拖进机架 | OSC 版需 string 参数（plugin\|model slug）——旧理由「liblo 收不了 string」**已推翻**（见文首 C4 订正）⇒ **OSC 版可复活，待李拍板**。JS API 已实测 `addModule=[ok]` + undo 生效（保留路径） |
+| C3 | 🔴 `/cable-add` `/cable-remove` **实际不生效**（2026-10-21 下午实锤） | 从输出口拖一条线到输入口 | ⚠️ **历史验收是缺口**：当时只验「回包 ok + undo 名正确」，没验线真的加了。10-21 B3 排查实测：回包 `ok replaced=0` 但 `/cables` 数量不变 ⇒ **只 push 不手动执行**（`State::push` 只入栈不 redo）。✅ **已修**（2026-10-21 深夜 C6 批，见 `/module-copy` 记录下方的 C6 段） |
+| C7 | ✅ `/module-remove`（2026-10-21 深夜 C6 批修复） | 右键模块 → Remove | 手动级联删（线→模块，一个 ComplexAction）+ push 记录。WINE 实测 41→40 模块 + 4 根级联线删，undo 完全恢复 |
+| C8 | ✅ `/module-move`（2026-10-21 深夜 C6 批修复 + 单位语义修正） | 拖动模块改位置 | 手动设 `box.pos` + `updateExpanders`。🔴 **附带修掉单位 bug**：文档说「x 格 y 行」，旧实现直接当 px（差 15 倍）——该端点此前从不生效故零兼容负担。⚠️ 位置真值归真机 A1 |
 | C9 | ✅ `/midi-out` | 在 DAW 里弹 MIDI 键盘 | WINE 实测回 "sent"。⚠️ bypassed 时回显 `skipped:bypassed`（不假装送达） |
-| C4 | ✅ `/undo` `/redo` | Ctrl+Z | WINE 实测 undo 名正确（change parameter / add cable / move module）+ 值回退。⭐ GUI 版 OSC 每帧在 UI 线程 pump ⇒ handler 里调 history 安全 |
+| C4 | ✅ `/undo` `/redo` | Ctrl+Z | WINE 实测 undo 名正确 + 值回退（param 类）。⭐ GUI 版 OSC 每帧在 UI 线程 pump ⇒ handler 里调 history 安全。⚠️ 10-21 下午订正：当时的「add cable / move module」undo 名只证明 action 入了栈，**操作本身从未生效**（见 C3/C7/C8） |
 | C5 | ⚠️ `/batch` **未单做**：`cardinal_music`/现有工具已能批量 | 批量操作 | `ComplexAction` 已在库内。C 组九个端点各自走 history，本身已可「批量 + 一次 undo」；真需要单端点再说 |
 | C6 | ✅ 读 `/module-json`（整模块 .vcv JSON）· 写走 JS `moduleFromJson(id,json)` | 通用改任意模块数据 | ⭐ 拆成两半的原因：读只需 int64 参数（OSC 可发），写要 JSON 字符串（OSC 收不了） |
+
+- **C3 · 日志环形缓冲 + `/log-get` ✅ 2026-10-22 早上完工并 WINE 运行级验证**
+  - **动机**：Cardinal 日志走 `logger.cpp` 的 `logVa()` 直 fprintf stderr——GUI standalone 无 console ⇒ 进程内什么都读不到。
+  - **实现**：`logVa()` 里附加推入 2000 条环形缓冲（ring mutex 保护；行格式 = 文件日志同款但**无 ANSI 色码、文件名只留 basename**）；新端点 `/log-get "ii"`（from, limit≤64）增量读，回包 `"<first>/<next>|<行>\\n<行>"`。MCP 工具 `cardinal_log_get`（57→58）。
+  - **验证**：WINE 探针 **8/8**（最老 5 行 / 增量读 first==上次 next 且含 load 新日志 / 无重叠 / 四种非法参数全 `err:E_BAD_ARGS` / limit=64 / 超界 from 空返回）；MCP 层端到端 **5/5**。
+  - 🔴 **过程坑（三个，都记入日志）**：① `logRingPush` 初版忘加锁（UI 线程刷日志 vs OSC 线程读 deque 竞态）⇒ 补 ring mutex；② `firstOut` 语义初版永远报 ring 最老条 ⇒ 改为 max(from, oldest)；③ **探针索引抄错**（c3 探针 ask 返回 aargs 列表而非 (payload,status) 元组，T2 按元组索引取 ⇒ 假失败三轮）⇒ 教训：新探针先 dump 原始回包对齐语义再写断言。
+  - patch = `tools/osc_patch/patches/08-c3-log-get.patch`（3 文件段：CardinalCommon.cpp + Rack logger.cpp/hpp；logger 两文件相对 Rack 子模块 HEAD）；replay 第 8 组，端点 30→31。⚠️ 动 Rack 层 ⇒ 重编需 `make rack.a`。exe 已部署：MD5 `d17ab013…`。
+- **C2 · `/load` skipped 列表可见化 ✅ 2026-10-22 早上完工并 WINE 运行级验证**（C 栏收官）
+  - **问题**：加载时插件缺失的模块被跳过只进 warningLog（**无 id 上下文**），接不上的线则是**故意完全静默**（upstream 注释：missing modules 造成多余抱怨）⇒ 接线侧失败不可见。
+  - **实现**：`rack::LoadSkip{id,kind,reason}` 收集器（mutex 保护），在 **`src/override/Engine.cpp` 的 `Engine::fromJson` 三个跳过点**插桩（model 加载失败 / module 装配失败 / cable 装配失败），`Manager::fromJson` 开头清空；新端点 `/load-skipped`（无参，回包 `<n>|kind:id:reason,...`，reason 已消毒+截 80）；MCP 工具 `cardinal_load_skipped`（58→59）。
+  - 🔴 **踩坑：Cardinal 编译的是 `src/override/Engine.cpp`，不是 Rack 原版** ⇒ 改错文件 ⇒ 链接期 `undefined reference to rack::getLoadSkips()`。判定法：`nm -C src/rack.a | grep LoadSkip` 查不到定义 + `find build -name 'Engine.cpp.o'` 只找到 `build/rack/override/Engine.cpp.o`。
+  - **验证**：WINE 探针 **6/6**（损坏 patch：MiniArranger 的 plugin slug 改成不存在的 ⇒ 1 module + 16 cable = 17 条 skip，逐条带 id 与 reason；干净 patch ⇒ 0；重载 ⇒ 归零）；MCP 层端到端 **5/5**。
+  - patch = `tools/osc_patch/patches/09-c2-load-skipped.patch`（4 文件段；before/after 副本法造基线，避免把 D2 的 oscLoadActive 等既有未提交改动混进去）；replay 第 9 组，端点 31→32。exe 已部署：103,013,888 B，MD5 `bf55806b…`。
+- **M1 · `/module-add` 加模块端点 ✅ 2026-10-22 早上完工并 WINE 运行级验证**（李选方案 A）
+  - **由来**：C2 当年因「liblo 收不了 string」下线；C4 实验推翻旧结论 ⇒ 文字类端点解锁 ⇒ 把这项能力正式补上（李 10-22 拍板方案 A）。
+  - **端点**：`/module-add "sii"` = plugin\|model slug + x(格) + y(格)。手动执行（照抄人类右键 Add module：`Rack/src/app/Browser.cpp` 的 addModuleAction：createModule → engine->addModule → createModuleWidget → setModulePosForce → rack->addModule）+ push `ModuleAdd` 记录 ⇒ **可 undo**（undo 名 = `add module`）。回包 = 新模块 id；错误码 `err:E_NO_MODEL`（slug/型号不存在）。MCP 工具 `cardinal_add_module(plugin, model, x, y)`（59→60）。
+  - **顺带修 JS 那条路**：`cardinal.addModule(slug,x,y)`（JS API）此前与 C6 修掉的四个端点同病——**只 push 不执行 ⇒ 回 ok 但模块没加**（当年「undo 生效」的验收只证明了 action 入栈）。现已改为手动执行 + push 记录。
+  - **验证**：WINE 探针 **10/10**（41→42 模块、新 id 与型号正确、undo→41、redo→42、未知插件/未知型号/无分隔符三种错法全 `err:E_NO_MODEL`、失败调用零副作用）；MCP 层端到端 **5/5**。
+  - 🔴 **两个新坑**：① **typespec 必须与参数顺序一致**——我先写成 `"ssi"`（s+s+i）而实际是 slug+int+int ⇒ liblo 不派发 ⇒ 端点永远哑（探针一眼看出）；② **`loadTemplate()` 不能在 OSC 侧调**（人类右键路径独有的「出厂预设」加载，`ModuleAdd::redo` 并不做；preset 应用会碰 UI 菜单/参数 ⇒ 调了之后 undo 就让 OSC 失联）。
+  - patch = `tools/osc_patch/patches/10-module-add.patch`（基线取 C2 后状态，只含本批改动）；replay 第 10 组，端点 32→33。exe 已部署：103,015,424 B，MD5 `2c2ce802…`。
+- **C5 · 注入器遗留问题清理 ✅ 2026-10-22 深夜完工**（纯文档，零代码）
+  - 6 个 `inject_osc_*.py` 的降级标记 B1 时已加齐；本次把散落各处的已知坑（e2 漏 `+` / e3 块边界 off-by-one + 探针选错基线 exe + 端口残留 / d 两个已修 bug / 三条通用坑：幂等判据、端点数数法、git apply 静默跳过）集中成 `tools/osc_patch/injectors-LEGACY-NOTES.md`，各注入器头部加指向行。
+  - `__pycache__` 已清（本就已被 .gitignore 排除）。注入器仅剩考古价值，日常重放一律走 `replay_osc.py` + `patches/*.patch`。
 
 **D 组 · 观察**
 
@@ -132,6 +159,36 @@
     Windows MCP → WSL Cardinal 端到端也通过（`returned/total/has_more` 全对、`err:E_BAD_ARGS` 正确）。
   - ⚠️ 实测校正：当前 `modules` 217 条 ≈ 4 KB、`cables` 307 条 ≈ 5 KB，**离 UDP 65 KB 上限很远**，
     所以分页是防未来，不是救火。
+- **`/cables-page` · cables 分页（HANDOFF §6.1b B2 项）✅ 2026-10-21 下午完工并 WINE 运行级验证**
+  - **动机**：`/cables` 全量返回，`CardinalCommon.cpp:544` 注释明说 poly 16 通道能撑爆 payload（同 E2 校正：防未来，不是救火）。
+  - **新增端点 `/cables-page "ii"`（offset, limit）**，旧 `/cables`（全量 + `"h"` 单模块过滤）保留 ⇒ 零破坏。
+  - 回包 payload = `"<returned>/<total>|id:inMod:inId:outMod:outId,..."`，items 与 `/cables` 同构；limit 上限 64；
+    越界 offset → returned=0 但 total 仍报真实数；offset<0 / limit<=0 / limit>64 → `err:E_BAD_ARGS`。
+  - **单模块过滤不做分页**（`/cables "h"` 场景线少）——组合需求将来再说。
+  - 实现：`osc_cables_page_handler`（`CardinalCommon.cpp`，B3 /transport 之前）+ X-macro 表注册；
+    导出为 `tools/osc_patch/patches/05-b2-cables-page.patch`（相对 01-04 应用后），`replay_osc.py` 第 5 组，
+    校验端点总数 28→29。
+  - MCP 侧：新增 `cardinal_cables_page`（offset/limit）工具 + `cables_page()`，工具数 55→56。
+  - **验证**：WINE 探针 **11/11**（hello / load tar.zst blob / 全量 72 条合法 / (0,64)→64/72 / (64,64)→8/72 /
+    (70,10)→2/72 / offset==total→0/72 / 越界→0/72 / 四种非法参数全 `err:E_BAD_ARGS` /
+    步进拼接==全量逐条一致 / `/cables "h"` 零破坏）；MCP 层端到端 **8/8**（load→page→has_more→bad args→stepped）。
+  - 🔴 **WINE/测试里 `/load` 必须发 tar.zst**：Rack 2 的 .vcv 是纯 JSON（legacy V1）或 zstd tar（V2），
+    `/load` 只吃后者 ⇒ 裸 JSON 必 fail（且 128 KB 超 UDP 单包上限）。
+    MCP 侧 `load_patch()` 用 `patchio.archive_bytes()` 包装（6513 B）；探针/测试必须照做。
+- **`/module-copy` · 复制模块（HANDOFF §6.1b B3 项，李选方案 B）✅ 2026-10-21 下午完工并 WINE 运行级验证**
+  - **语义 = 原生 `ModuleWidget::cloneAction(cloneCables=true)` 的 OSC 孪生**（不发明语义）：新 id = `random::u64() % (1<<53)`（避撞现有）；模块 JSON deepcopy + 存储目录 copy；`cloneCables=1` 只复制**输入侧**的线（上游 → 新模块同输入口；自 patch 连到自己）⇒ 不可能违反「同一输入口一根线」；位置 = 源右侧 1 HP（`setModulePosNearest`）；全程一个 ComplexAction ⇒ undo 一次全撤。
+  - 🔴 **实现铁律（WINE 实测教训）**：`rack::history::State::push()` **只入栈不执行**！VCV 惯例 = 「先手动改引擎+UI，再 push 供 undo」。第一版照 cable-add 的「只 push」模式写 ⇒ 回包 ok 但 engine 毫无变化（手动 `/redo` 才生效）⇒ 重写为「手动执行 + push 记录」。
+  - 入参 `"hi"`（moduleId, cloneCables）；回包 `"<newModuleId> copied_cables=<n>"`。MCP 工具 `cardinal_module_copy`（56→57）。
+  - **验证**：WINE 探针 **12/13**（T3：41→42 模块 / 72→86 线 / 14 根新线全部落在克隆输入侧 / 上游保持 / 参数零差异；T6 undo×2 完全恢复基线；T7 redo×2；T5 坏 id → `err:E_NO_MODULE`）。唯一 FAIL = T8：**顺带实锤 `/cable-add` 不生效**（见 C3 订正）。MCP 层端到端 **7/7**。
+  - patch = `tools/osc_patch/patches/06-b3-module-copy.patch`（相对 01-05 应用后）；`replay_osc.py` 第 6 组，端点 29→30。
+  - exe 已部署：103,005,184 B，MD5 `751cdaea…`，13:47 构建。
+- **C6 · 写端点修复（4 个）✅ 2026-10-21 深夜完工并 WINE 运行级验证**
+  - **修的对象**：`/cable-add` `/cable-remove` `/module-move` `/module-remove` —— 全部「只 push 不手动执行」⇒ 回包 ok 但机架毫无变化（B3 排查时 T8 实锤：cable-add 后线数 86→86）。历史验收只验了回包 + undo 名，是 A1 缺口的深层案例。
+  - **修法（对齐原生人类路径）**：cable-add = 手动 addCable + CableWidget（+ 同输入口旧线挤掉，CableRemove 先 setCable 提取）；cable-remove = setCable 提取后 removeCable + delete（析构联动 engine->removeCable）；module-move = `box.pos = newPos` + updateExpanders；module-remove = 一个 ComplexAction（级联 CableRemove 们 + ModuleRemove）+ 手动 removeModule + delete。
+  - 🔴 **`/module-move` 单位语义 bug 一并修掉**：文档/工具说「x 格 y 行」，旧 handler 直接 `Vec(px, py)` 当 px 用（`box.pos` 是 px 且带 `RACK_OFFSET` 2000×100 格大偏移）⇒ 按格传只动 1/15。现按 `RACK_GRID_SIZE`(15×380)/`RACK_OFFSET` 换算。该端点此前从不生效，零兼容负担。
+  - ⚠️ **module-move 位置真值 WINE 下不可直验**：autosave 只由 Scene 周期 step 触发，WINE 下实测 35s 不落盘（exp_move.py 证实）⇒ 位置归真机 A1 验收。
+  - **验证**：WINE 探针 **14/14**（cable-add 72→73 + undo/redo 闭环；cable-remove 闭环；module-move 拓扑不变 + undo 名；module-remove 41→40 + 4 根级联删 + undo 完全恢复 41/72；B3 回归）；MCP 层端到端 **7/7**（四端点 + undo×4 恢复基线）。
+  - patch = `tools/osc_patch/patches/07-c6-write-endpoints.patch`（相对 01-06 应用后）；`replay_osc.py` 第 7 组。exe 已部署：103,006,208 B，MD5 `836aea28…`。
 - **E3 · 注册表抽函数 ✅ 2026-10-21 完工并运行级验证**（E 组收官）
   - **原问题**：thread 版（`lo_server_thread_add_method`）与 plain 版（`lo_server_add_method`）**各写一遍**
     完整端点表（28 端点 + fallback）。加一个新端点必须记得改两处，漏一处 ⇒ **静默失效**
@@ -155,7 +212,7 @@
 - `libquickjs.a` 已静态链入（`Makefile.cardinal.mk:152-154`）⇒ 实测 exe 体积 +21KB 即 JS 代码量
 - **实际实现与原设想的三处偏差**（都是实测逼出来的）：
   1. **不跑在 DSP 回调**。原计划「入队 + DSP 回调里 eval」是为了躲 GC 抖动；实际 OSC handler 已在 UI 线程串行 pump，直接在 handler 里同步 eval 更简单、且不存在并发问题（代价：UI 线程最多卡 2 秒 = 预算上限）
-  2. **输入改「脚本文件 + 索引」**（`/osc-js-run i` + `/osc-js-list`）而非即时字符串——liblo 收不了 string。且脚本放 `js/` 可 git 管理，反倒更合李的工作流
+  2. **输入改「脚本文件 + 索引」**（`/osc-js-run i` + `/osc-js-list`）——「liblo 收不了 string」是当时的误判（已推翻，见文首 C4 订正），但脚本放 `js/` 可 git 管理，仍是更合李工作流的方案
   3. **预算是墙钟不是指令数**。🔴 血泪：原先只数指令、上限 2000 万，实测死循环 **40 秒没被打断、UI 线程被永久卡死**。根因是 quickjs 只在 `interrupt_counter`（`JS_INTERRUPT_COUNTER_INIT=10000`，`deps/QuickJS/quickjs.c:316`）递减到 0 时才调 handler ⇒ 2000 万次 handler 调用 ≈ **2000 亿条指令**，差 5 个数量级。更根本的是**单位错了**：安全目标是「不卡 UI」，量纲必须是时间——同一指令数在真机和 WINE 上差几个数量级。⇒ 现为墙钟 2000ms（`CARDINAL_JS_BUDGET_MS` 可覆盖）+ 100 万次 handler 兜底，超时回 `budget-exceeded ms=2001`，实测**准点打断且进程存活**
 - ✅ 安全模型三门全落地并实测：**默认 off**（`CARDINAL_JS_MODE` 未设即拒绝）·**绝不初始化 libc**（无 std/os ⇒ 无 exec）·**墙钟预算**
 - 脚本契约：包成 `globalThis.result = (function(){ <脚本> })();` ⇒ **用 `return` 交结果**。🔴 血泪：脚本若自己 `globalThis.result = ...`，会被 IIFE 的 undefined 覆盖（实测踩过）

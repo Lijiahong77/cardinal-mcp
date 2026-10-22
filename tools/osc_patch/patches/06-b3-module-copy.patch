@@ -1,0 +1,170 @@
+diff --git a/src/CardinalCommon.cpp b/src/CardinalCommon.cpp
+index 570e3fb..29b2fe8 100644
+--- a/src/CardinalCommon.cpp
++++ b/src/CardinalCommon.cpp
+@@ -1592,6 +1592,157 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
+     return 0;
+ }
+ 
++// ==== CARDINAL-MCP-B3-MODULE-COPY-BEGIN ====
++// ------------------------------------------------------------ /module-copy
++// B3 (2026-10-21): duplicate a module — the OSC twin of the human
++// "Duplicate" / "Duplicate with cables" action (ModuleWidget::cloneAction).
++// 入参 "hi" = moduleId, cloneCables(0/1)
++// 回复: /resp "module-copy" "<newModuleId> copied_cables=<n>"
++// 🔴 实现模式（WINE 实测教训）：rack::history::State::push() 只入栈不执行！
++//    必须「先手动改引擎+UI，再 push action 供 undo」——即原生 cloneAction 的模式。
++// 语义对齐原生：
++//   - 新 id = random::u64() % (1<<53)（避开现有 id）
++//   - 模块 JSON deepcopy（jsonStripIds 后 fromJson）+ 存储目录 copy
++//   - cloneCables=1 只复制【输入侧】的线（上游 → 新模块同输入口；自 patch 连到自己）
++//     ⇒ 不可能违反「同一输入口一根线」（新模块输入口本来为空）
++//   - 位置 = 源 widget 右侧 1 HP（setModulePosNearest 找空位）
++//   - 全程一个 ComplexAction ⇒ cardinal_undo 一次全撤
++static int osc_module_copy_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_module_copy_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "module-copy", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    const int64_t srcId = argv[0]->h;
++    const int64_t cloneCables = argv[1]->i;
++
++    CardinalPluginContext* const context = plugin->context;
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++   #endif
++
++    std::string payload;
++    const char* status = "ok";
++
++    rack::engine::Module* const src = context->engine->getModule(srcId);
++    rack::app::ModuleWidget* const srcWidget =
++        (APP->scene != nullptr && APP->scene->rack != nullptr)
++            ? APP->scene->rack->getModule(srcId) : nullptr;
++    if (src == nullptr || srcWidget == nullptr)
++    {
++        payload = "no-module";
++        status = "err:E_NO_MODULE";
++    }
++    else
++    {
++        rack::plugin::Model* const model = src->getModel();
++
++        // 新 id：随机且不撞现有
++        int64_t newId = 0;
++        do {
++            newId = static_cast<int64_t>(rack::random::u64() % (1ull << 53));
++        } while (newId == 0 || context->engine->getModule(newId) != nullptr);
++
++        // 模块 JSON（剥 id；fromJson 时由新模块重新装配）
++        APP->engine->prepareSaveModule(src);
++        json_t* const moduleJ = src->toJson();
++        rack::engine::Module::jsonStripIds(moduleJ);
++
++        // ---- 手动执行（引擎 + UI），对齐原生 cloneAction ----
++        rack::engine::Module* const cloned = model->createModule();
++        cloned->id = newId;  // 先设 id，供存储目录 copy
++        rack::system::copy(src->getPatchStorageDirectory(),
++                           cloned->getPatchStorageDirectory());
++        try {
++            cloned->fromJson(moduleJ);
++        }
++        catch (rack::Exception& e) {
++            WARN("%s", e.what());
++        }
++        APP->engine->addModule(cloned);
++
++        rack::app::ModuleWidget* const clonedWidget = model->createModuleWidget(cloned);
++        APP->scene->rack->updateModuleOldPositions();
++        APP->scene->rack->addModule(clonedWidget);
++        // 位置：源 widget 右侧 1 HP，落在最近空位
++        rack::math::Vec newPos = srcWidget->box.pos;
++        newPos.x += clonedWidget->box.getWidth();
++        APP->scene->rack->setModulePosNearest(clonedWidget, newPos);
++
++        int64_t copied = 0;
++        if (cloneCables)
++        {
++            const std::vector<int64_t> cableIds = context->engine->getCableIds();
++            for (int64_t cid : cableIds)
++            {
++                rack::engine::Cable* const c = context->engine->getCable(cid);
++                if (c == nullptr)
++                    continue;
++                if (c->inputModule != src)
++                    continue;  // 只带输入侧（原生语义）
++                rack::engine::Cable* const nc = new rack::engine::Cable;
++                nc->inputModule = cloned;
++                nc->inputId = c->inputId;
++                // 自 patch（src→src）连到新模块自己，否则保持原上游
++                nc->outputModule = (c->outputModule == src) ? cloned : c->outputModule;
++                nc->outputId = c->outputId;
++                APP->engine->addCable(nc);
++
++                rack::app::CableWidget* const ncw = new rack::app::CableWidget;
++                ncw->setCable(nc);
++                APP->scene->rack->addCable(ncw);
++                ++copied;
++            }
++        }
++
++        // ---- push 记录（只供 undo/redo，不负责执行）----
++        rack::history::ComplexAction* const h = new rack::history::ComplexAction;
++        h->name = "duplicate module";
++
++        rack::history::ModuleAdd* const hma = new rack::history::ModuleAdd;
++        hma->setModule(clonedWidget);  // 从已建好的 widget 提取 model/id/pos/json
++        h->push(hma);
++
++        if (cloneCables)
++        {
++            const std::vector<int64_t> cableIds = context->engine->getCableIds();
++            for (int64_t cid : cableIds)
++            {
++                rack::engine::Cable* const c = context->engine->getCable(cid);
++                if (c == nullptr || c->inputModule != cloned)
++                    continue;  // 只收我们刚复制的那些线
++                rack::app::CableWidget* const cw = APP->scene->rack->getCable(c->id);
++                if (cw == nullptr)
++                    continue;
++                rack::history::CableAdd* const hca = new rack::history::CableAdd;
++                hca->setCable(cw);
++                h->push(hca);
++            }
++        }
++
++        APP->history->push(h);
++        payload = std::to_string(newId) + " copied_cables=" + std::to_string(copied);
++    }
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++   #endif
++
++    cardinalOscReply(source, server, "module-copy", payload, status);
++    return 0;
++}
++// ==== CARDINAL-MCP-B3-MODULE-COPY-END ====
++
+ // ---------------------------------------------------------------- C9 /midi-out
+ // 入参 "iiii" = channel, byte0, byte1, byte2（数值参数，避开 string/blob 通路）
+ // ⚠️ frame 必须 >= 0（TODO: plugincontext.hpp:208 assert）⇒ 用 context->frame
+@@ -2717,6 +2868,7 @@ void Initializer::loadSettings(const bool isRealInstance)
+     REG("/module-json", "h", osc_module_json_handler) \
+     REG("/module-remove", "h", osc_module_remove_handler) \
+     REG("/module-move", "hii", osc_module_move_handler) \
++    REG("/module-copy", "hi", osc_module_copy_handler) \
+     REG("/midi-out", "iiii", osc_midi_out_handler) \
+     REG("/osc-js-run", "i", osc_js_run_handler) \
+     REG("/osc-js-list", "", osc_js_list_handler) \

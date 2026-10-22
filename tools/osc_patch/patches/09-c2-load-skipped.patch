@@ -1,0 +1,192 @@
+diff --git a/src/CardinalCommon.cpp b/src/CardinalCommon.cpp
+index a326f5b..6f74ce2 100644
+--- a/src/CardinalCommon.cpp
++++ b/src/CardinalCommon.cpp
+@@ -1664,6 +1664,40 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
+     return 0;
+ }
+ 
++// ==== CARDINAL-MCP-C2-LOAD-SKIPPED-BEGIN ====
++// ------------------------------------------------------------ /load-skipped
++// C2 (2026-10-22): 读上一次 /load 被跳过的模块/线。
++// 无参。回复: /resp "load-skipped" "<n>|kind:id:reason,kind:id:reason,..."
++// reason 已消毒（: , | 换行替换为 _）并截断 80 字符，防止破坏分隔格式。
++// 与 warningLog 互补：那里是异常文本，这里带 id 和 kind 的结构化清单。
++static int osc_load_skipped_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_load_skipped_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 0, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    const std::vector<rack::LoadSkip> skips = rack::getLoadSkips();
++    std::string items;
++    for (size_t i = 0; i < skips.size(); ++i)
++    {
++        if (i)
++            items += ",";
++        std::string reason = skips[i].reason;
++        for (char& ch : reason)
++            if (ch == ':' || ch == ',' || ch == '|' || ch == '\n' || ch == '\r')
++                ch = '_';
++        if (reason.size() > 80)
++            reason.resize(80);
++        items += skips[i].kind + ":" + std::to_string(skips[i].id) + ":" + reason;
++    }
++    const std::string payload = std::to_string(skips.size()) + "|" + items;
++    cardinalOscReply(source, server, "load-skipped", payload, "ok");
++    return 0;
++}
++// ==== CARDINAL-MCP-C2-LOAD-SKIPPED-END ====
++
+ // ==== CARDINAL-MCP-C3-LOG-GET-BEGIN ====
+ // ------------------------------------------------------------ /log-get
+ // C3 (2026-10-22): 增量读进程内日志环形缓冲。
+@@ -2491,6 +2525,8 @@ static int osc_js_list_handler(const char*, const char*, lo_arg**, int, const lo
+ 
+ // ==== CARDINAL-MCP-C-GROUP-END ====
+ 
++
++
+ static int osc_fallback_handler(const char* const path, const char* const types, lo_arg**, int, lo_message, void*)
+ {
+     d_stderr("Cardinal OSC unhandled message \"%s\" with types \"%s\"", path, types);
+@@ -2981,6 +3017,7 @@ void Initializer::loadSettings(const bool isRealInstance)
+     REG("/module-move", "hii", osc_module_move_handler) \
+     REG("/module-copy", "hi", osc_module_copy_handler) \
+     REG("/log-get", "ii", osc_log_get_handler) \
++    REG("/load-skipped", "", osc_load_skipped_handler) \
+     REG("/midi-out", "iiii", osc_midi_out_handler) \
+     REG("/osc-js-run", "i", osc_js_run_handler) \
+     REG("/osc-js-list", "", osc_js_list_handler) \
+@@ -3291,6 +3328,7 @@ void loadTemplate(const bool factory)
+             remoteUtils::sendFullPatchToRemote(remoteDetails);
+ }
+ 
++
+ void loadTemplateDialog(const bool factory)
+ {
+ #ifndef HEADLESS_BEHAVIOUR
+diff --git a/src/override/Engine.cpp b/src/override/Engine.cpp
+index fee31df..286fcf0 100644
+--- a/src/override/Engine.cpp
++++ b/src/override/Engine.cpp
+@@ -1238,6 +1238,12 @@ json_t* Engine::toJson() {
+ }
+ 
+ 
++// C2: 从 moduleJ 取 id（加载早期 id 可能还没设到 module 上，回退到数组下标）
++static int64_t loadSkipModuleId(json_t* moduleJ, size_t fallbackIndex) {
++	json_t* idJ = json_object_get(moduleJ, "id");
++	return idJ ? json_integer_value(idJ) : static_cast<int64_t>(fallbackIndex);
++}
++
+ void Engine::fromJson(json_t* rootJ) {
+ 	// Don't write-lock the entire method because most of it doesn't need it.
+ 
+@@ -1257,6 +1263,7 @@ void Engine::fromJson(json_t* rootJ) {
+ 		}
+ 		catch (Exception& e) {
+ 			WARN("Cannot load model: %s", e.what());
++			addLoadSkip(loadSkipModuleId(moduleJ, moduleIndex), "module", e.what());
+ 			APP->patch->log(e.what()); // D2: keep the diagnostic (was silenced upstream)
+ 			continue;
+ 		}
+@@ -1286,6 +1293,7 @@ void Engine::fromJson(json_t* rootJ) {
+ 		}
+ 		catch (Exception& e) {
+ 			WARN("Cannot load module: %s", e.what());
++			addLoadSkip(loadSkipModuleId(moduleJ, moduleIndex), "module", e.what());
+ 			APP->patch->log(e.what()); // D2: keep the diagnostic (was silenced upstream)
+ 			helper->removeCachedModuleWidget(module);
+ 			delete module;
+@@ -1319,6 +1327,7 @@ void Engine::fromJson(json_t* rootJ) {
+ 		}
+ 		catch (Exception& e) {
+ 			WARN("Cannot load cable: %s", e.what());
++			addLoadSkip(cable->id >= 0 ? cable->id : static_cast<int64_t>(cableIndex), "cable", e.what());
+ 			delete cable;
+ 			// Don't log exceptions because missing modules create unnecessary complaining when cables try to connect to them.
+ 			continue;
+@@ -1343,4 +1352,25 @@ void Engine_setRemoteDetails(Engine* const engine, remoteUtils::RemoteDetails* c
+ 
+ } // namespace engine
+ 
++// ==== CARDINAL-MCP-C2-LOADSKIP-BEGIN ====
++// C2: /load skipped 收集器（定义）
++std::vector<LoadSkip> g_loadSkips;
++static std::mutex g_loadSkipsMtx;
++
++void clearLoadSkips() {
++	std::lock_guard<std::mutex> lock(g_loadSkipsMtx);
++	g_loadSkips.clear();
++}
++
++void addLoadSkip(int64_t id, const std::string& kind, const std::string& reason) {
++	std::lock_guard<std::mutex> lock(g_loadSkipsMtx);
++	g_loadSkips.push_back(LoadSkip{id, kind, reason});
++}
++
++std::vector<LoadSkip> getLoadSkips() {
++	std::lock_guard<std::mutex> lock(g_loadSkipsMtx);
++	return g_loadSkips;
++}
++// ==== CARDINAL-MCP-C2-LOADSKIP-END ====
++
+ } // namespace rack
+diff --git a/src/Rack/include/engine/Engine.hpp b/src/Rack/include/engine/Engine.hpp
+index 5e17a35..b8f87e4 100644
+--- a/src/Rack/include/engine/Engine.hpp
++++ b/src/Rack/include/engine/Engine.hpp
+@@ -6,11 +6,13 @@
+ #include <engine/Cable.hpp>
+ #include <engine/ParamHandle.hpp>
+ 
++
+ namespace rack {
+ /** High-performance classes handling modules and voltage signals between them
+ */
+ namespace engine {
+ 
++
+ /** Manages Modules and Cables and steps them in time.
+ 
+ Engine contains a shared mutex that locks when the Engine state is being read or written (manipulated).
+@@ -231,6 +233,24 @@ struct Engine {
+ 	PRIVATE void startFallbackThread();
+ };
+ 
++
+ } // namespace engine
+ 
++// ==== CARDINAL-MCP-C2-LOADSKIP-BEGIN ====
++// C2 (2026-10-22): /load skipped 收集器。Engine::fromJson 加载时被跳过的
++// 模块/线在此留痕（此前 cable skip 故意静默、模块 skip 只进 warningLog 且
++// 无 id 上下文）。由 Manager::fromJson 清空、OSC /load-skipped 读取。
++struct LoadSkip {
++	int64_t id;
++	std::string kind;   // "module" | "cable"
++	std::string reason;
++	LoadSkip(int64_t id_, const std::string& kind_, const std::string& reason_)
++		: id(id_), kind(kind_), reason(reason_) {}
++};
++extern std::vector<LoadSkip> g_loadSkips;
++void clearLoadSkips();
++void addLoadSkip(int64_t id, const std::string& kind, const std::string& reason);
++std::vector<LoadSkip> getLoadSkips();
++// ==== CARDINAL-MCP-C2-LOADSKIP-END ====
++
+ } // namespace rack
+diff --git a/src/Rack/src/patch.cpp b/src/Rack/src/patch.cpp
+index 1ba3455..4bfde83 100644
+--- a/src/Rack/src/patch.cpp
++++ b/src/Rack/src/patch.cpp
+@@ -476,6 +476,7 @@ json_t* Manager::toJson() {
+ void Manager::fromJson(json_t* rootJ) {
+ 	clear();
+ 	warningLog = "";
++	clearLoadSkips();
+ 
+ 	// version
+ 	std::string version;

@@ -1,0 +1,160 @@
+diff --git a/src/CardinalCommon.cpp b/src/CardinalCommon.cpp
+index aabbd6f..2aa20e3 100644
+--- a/src/CardinalCommon.cpp
++++ b/src/CardinalCommon.cpp
+@@ -1664,6 +1664,47 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
+     return 0;
+ }
+ 
++// ==== CARDINAL-MCP-C3-LOG-GET-BEGIN ====
++// ------------------------------------------------------------ /log-get
++// C3 (2026-10-22): 增量读进程内日志环形缓冲。
++// 入参 "ii" = from, limit（from=0 从最老；limit 上限 64）
++// 回复: /resp "log-get" "<first>/<next>|<line1>\n<line2>..."
++// first = 实际返回的最老条序号（from 太老被挤掉时会 > from，如实报告）
++// next = 下次该传的 from；行内容无 ANSI 色码、文件名只留 basename
++static int osc_log_get_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_log_get_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    const int64_t from = argv[0]->i;
++    const int64_t limit = argv[1]->i;
++    if (from < 0 || limit <= 0 || limit > 64)
++    {
++        cardinalOscReply(source, server, "log-get", "", "err:E_BAD_ARGS");
++        return 0;
++    }
++
++    uint64_t first = 0, next = 0;
++    const std::vector<std::string> lines =
++        rack::logger::getLogLines(static_cast<uint64_t>(from),
++                                  static_cast<size_t>(limit), first, next);
++    std::string items;
++    for (size_t i = 0; i < lines.size(); ++i)
++    {
++        if (i)
++            items += "\n";
++        items += lines[i];
++    }
++    const std::string payload = std::to_string(first) + "/" + std::to_string(next)
++                              + "|" + items;
++    cardinalOscReply(source, server, "log-get", payload, "ok");
++    return 0;
++}
++// ==== CARDINAL-MCP-C3-LOG-GET-END ====
++
+ // ==== CARDINAL-MCP-B3-MODULE-COPY-BEGIN ====
+ // ------------------------------------------------------------ /module-copy
+ // B3 (2026-10-21): duplicate a module — the OSC twin of the human
+@@ -2941,6 +2982,7 @@ void Initializer::loadSettings(const bool isRealInstance)
+     REG("/module-remove", "h", osc_module_remove_handler) \
+     REG("/module-move", "hii", osc_module_move_handler) \
+     REG("/module-copy", "hi", osc_module_copy_handler) \
++    REG("/log-get", "ii", osc_log_get_handler) \
+     REG("/midi-out", "iiii", osc_midi_out_handler) \
+     REG("/osc-js-run", "i", osc_js_run_handler) \
+     REG("/osc-js-list", "", osc_js_list_handler) \
+diff --git a/src/Rack/src/logger.cpp b/src/Rack/src/logger.cpp
+index 542af66..407ea03 100644
+--- a/src/Rack/src/logger.cpp
++++ b/src/Rack/src/logger.cpp
+@@ -94,6 +94,9 @@ static const int levelColors[] = {
+ 	31,
+ };
+ 
++// C3: 环形缓冲推入（定义见文件末 C3 块）
++static void logRingPush(const std::string& s);
++
+ static void logVa(Level level, const char* filename, int line, const char* func, const char* format, va_list args) {
+ 	if (!outputFile)
+ 		return;
+@@ -107,6 +110,18 @@ static void logVa(Level level, const char* filename, int line, const char* func,
+ 		std::fprintf(outputFile, "\x1B[0m");
+ 	std::vfprintf(outputFile, format, args);
+ 	std::fprintf(outputFile, "\n");
++
++	// C3: 同一条也推入进程内环形缓冲（锁已持，fmt 在 args 里）
++	{
++		char body[1024];
++		std::vsnprintf(body, sizeof(body), format, args);
++		const char* base = std::strrchr(filename, '/');
++		base = base ? base + 1 : filename;
++		char out[1200];
++		std::snprintf(out, sizeof(out), "[%.03f %s %s:%d %s] %s",
++		              nowTime, levelLabels[level], base, line, func, body);
++		logRingPush(std::string(out));
++	}
+ 	// Note: This adds around 10us, but it's important for logging to finish writing the file, and logging is not used in performance critical code.
+ 	std::fflush(outputFile);
+ }
+@@ -123,5 +138,48 @@ bool wasTruncated() {
+ }
+ 
+ 
++
++// ==== CARDINAL-MCP-C3-LOGRING-BEGIN ====
++// C3 (2026-10-22): 进程内日志环形缓冲（/log-get 的数据源）
++struct LogRing {
++	std::mutex mtx;
++	std::deque<std::pair<uint64_t, std::string>> lines;
++	uint64_t seq = 0;
++	static const size_t CAP = 2000;
++};
++static LogRing g_logRing;
++
++static void logRingPush(const std::string& s) {
++	std::lock_guard<std::mutex> lock(g_logRing.mtx);
++	g_logRing.lines.push_back(std::make_pair(++g_logRing.seq, s));
++	while (g_logRing.lines.size() > g_logRing.CAP)
++		g_logRing.lines.pop_front();
++}
++
++std::vector<std::string> getLogLines(uint64_t from, size_t limit,
++                                     uint64_t& firstOut, uint64_t& nextOut) {
++	std::lock_guard<std::mutex> lock(g_logRing.mtx);
++	std::vector<std::string> out;
++	if (limit > 64)
++		limit = 64;
++	// first = 实际起点：请求的 from；仅当 from 比 ring 最老条还老（被挤掉）时报最老条
++	const uint64_t oldest = g_logRing.lines.empty() ? 0 : g_logRing.lines.front().first;
++	firstOut = from > oldest ? from : oldest;
++	nextOut = g_logRing.seq;
++	for (auto it = g_logRing.lines.begin(); it != g_logRing.lines.end(); ++it) {
++		if (it->first < from)
++			continue;
++		if (out.size() >= limit)
++			break;
++		out.push_back(it->second);
++	}
++	if (!out.empty()) {
++		// ring 内序号连续 ⇒ out 最后一条的 seq = from + out.size() - 1
++		nextOut = from + out.size();
++	}
++	return out;
++}
++// ==== CARDINAL-MCP-C3-LOGRING-END ====
++
+ } // namespace logger
+ } // namespace rack
+diff --git a/src/Rack/include/logger.hpp b/src/Rack/include/logger.hpp
+index d47725f..896fa47 100644
+--- a/src/Rack/include/logger.hpp
++++ b/src/Rack/include/logger.hpp
+@@ -42,6 +42,13 @@ void log(Level level, const char* filename, int line, const char* func, const ch
+ */
+ PRIVATE bool wasTruncated();
+ 
++// C3 (2026-10-22): 进程内日志环形缓冲 —— GUI standalone 的 stderr 无处可去，
++// 加一个 OSC 可读的增量读接口。行格式与文件日志一致（但不含 ANSI 色码，
++// 文件名只留 basename）。线程安全（与写文件同一把锁）。
++// from=0 从最老一条开始；越界/被挤掉的 from 会返回实际最老条并如实报 first。
++std::vector<std::string> getLogLines(uint64_t from, size_t limit,
++                                     uint64_t& firstOut, uint64_t& nextOut);
++
+ 
+ } // namespace logger
+ } // namespace rack

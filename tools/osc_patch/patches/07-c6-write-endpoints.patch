@@ -1,0 +1,178 @@
+diff --git a/src/CardinalCommon.cpp b/src/CardinalCommon.cpp
+index 29b2fe8..aabbd6f 100644
+--- a/src/CardinalCommon.cpp
++++ b/src/CardinalCommon.cpp
+@@ -1321,8 +1321,11 @@ static int osc_cable_add_handler(const char*, const char* types, lo_arg** argv,
+     }
+     else
+     {
++        rack::history::ComplexAction* const h = new rack::history::ComplexAction;
++        h->name = "add cable";
++
+         int replaced = 0;
+-        // 查重：同一输入口已接的线，先 remove（模仿人类拖线挤掉）
++        // 查重：同一输入口已接的线，先手动删（模仿人类拖线挤掉）
+         std::vector<int64_t> ids = context->engine->getCableIds();
+         for (int64_t id : ids)
+         {
+@@ -1331,19 +1334,37 @@ static int osc_cable_add_handler(const char*, const char* types, lo_arg** argv,
+                 continue;
+             if (c->inputModule == inM && c->inputId == inPort)
+             {
+-                rack::history::CableRemove* r = new rack::history::CableRemove;
+-                r->cableId = id;
+-                APP->history->push(r);
+-                ++replaced;
++                rack::app::CableWidget* const cw = APP->scene->rack->getCable(id);
++                if (cw != nullptr)
++                {
++                    rack::history::CableRemove* const r = new rack::history::CableRemove;
++                    r->setCable(cw);  // 删前提取字段，供 undo 重建
++                    h->push(r);
++                    APP->scene->rack->removeCable(cw);
++                    delete cw;  // 析构联动 engine->removeCable
++                    ++replaced;
++                }
+             }
+         }
+-        rack::history::CableAdd* a = new rack::history::CableAdd;
+-        a->cableId = -1;   // 加入引擎时分配新 id
+-        a->inputModuleId = inMod;
+-        a->inputId = inPort;
+-        a->outputModuleId = outMod;
+-        a->outputId = outPort;
+-        APP->history->push(a);
++
++        // 手动加线（引擎 + UI）
++        rack::engine::Cable* const nc = new rack::engine::Cable;
++        nc->inputModule = inM;
++        nc->inputId = inPort;
++        nc->outputModule = outM;
++        nc->outputId = outPort;
++        context->engine->addCable(nc);
++
++        rack::app::CableWidget* const ncw = new rack::app::CableWidget;
++        ncw->setCable(nc);
++        APP->scene->rack->addCable(ncw);
++
++        // push 记录（从已建好的 widget 提取，供 undo/redo）
++        rack::history::CableAdd* const a = new rack::history::CableAdd;
++        a->setCable(ncw);
++        h->push(a);
++
++        APP->history->push(h);
+         payload = std::string("ok replaced=") + std::to_string(replaced);
+     }
+ 
+@@ -1380,10 +1401,16 @@ static int osc_cable_remove_handler(const char*, const char* types, lo_arg** arg
+ 
+     std::string payload;
+     const char* status = "ok";
+-    if (context->engine->getCable(cableId) != NULL)
++    rack::app::CableWidget* const cw = APP->scene->rack->getCable(cableId);
++    if (cw != nullptr && context->engine->getCable(cableId) != NULL)
+     {
+-        rack::history::CableRemove* a = new rack::history::CableRemove;
+-        a->cableId = cableId;
++        rack::history::CableRemove* const a = new rack::history::CableRemove;
++        a->setCable(cw);  // 删前提取字段，供 undo 重建
++
++        // 手动删（析构联动 engine->removeCable）
++        APP->scene->rack->removeCable(cw);
++        delete cw;
++
+         APP->history->push(a);
+         payload = "ok";
+     }
+@@ -1522,12 +1549,45 @@ static int osc_module_remove_handler(const char*, const char* types, lo_arg** ar
+ 
+     std::string payload;
+     const char* status = "ok";
+-    if (context->engine->getModule(moduleId) != NULL)
++    rack::app::ModuleWidget* const mw = APP->scene->rack->getModule(moduleId);
++    if (mw != nullptr && context->engine->getModule(moduleId) != NULL)
+     {
+-        rack::history::ModuleRemove* a = new rack::history::ModuleRemove;
+-        a->moduleId = moduleId;
+-        APP->history->push(a);
+-        payload = "ok";
++        rack::history::ComplexAction* const h = new rack::history::ComplexAction;
++        h->name = "delete module";
++
++        // 级联删线（对齐 appendDisconnectActions）：先提取再删
++        std::vector<int64_t> ids = context->engine->getCableIds();
++        int cascaded = 0;
++        for (int64_t cid : ids)
++        {
++            rack::engine::Cable* const c = context->engine->getCable(cid);
++            if (c == NULL)
++                continue;
++            if (c->inputModule != mw->module && c->outputModule != mw->module)
++                continue;
++            rack::app::CableWidget* const cw = APP->scene->rack->getCable(cid);
++            if (cw == nullptr)
++                continue;
++            rack::history::CableRemove* const cr = new rack::history::CableRemove;
++            cr->setCable(cw);
++            h->push(cr);
++            APP->scene->rack->removeCable(cw);
++            delete cw;  // 析构联动 engine->removeCable
++            ++cascaded;
++        }
++
++        rack::history::ModuleRemove* const a = new rack::history::ModuleRemove;
++        a->setModule(mw);  // 删前提取 model/id/pos/json，供 undo 重建
++        h->push(a);
++
++        APP->history->push(h);
++
++        // 手动删模块（removeModule 清 UI + 析构联动 engine->removeModule）
++        APP->scene->rack->removeModule(mw);
++        delete mw;
++        APP->scene->rack->updateExpanders();
++
++        payload = std::string("ok cascaded=") + std::to_string(cascaded);
+     }
+     else
+     {
+@@ -1561,8 +1621,8 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
+     }
+     CardinalPluginContext* const context = plugin->context;
+     const int64_t moduleId = argv[0]->h;
+-    const float px = argv[1]->i;
+-    const float py = argv[2]->i;
++    const int px = argv[1]->i;
++    const int py = argv[2]->i;
+ 
+    #ifdef CARDINAL_INIT_OSC_THREAD
+     rack::contextSet(context);
+@@ -1570,13 +1630,25 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
+ 
+     std::string payload;
+     const char* status = "ok";
+-    if (context->engine->getModule(moduleId) != NULL)
++    rack::app::ModuleWidget* const mw = APP->scene->rack->getModule(moduleId);
++    if (mw != nullptr && context->engine->getModule(moduleId) != NULL)
+     {
+-        rack::history::ModuleMove* a = new rack::history::ModuleMove;
++        rack::history::ModuleMove* const a = new rack::history::ModuleMove;
+         a->moduleId = moduleId;
+-        a->newPos = rack::math::Vec(px, py);
++        a->oldPos = mw->box.pos;
++        // 语义对齐 .vcv 文件与工具文档：x = 格（RACK_GRID_WIDTH=15px），y = 行号（RACK_GRID_HEIGHT=380px）。
++        // box.pos 是 px 且带 RACK_OFFSET（2000x100 格）大偏移 ⇒ 必须换算，不能直接 Vec(px,py)。
++        // 🔴 旧代码直接 Vec(px,py) ⇒ 传「格」被当「px」用，移动距离只有 1/15（x 向）——该端点此前从不生效，零兼容负担。
++        a->newPos = rack::math::Vec(
++            px * rack::app::RACK_GRID_SIZE.x + rack::app::RACK_OFFSET.x,
++            py * rack::app::RACK_GRID_SIZE.y + rack::app::RACK_OFFSET.y);
++
++        // 手动执行（对齐 ModuleMove::redo）
++        mw->box.pos = a->newPos;
++        APP->scene->rack->updateExpanders();
++
+         APP->history->push(a);
+-        payload = std::string("ok ") + std::to_string((int)px) + ":" + std::to_string((int)py);
++        payload = std::string("ok ") + std::to_string(px) + ":" + std::to_string(py);
+     }
+     else
+     {

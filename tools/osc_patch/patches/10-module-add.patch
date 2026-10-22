@@ -1,0 +1,183 @@
+diff --git a/src/CardinalCommon.cpp b/src/CardinalCommon.cpp
+index a326f5b..c948d77 100644
+--- a/src/CardinalCommon.cpp
++++ b/src/CardinalCommon.cpp
+@@ -1664,6 +1664,131 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
+     return 0;
+ }
+ 
++// ==== CARDINAL-MCP-MODULE-ADD-BEGIN ====
++// ------------------------------------------------------------ /module-add
++// 新端点（2026-10-22，李选方案 A）：按 plugin|model slug + 格坐标往机架加模块。
++// 入参 "ssi" = slug, x(格), y(格)
++// 手动执行（照抄人类右键 Add module 路径：Rack/src/app/Browser.cpp addModuleAction）
++//   + push ModuleAdd 记录 ⇒ 可 undo（ModuleAdd::undo = removeModule + delete）。
++// 位置：格 → px（RACK_GRID_SIZE / RACK_OFFSET）；setModulePosForce 会自动避让同排占用。
++// 回包: /resp "module-add" "<newModuleId>"
++//       错误码 err:E_NO_PLUGIN（插件不存在）/ err:E_NO_MODEL（型号不存在）/ err:E_INTERNAL
++static int osc_module_add_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_module_add_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 3, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "module-add", "no-plugin", "err:E_NO_PLUGIN");
++        return 0;
++    }
++    CardinalPluginContext* const context = plugin->context;
++    const std::string slug = &argv[0]->s;
++    const int gx = argv[1]->i;
++    const int gy = argv[2]->i;
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++   #endif
++
++    std::string payload;
++    const char* status = "ok";
++    const size_t bar = slug.find('|');
++    const std::string pluginSlug = (bar == std::string::npos) ? slug : slug.substr(0, bar);
++    const std::string modelSlug = (bar == std::string::npos) ? std::string() : slug.substr(bar + 1);
++
++    rack::plugin::Plugin* const p = rack::plugin::getPlugin(pluginSlug);
++    rack::plugin::Model* const model = (p != nullptr) ? p->getModel(modelSlug) : nullptr;
++    if (p == nullptr)
++    {
++        // 用 E_NO_MODEL 而不是 E_NO_PLUGIN：后者在既有约定里表示「OSC 桥未就绪」，
++        // 混用会把「插件 slug 写错」误诊成桥坏了。
++        payload = "no-such-plugin-slug";
++        status = "err:E_NO_MODEL";
++    }
++    else if (model == nullptr)
++    {
++        payload = "no-such-model";
++        status = "err:E_NO_MODEL";
++    }
++    else
++    {
++        try
++        {
++            // 手动执行（对齐人类右键 Add module）
++            rack::engine::Module* const module = model->createModule();
++            context->engine->addModule(module);
++            rack::app::ModuleWidget* const mw = model->createModuleWidget(module);
++            APP->scene->rack->updateModuleOldPositions();
++            const rack::math::Vec pos(
++                gx * rack::app::RACK_GRID_SIZE.x + rack::app::RACK_OFFSET.x,
++                gy * rack::app::RACK_GRID_SIZE.y + rack::app::RACK_OFFSET.y);
++            APP->scene->rack->setModulePosForce(mw, pos);
++            APP->scene->rack->addModule(mw);
++            // ⚠️ 故意不调 loadTemplate()：它是人类右键路径独有的「出厂预设」加载，
++            // 而 ModuleAdd::redo（undo→redo 重建）并不做——做了反而与 redo 不一致，
++            // 且 preset 应用会碰 UI 菜单/参数，在 OSC 侧调用不稳。
++
++            rack::history::ModuleAdd* const a = new rack::history::ModuleAdd;
++            a->setModule(mw);
++            APP->history->push(a);
++            payload = std::to_string(module->id);
++        }
++        catch (rack::Exception& e)
++        {
++            payload = std::string("create-failed: ") + e.what();
++            status = "err:E_INTERNAL";
++        }
++    }
++
++   #ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++   #endif
++
++    cardinalOscReply(source, server, "module-add", payload, status);
++    return 0;
++}
++// ==== CARDINAL-MCP-MODULE-ADD-END ====
++
++// ==== CARDINAL-MCP-C2-LOAD-SKIPPED-BEGIN ====
++// ------------------------------------------------------------ /load-skipped
++// C2 (2026-10-22): 读上一次 /load 被跳过的模块/线。
++// 无参。回复: /resp "load-skipped" "<n>|kind:id:reason,kind:id:reason,..."
++// reason 已消毒（: , | 换行替换为 _）并截断 80 字符，防止破坏分隔格式。
++// 与 warningLog 互补：那里是异常文本，这里带 id 和 kind 的结构化清单。
++static int osc_load_skipped_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_load_skipped_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 0, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    const std::vector<rack::LoadSkip> skips = rack::getLoadSkips();
++    std::string items;
++    for (size_t i = 0; i < skips.size(); ++i)
++    {
++        if (i)
++            items += ",";
++        std::string reason = skips[i].reason;
++        for (char& ch : reason)
++            if (ch == ':' || ch == ',' || ch == '|' || ch == '\n' || ch == '\r')
++                ch = '_';
++        if (reason.size() > 80)
++            reason.resize(80);
++        items += skips[i].kind + ":" + std::to_string(skips[i].id) + ":" + reason;
++    }
++    const std::string payload = std::to_string(skips.size()) + "|" + items;
++    cardinalOscReply(source, server, "load-skipped", payload, "ok");
++    return 0;
++}
++// ==== CARDINAL-MCP-C2-LOAD-SKIPPED-END ====
++
+ // ==== CARDINAL-MCP-C3-LOG-GET-BEGIN ====
+ // ------------------------------------------------------------ /log-get
+ // C3 (2026-10-22): 增量读进程内日志环形缓冲。
+@@ -2204,9 +2329,17 @@ static JSValue jsApiAddModule(JSContext* ctx, JSValueConst this_val, int argc, J
+     }
+     if (model == NULL)
+         return JS_ThrowInternalError(ctx, "no model (need plugin|model full slug)");
+-    rack::history::ModuleAdd* a = new rack::history::ModuleAdd;
+-    a->model = model;
+-    a->pos = rack::math::Vec(px, py);
++    // 🔴 2026-10-22 修（同 C6 根因）：rack::history::State::push() 只入栈不执行
++    // ⇒ 原先这里回 "ok" 但模块根本没被加进机架（手动 /redo 才生效）。
++    // 现在手动执行（对齐人类右键 Add module）+ push 记录（可 undo）。
++    // 位置沿用原语义：px（不是格）。
++    rack::engine::Module* const module = model->createModule();
++    APP->engine->addModule(module);
++    rack::app::ModuleWidget* const mw = model->createModuleWidget(module);
++    mw->box.pos = rack::math::Vec(px, py);
++    APP->scene->rack->addModule(mw);
++    rack::history::ModuleAdd* const a = new rack::history::ModuleAdd;
++    a->setModule(mw);
+     APP->history->push(a);
+     return JS_NewStringLen(ctx, "ok", 2);
+ }
+@@ -2491,6 +2624,8 @@ static int osc_js_list_handler(const char*, const char*, lo_arg**, int, const lo
+ 
+ // ==== CARDINAL-MCP-C-GROUP-END ====
+ 
++
++
+ static int osc_fallback_handler(const char* const path, const char* const types, lo_arg**, int, lo_message, void*)
+ {
+     d_stderr("Cardinal OSC unhandled message \"%s\" with types \"%s\"", path, types);
+@@ -2981,6 +3116,8 @@ void Initializer::loadSettings(const bool isRealInstance)
+     REG("/module-move", "hii", osc_module_move_handler) \
+     REG("/module-copy", "hi", osc_module_copy_handler) \
+     REG("/log-get", "ii", osc_log_get_handler) \
++    REG("/load-skipped", "", osc_load_skipped_handler) \
++    REG("/module-add", "sii", osc_module_add_handler) \
+     REG("/midi-out", "iiii", osc_midi_out_handler) \
+     REG("/osc-js-run", "i", osc_js_run_handler) \
+     REG("/osc-js-list", "", osc_js_list_handler) \
+@@ -3291,6 +3428,7 @@ void loadTemplate(const bool factory)
+             remoteUtils::sendFullPatchToRemote(remoteDetails);
+ }
+ 
++
+ void loadTemplateDialog(const bool factory)
+ {
+ #ifndef HEADLESS_BEHAVIOUR

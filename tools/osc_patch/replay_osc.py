@@ -3,7 +3,7 @@
 """replay_osc.py —— 把全部 OSC 改动一次性重放到 Cardinal 源码树
 
 ★ 为什么有这个脚本（2026-10-21）
-  在此之前，28 个 OSC 端点的 C++ 改动**只存在于 WSL 工作区**（不在 git 里）。
+  在此之前，33 个 OSC 端点的 C++ 改动**只存在于 WSL 工作区**（不在 git 里）。
   ⇒ 一次 `git checkout .` 就全没了；`MenuBar.cpp` 的自动开 OSC 补丁更是
     **不在任何注入器里**，连"重跑注入器"都救不回来。
 
@@ -25,6 +25,12 @@
   | 2 | 02-rack-osc.patch | `src/Rack/`：`settings.hpp` / `settings.cpp`（`oscLoadActive`）<br>`src/patch.cpp`（fromJson 弹窗条件化） | Rack 子模块当前 HEAD |
   | 3 | 03-build-env.patch | `plugins/plugins.cpp`（注册 Starsea）<br>`plugins/Makefile`（Starsea 目标）<br>`include/simd-compat/immintrin.h`（编译兼容）<br>删除 `lv2export/plugins/aubileinstruments-macro-osc-2.cpp` | Cardinal `8aa0fc7` |
   | 4 | 04-starsea-plugin.patch | 新增 `plugins/Starsea/`（**10 个文件**：MiniArranger 骨架 + 扩展器 + 3 个面板 SVG） | Cardinal `8aa0fc7` |
+  | 5 | 05-b2-cables-page.patch | `src/CardinalCommon.cpp`（B2 `/cables-page` 分页端点：handler + X-macro 注册） | Cardinal `8aa0fc7` + 01-04 应用后 |
+  | 6 | 06-b3-module-copy.patch | `src/CardinalCommon.cpp`（B3 `/module-copy` 复制模块：**手动执行 + push 记录**，对齐原生 `cloneAction`） | Cardinal `8aa0fc7` + 01-05 应用后 |
+  | 7 | 07-c6-write-endpoints.patch | `src/CardinalCommon.cpp`（C6：4 个写端点修为「手动执行 + push 记录」+ `/module-move` 单位语义修正） | Cardinal `8aa0fc7` + 01-06 应用后 |
+  | 8 | 08-c3-log-get.patch | `src/CardinalCommon.cpp`（C3 `/log-get` 端点）+ `src/Rack/src/logger.cpp` + `src/Rack/include/logger.hpp`（进程内日志环形缓冲） | Cardinal `8aa0fc7` + 01-07 应用后（logger 两文件相对 Rack 子模块 HEAD） |
+  | 9 | 09-c2-load-skipped.patch | `src/override/Engine.cpp` + `src/Rack/include/engine/Engine.hpp` + `src/Rack/src/patch.cpp` + `src/CardinalCommon.cpp`（C2 `/load` skipped 收集器 + `/load-skipped` 端点） | Cardinal `8aa0fc7` + 01-08 应用后 |
+  | 10 | 10-module-add.patch | `src/CardinalCommon.cpp`（`/module-add` 端点：按 plugin\|model slug + 格坐标加模块；顺带修 JS `addModule` 的 push-only 缺陷） | Cardinal `8aa0fc7` + 01-09 应用后 |
 
 ★ 幂等
   每一组都先 `git apply --check`：能干净应用 ⇒ 跳过（已应用过）；
@@ -88,6 +94,12 @@ PATCHES = [
     ("02-rack-osc.patch", "Rack 子模块：oscLoadActive + fromJson 弹窗条件化", "src/Rack"),
     ("03-build-env.patch", "构建环境：Starsea 注册 + Makefile + immintrin 兼容 + 删 lv2export", ""),
     ("04-starsea-plugin.patch", "Starsea 自建插件包（10 个文件，新增）", ""),
+    ("05-b2-cables-page.patch", "B2 /cables-page 分页端点（handler + X-macro 注册）", ""),
+    ("06-b3-module-copy.patch", "B3 /module-copy 复制模块（手动执行 + push 记录，对齐原生 cloneAction）", ""),
+    ("07-c6-write-endpoints.patch", "C6 写端点修复（手动执行 + push 记录 + module-move 单位换算）", ""),
+    ("08-c3-log-get.patch", "C3 日志环形缓冲 + /log-get 端点（含 Rack logger.cpp/hpp）", ""),
+    ("09-c2-load-skipped.patch", "C2 /load skipped 收集器 + /load-skipped 端点（override/Engine + Rack + CardinalCommon）", ""),
+    ("10-module-add.patch", "M1 /module-add 端点（slug + 格坐标加模块）+ JS addModule 修复", ""),
 ]
 
 # 校验点：应用完后这些标记必须存在（防止 patch 被裁剪/漏 apply）
@@ -103,6 +115,21 @@ VERIFY_MARKS = [
     ("src/CardinalCommon.cpp", 'REG("/screenshot"', "D1 截图端点已注册"),
     ("src/CardinalCommon.cpp", 'REG("/osc-js-run"', "C 组 JS 端点已注册"),
     ("src/CardinalCommon.cpp", "osc_modules_page_handler", "E2 handler 实现"),
+    ("src/CardinalCommon.cpp", "// ==== CARDINAL-MCP-B2-CABLES-PAGE-BEGIN ====", "B2 /cables-page"),
+    ("src/CardinalCommon.cpp", 'REG("/cables-page"', "B2 分页端点已注册"),
+    ("src/CardinalCommon.cpp", "osc_cables_page_handler", "B2 handler 实现"),
+    ("src/CardinalCommon.cpp", "// ==== CARDINAL-MCP-B3-MODULE-COPY-BEGIN ====", "B3 /module-copy"),
+    ("src/CardinalCommon.cpp", 'REG("/module-copy"', "B3 复制端点已注册"),
+    ("src/CardinalCommon.cpp", "osc_module_copy_handler", "B3 handler 实现"),
+    ("src/CardinalCommon.cpp", "// ==== CARDINAL-MCP-C3-LOG-GET-BEGIN ====", "C3 /log-get"),
+    ("src/CardinalCommon.cpp", 'REG("/log-get"', "C3 日志端点已注册"),
+    ("src/CardinalCommon.cpp", "osc_log_get_handler", "C3 handler 实现"),
+    ("src/Rack/src/logger.cpp", "logRingPush", "C3 环形缓冲"),
+    ("src/CardinalCommon.cpp", "// ==== CARDINAL-MCP-C2-LOAD-SKIPPED-BEGIN ====", "C2 /load-skipped"),
+    ("src/CardinalCommon.cpp", 'REG("/load-skipped"', "C2 skipped 端点已注册"),
+    ("src/override/Engine.cpp", "addLoadSkip", "C2 收集器插桩"),
+    ("src/CardinalCommon.cpp", "// ==== CARDINAL-MCP-MODULE-ADD-BEGIN ====", "M1 /module-add"),
+    ("src/CardinalCommon.cpp", 'REG("/module-add"', "M1 加模块端点已注册"),
     ("src/override/MenuBar.cpp", "startRemoteServer", "MenuBar 自动开 OSC"),
     ("src/override/Window.cpp", "g_screenshotFilePath", "截图落盘"),
     ("src/Rack/src/settings.cpp", "oscLoadActive", "Rack oscLoadActive 定义"),
@@ -111,8 +138,8 @@ VERIFY_MARKS = [
     ("plugins/Starsea/src/MiniArrangerExpander.cpp", "MiniArrangerExpander", "扩展器模块"),
 ]
 
-# OSC 端点总数（E3 后 = 28）
-EXPECTED_ENDPOINTS = 28
+# OSC 端点总数（M1 后 = 33）
+EXPECTED_ENDPOINTS = 33
 
 
 # --------------------------------------------------------------------------
@@ -272,7 +299,7 @@ def main():
         ok, problems, n_ep = verify(root)
         print("端点数     : %d / %d" % (n_ep, EXPECTED_ENDPOINTS))
         if ok:
-            print("\n✅ 校验通过：28 端点 + 所有标记齐全")
+            print("\n✅ 校验通过：33 端点 + 所有标记齐全")
             return 0
         print("\n❌ 校验不通过：")
         for p in problems:
@@ -312,7 +339,7 @@ def main():
     print("")
     print("端点数     : %d / %d" % (n_ep, EXPECTED_ENDPOINTS))
     if ok:
-        print("✅ 校验通过：28 端点 + 所有标记齐全")
+        print("✅ 校验通过：33 端点 + 所有标记齐全")
         print("\n下一步：编译（见 HANDOFF.md §2.4）")
         return 0
     print("❌ 校验不通过：")

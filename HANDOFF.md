@@ -13,10 +13,10 @@
 
 | 问题 | 答案 |
 |---|---|
-| **这是什么项目** | 给 Cardinal 模块化合成器加一套 **MCP 遥控能力**（**55 个工具**）+ **OSC 端点**（**28 个**），让 AI 能在软件里读状态、改机架、加模块、导出乐谱。 |
+| **这是什么项目** | 给 Cardinal 模块化合成器加一套 **MCP 遥控能力**（**57 个工具**）+ **OSC 端点**（**30 个**），让 AI 能在软件里读状态、改机架、加模块、导出乐谱。 |
 | **现在能用吗** | **能。** 部署的 `D:\Cardinal\win64\CardinalNative.exe` 已通过真机验收（10-21 10:08 构建，含 E1 三段式 + E2 分页 + E3 注册表抽函数）。 |
-| **最需要注意什么** | ① `D:\Cardinal` 是你的 fork（可 push）；WSL 的 `~/Cardinal` 是上游 clone（**绝不能 push**）。<br>② WSL 源码树**已经是「带 OSC 的可编译状态」**（10-21 实测：28 端点注册全在）⇒ 改完直接编；但 `git checkout .` 会把 OSC 改动冲掉（`MenuBar.cpp` 的自动开 OSC 补丁不在任何注入器里，**尤其别丢**）。<br>③ 改 `.vcv` 只写文件**李看不见**，要走 OSC `/load` 推送。 |
-| **明天第一件事** | 把本地那个还没推的提交推上去：`cd /d/Cardinal && git push origin main`（见 §2.1）。 |
+| **最需要注意什么** | ① `D:\Cardinal` 是你的 fork（可 push）；WSL 的 `~/Cardinal` 是上游 clone（**绝不能 push**）。<br>② WSL 源码树**已经是「带 OSC 的可编译状态」**（10-21 下午实测：30 端点注册全在，含 B2 `/cables-page` + B3 `/module-copy`）⇒ 改完直接编；`git checkout .` 冲掉工作区改动后跑一次 `replay_osc.py` 即可完全恢复（MenuBar 补丁现已在 `01-osc-core.patch` 里，B2 在 `05-b2-cables-page.patch` 里）。<br>③ 改 `.vcv` 只写文件**李看不见**，要走 OSC `/load` 推送。 |
+| **明天第一件事** | B2 这批改动（C++ patch + MCP 工具 + 文档）**未提交**，等李点头后提交推送（方法见 §2.1）。 |
 | **最权威的三份文档** | `HANDOFF.md`（本文件，怎么开工）· `docs/TODO-BACKLOG.md`（还有什么没做）· `docs/CARDINAL-MCP-CAPABILITY-MAP.md`（每个工具/端点对应哪段源码） |
 
 ---
@@ -27,9 +27,9 @@
 
 | 项 | 实际状态 / 位置 |
 |---|---|
-| **MCP 工具** | **55 个**（`tools/cardinal_mcp.py`，TOOLS == DISPATCH 已校验） |
-| **OSC 端点** | **28 个**（A 组读数 5 / B 组零 hook 5 / C 组模拟人类操作 9 + QuickJS 2 / D 组 `/screenshot` 1 / E 组 E1 三段式 + E2 分页 1 + E3 注册表重构） |
-| **部署的 exe** | `D:\Cardinal\win64\CardinalNative.exe`，**103,001,088 B**，MD5 `608c94aaa22c48f17c85c8a90d6ff522`，构建于 10-21 10:08（含 E1 三段式 + E2 分页 + E3 注册表抽函数 + 自动开 OSC 延后） |
+| **MCP 工具** | **60 个**（`tools/cardinal_mcp.py`，TOOLS == DISPATCH 已校验） |
+| **OSC 端点** | **33 个**（A 组读数 5 / B 组零 hook 5 / C 组模拟人类操作 9 + QuickJS 2 / D 组 `/screenshot` 1 / E 组 E1 三段式 + E2 分页 1 / B2 `/cables-page` 分页 1 / B3 `/module-copy` 复制 1 / C3 `/log-get` 日志 1 / C2 `/load-skipped` 1 / **M1 `/module-add` 加模块 1** + E3 注册表重构） |
+| **部署的 exe** | `D:\Cardinal\win64\CardinalNative.exe`，**103,015,424 B**，MD5 `2c2ce802e5842f3646befe8cbf0dfc69`，构建于 10-22 09:0x（含 E1 三段式 + E2 分页 + E3 注册表抽函数 + B2 `/cables-page` + B3 `/module-copy` + C6 写端点修复 + C3 日志环形缓冲 + `/log-get` + **C2 `/load` skipped 收集器** + **M1 `/module-add`** + 自动开 OSC 延后） |
 | **OSC 自动开启** | 已生效（`CARDINAL_OSC_AUTOSTART` 未设或 ≠ `0` 时，启动即开 2228 端口，不用再手点菜单） |
 | **MCP 注册** | `C:\Users\lijia\.workbuddy\mcp.json`，server 名 `cardinal` |
 | **机架资产** | `patches/` 下 **53 个 `.vcv`**；已验收成品见 §6.3 |
@@ -40,7 +40,7 @@
 | 项 | 状态 |
 |---|---|
 | **Git 推送** | ✅ 本地 `main` 与 `origin/main` **完全同步**（2026-10-21 11:20 推了 `1f0c718`，含 E3 + E8 解锁一批）。⚠️ 推送方法已变：**光「清代理 + 直连」会超时**，必须**指定能通的 GitHub 边缘 IP** —— 见 §2.1 |
-| **WSL 源码树** | ✅ **已是「带 OSC 的可编译状态」**（2026-10-21 10:50 实测复核）。`src/CardinalCommon.cpp` 里 **28 个端点注册全在**，`CARDINAL_OSC_METHODS` X-macro 在、`/modules-page` 在，`src/override/MenuBar.cpp` 的延后 120 帧补丁也在 ⇒ **改完直接编即可**。<br>✅ **2026-10-21 11:40 已解决「改动会丢」这个风险**：全部改动的真相已导出成 `tools/osc_patch/patches/*.patch` 进本仓库（git 跟踪），由 `replay_osc.py` 统一重放 —— 实测在干净 upstream 副本上重放后与现状 **22/22 文件逐字节一致**、端点 28/28、幂等零破坏 ⇒ **`git checkout .` 也不怕了**（重放即可恢复）。详见 `tools/osc_patch/README.md` |
+| **WSL 源码树** | ✅ **已是「带 OSC 的可编译状态」**（2026-10-21 10:50 实测复核）。`src/CardinalCommon.cpp` 里 **33 个端点注册全在**，`CARDINAL_OSC_METHODS` X-macro 在、`/modules-page` 在，`src/override/MenuBar.cpp` 的延后 120 帧补丁也在 ⇒ **改完直接编即可**。<br>✅ **2026-10-21 11:40 已解决「改动会丢」这个风险**：全部改动的真相已导出成 `tools/osc_patch/patches/*.patch` 进本仓库（git 跟踪），由 `replay_osc.py` 统一重放 —— 实测在干净 upstream 副本上重放后与现状 **22/22 文件逐字节一致**、端点 29/29、幂等零破坏 ⇒ **`git checkout .` 也不怕了**（重放即可恢复）。详见 `tools/osc_patch/README.md` |
 | **WSL 里的 MenuBar 自动开 OSC 补丁** | ✅ **已解决**（2026-10-21 11:40）。它原先**不在任何注入器里**、整树 `git checkout .` 就丢 ⇒ 现在已包含在 `tools/osc_patch/patches/01-osc-core.patch` 里（git 跟踪），`replay_osc.py` 一跑就恢复 ⇒ 不用再手工贴（§2.3.1 只留作兜底） |
 | **E 组（协议级）** | **E1 三段式响应 ✅ / E2 分页 ✅ / E3 注册表抽函数 ✅ 全部完工**（E3 为纯重构：27 端点行为指纹与重构前逐条一致） |
 | **其他待拍板** | life1 三修法、段落编排规格、`.mid` 导出 —— 见 §6 |
@@ -131,7 +131,7 @@ done
 ```bash
 cd /d/Cardinal
 
-# 列工具（应看到 55 个）
+# 列工具（应看到 60 个）
 "C:/Users/lijia/.workbuddy/binaries/python/envs/music-ai/Scripts/python.exe" \
   D:/Cardinal/tools/cardinal_mcp.py --tools
 
@@ -201,9 +201,15 @@ wsl.exe -e bash -lc '
 ✔ 已应用      02-rack-osc.patch            [src/Rack] Rack 子模块：oscLoadActive + fromJson 弹窗条件化
 ✔ 已应用      03-build-env.patch           构建环境：Starsea 注册 + Makefile + immintrin 兼容 + 删 lv2export
 ✔ 已应用      04-starsea-plugin.patch      Starsea 自建插件包（10 个文件，新增）
+✔ 已应用      05-b2-cables-page.patch      B2 /cables-page 分页端点（handler + 注册）
+✔ 已应用      06-b3-module-copy.patch      B3 /module-copy 复制模块（handler + 注册）
+✔ 已应用      07-c6-write-endpoints.patch      C6 写端点修复（4 端点手动执行化）
+✔ 已应用      08-c3-log-get.patch            C3 日志环形缓冲 + /log-get
+✔ 已应用      09-c2-load-skipped.patch       C2 /load skipped 收集器 + /load-skipped
+✔ 已应用      10-module-add.patch           M1 /module-add（slug + 格坐标加模块）
 
-端点数     : 28 / 28
-✅ 校验通过：28 端点 + 所有标记齐全
+端点数     : 33 / 33
+✅ 校验通过：33 端点 + 所有标记齐全
 ```
 
 **④ 只校验现状（不重放）：**
@@ -498,10 +504,14 @@ wsl.exe -e bash -lc '
 会撞 `CardinalMiniSep` / LV2 的既有失败，给人「全编不过」的错觉。
 **只编 `make -C CardinalNative`**。
 
-### 5.6 🟡 liblo 收不了 string 参数
+### 5.6 ✅ liblo **能**收 string 参数（旧结论已推翻，2026-10-21 深夜 C4 实验）
 
-发 string 正常，收 string 全哑。需要文本/JSON 的操作：
-走 **JS 脚本文件 + 数值索引**（`/osc-js-run <index>`），脚本放 `js/` 目录。
+注册 `"s"` 类型 handler 即可正常接收：WINE 实测 ASCII / 带 `|` 分隔符 / 200 字符长串
+全部正确收到；类型不匹配时 liblo 正确忽略（不派发）。
+🔴 旧结论「收不了 string」实为**注册方式问题**（typespec 没注册 `"s"` ⇒ liblo 不派发 ⇒ 表现为全哑），
+10-20 三轮实测的 echo/module-add/js-eval 大概率都栽在这。
+⇒ **文本类端点已解锁**，候选 `/module-add "ss"`（plugin|model slug + 位置）——
+C2 当年下线的理由已不成立，**待李拍板**。JS 脚本路径保留可用（IIFE + return）。
 
 ### 5.7 🟡 JS 预算是「墙钟」不是指令数
 
@@ -555,7 +565,7 @@ DISPLAY=:0 CARDINAL_OSC_AUTOSTART=1 wine bin/CardinalNative.exe
 
 #### 6.1b 🔴 后面还有的工作（2026-10-21 盘点 · 按「谁来做」分栏）
 
-> **性质说明**：协议层（A/B/C/D/E 五组）**已全部完工**，没有下一批端点可做了。
+> **性质说明**：协议层（A/B/C/D/E 五组）**已全部完工**；B2 `/cables-page` + B3 `/module-copy` 是 10-21 下午补的收尾端点（E2 分页的 cables 孪生 / 原生 cloneAction 的 OSC 孪生），之后没有下一批端点可做。
 > 剩下的全是「**要么缺一次真机验收、要么缺一个李的拍板**」。
 
 **A · 需要李在场的（做不了我做不了）**
@@ -573,8 +583,8 @@ DISPLAY=:0 CARDINAL_OSC_AUTOSTART=1 wine bin/CardinalNative.exe
 | # | 事项 | 说明 |
 |---|---|---|
 | B1 | ~~**把 OSC 改动纳入版本控制**~~ ✅ **已完成**（2026-10-21 11:40） | 28 个端点的 C++ 改动 + Starsea 插件包（10 文件）已导出成 **4 组 patch** 进 git（`tools/osc_patch/patches/`），由 `replay_osc.py` 统一重放。**实测**：干净 upstream 副本重放后与现状 **22/22 文件逐字节一致**、端点 28/28、幂等重跑零破坏 ⇒ `git checkout .` 不再是灾难 |
-| B2 | **`/cables` 分页** | `/modules` 有分页（E2）了，`/cables` 还是全量返回。机架大时 payload 会爆（`CardinalCommon.cpp:544` 注释明说 poly 16 通道能撑爆） |
-| B3 | **撤销/复制粘贴** | `cardinal_undo`/`cardinal_redo` 已有（走 history）；**复制粘贴模块**没有 —— VCV 文件里复制一个模块 = 改 id + 重挂线 |
+| B2 | ~~**`/cables` 分页**~~ ✅ **已完成**（2026-10-21 下午） | 新端点 `/cables-page "ii"`（offset, limit），旧 `/cables` 全量 + `"h"` 过滤保留 ⇒ 零破坏；MCP 工具 `cardinal_cables_page`（55→56）。WINE 探针 **11/11** + MCP 层端到端 **8/8**；exe 已部署（MD5 `32d3cfbc…`）；patch = `tools/osc_patch/patches/05-b2-cables-page.patch`。⚠️ **未提交**，等李点头 |
+| B3 | ~~**撤销/复制粘贴**~~ ✅ **已完成**（2026-10-21 下午，李选方案 B） | 新端点 `/module-copy "hi"`（moduleId, cloneCables）—— 原生 `cloneAction` 的 OSC 孪生：输入侧线跟随、自 patch 连自己、右侧 1 HP、一个 ComplexAction 全撤。MCP 工具 `cardinal_module_copy`（56→57）。WINE 探针 **12/13** + MCP 端到端 **7/7**；exe 已部署（MD5 `751cdaea…`）；patch = `06-b3-module-copy.patch`。⚠️ **未提交**，等李点头 |
 | B4 | **每轨独立长度** | MiniArranger 4+4 循环是**固定 8 小节**；每轨独立长度（李录的和弦长度不一）没做 |
 | B5 | **`cardinal_mcp.py` 的单元测试** | 现在只有 `--selftest`（冒烟级）。`set_params_batch` / `diff` 这类**改文件**的逻辑应该有回归测试（断言「全部失败不写盘」「reserved 槽被拒」这类硬性质） |
 | B6 | **插件 slugs 硬编码清理** | 工具里散落 `Bogaudio-VCO` / `Fundamental-VCA-1` 这类字符串（改插件名就崩）⇒ 应统一走 `modbrowser` 查 |
@@ -585,9 +595,10 @@ DISPLAY=:0 CARDINAL_OSC_AUTOSTART=1 wine bin/CardinalNative.exe
 |---|---|
 | C1 | ~~**`MenuBar.cpp` 自动开 OSC 补丁不在任何注入器里**~~ ✅ **已解**（2026-10-21 11:40）| 该补丁连同全部 28 端点改动已导出成 `tools/osc_patch/patches/01-osc-core.patch` 进 git，由 `replay_osc.py` 重放 ⇒ 整树 `git checkout .` 后跑一次脚本即可完全恢复。⚠️ 注意：**patch 相对 upstream `8aa0fc7`**，upstream 变了会冲突（脚本会停下报错，不会硬塞） |
 | C2 | **`/load` 的 `skipped` 列表拿不到**（引擎刻意避免，TODO-BACKLOG E4）⇒ 接线侧静默失败仍不可见 |
-| C3 | **Cardinal 日志进程内读不到**（`logger.cpp:110` 直 fprintf）⇒ 要读必须加环形缓冲 hook |
-| C4 | **liblo 收不了 string 参数** ⇒ 需文本/JSON 的操作一律走 JS 脚本文件 + 数值索引 |
-| C5 | **E3 注入器有遗留问题**（上一轮记录：字符串拼接漏 `+`、块边界 off-by-one、探针误选 E1 基线）⇒ 重放前先修 |
+| C3 | ~~**Cardinal 日志进程内读不到**~~ ✅ **已修**（2026-10-22 早上 C3 批） | Rack `logger.cpp` 的 `logVa()` 附加推入 2000 条环形缓冲（mutex 保护，行格式同文件日志但无 ANSI、文件名留 basename）+ 新端点 `/log-get "ii"`（from, limit≤64，增量读）。MCP 工具 `cardinal_log_get`（57→58）。WINE 探针 **8/8** + MCP 层端到端 **5/5**；patch = `08-c3-log-get.patch`（含 Rack logger 两文件，重编需 `make rack.a`）。⚠️ 改的是 Rack 层 ⇒ 与 upstream 冲突面比纯 CardinalCommon 大 |
+| C4 | ~~**liblo 收不了 string 参数**~~ ✅ **旧结论已推翻**（2026-10-21 深夜 C4 实验） | 注册 `"s"` handler 即可正常收 string（ASCII/分隔符/200 字符全验过）；旧结论实为注册方式问题（typespec 不匹配 ⇒ liblo 不派发）。**文本类端点已解锁**（候选 `/module-add "ss"`，待李拍板）；JS 脚本路径保留 |
+| C5 | ~~**E3 注入器有遗留问题**~~ ✅ **已清理**（2026-10-22 深夜 C5 批） | 6 个注入器的降级标记齐全（B1 加的）；已知坑（e2 漏 `+`、e3 块边界 off-by-one / 探针选错基线 / 端口残留、d 两个已修 bug、三条通用坑）已集中成 `tools/osc_patch/injectors-LEGACY-NOTES.md`，各注入器头部加指向行，README 目录树同步。注入器仅为历史记录，日常重放一律走 `replay_osc.py` + patches |
+| C6 | ~~**4 个写端点实际不生效**~~ ✅ **已修**（2026-10-21 深夜 C6 批） | `/cable-add` `/cable-remove` `/module-move` `/module-remove` 全部修为「手动执行 + push 记录」（`State::push()` 只入栈不 redo）。WINE 探针 **14/14** + MCP 层端到端 **7/7**；patch = `07-c6-write-endpoints.patch`。附带修掉 `/module-move` 单位语义 bug（文档说格、旧实现当 px，差 15 倍）。⚠️ module-move 的位置真值 WINE 下不可直验（autosave 周期落盘不触发）⇒ 归真机 A1 |
 
 ### 6.2 已由李结案（2026-10-21 裁决，**不是待办**）
 
@@ -626,14 +637,14 @@ HostMIDI 复音 8 声道分轨录和弦，4+4 循环，每轨独立音色链。
 
 | 路径 | 作用 |
 |---|---|
-| `tools/cardinal_mcp.py` | **MCP 服务主体**，**55 个工具** + 命令行入口 |
+| `tools/cardinal_mcp.py` | **MCP 服务主体**，**60 个工具** + 命令行入口 |
 | `tools/osc_patch/inject_osc_read.py` | A 组注入器（5 个读数端点） |
 | `tools/osc_patch/inject_osc_b.py` | B 组注入器（5 个零 hook 端点） |
 | `tools/osc_patch/inject_osc_c.py` | C 组注入器（9 个操作 + 2 个 JS 端点） |
 | `tools/osc_patch/inject_osc_d.py` | D 组注入器（`/screenshot` + `/load` 回 warningLog） |
 | `tools/osc_patch/inject_osc_e2.py` | E2 注入器（`/modules-page` 分页，依赖 E1+A 组） |
 | `tools/osc_patch/inject_osc_e3.py` | E3 注入器（端点注册表抽 X-macro 单一真源；依赖 A/B/C/D/E1/E2）——⚠️ **已降级为历史记录**，不再是重放路径 |
-| `tools/osc_patch/replay_osc.py` | ⭐ **统一重放脚本**（唯一入口）：把 `patches/*.patch` 放回源码树，幂等 + 自动校验 28 端点 |
+| `tools/osc_patch/replay_osc.py` | ⭐ **统一重放脚本**（唯一入口）：把 `patches/*.patch`（10 组）放回源码树，幂等 + 自动校验 33 端点 |
 | `tools/osc_patch/patches/*.patch` | ⭐ **改动的真相**（4 组，git 跟踪）：OSC 核心 / Rack 子模块 / 构建环境 / Starsea 插件 |
 | `tools/osc_patch/README.md` | 重放说明 + 基线 + 三个踩过的坑 |
 | `tools/osc_patch/*.inc` | 注入用的 C++ handler 源码 |

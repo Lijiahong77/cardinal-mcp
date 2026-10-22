@@ -1001,6 +1001,7 @@ _STATUS_NOTES = {
     "err:E_NO_MODULE": "no module with that id exists in the running rack",
     "err:E_BAD_PARAM": "module exists but the param/light index is out of range",
     "err:E_NO_CABLE": "no cable with that id exists",
+    "err:E_NO_MODEL": "no plugin|model matches that slug (check the slugs with cardinal_plugins)",
     "err:E_BAD_PORT": "port index out of range",
     "err:E_NOTHING": "nothing to undo/redo",
     "err:E_BAD_ARGS": "bad request arguments (e.g. script index)",
@@ -1260,6 +1261,143 @@ def cables(module_id=None):
     return {"ok": True, "count": len(out), "cables": out}
 
 
+def cables_page(offset=0, limit=32):
+    """Read one PAGE of the running rack's cables (B2, 2026-10-21).
+
+    Paged twin of `cables()` for when a rack grows large — `/cables` returns
+    everything in one datagram, and a poly-16 rack's cable list can blow up
+    the payload. Wire payload is `<returned>/<total>|id:inMod:inId:outMod:outId,...`
+    where items use the same shape as `cables()`.
+
+      offset  — 0-based start index into the cable list
+      limit   — page size, capped at 64 by the server
+
+    Overshooting offset returns empty items but still reports the real total.
+    """
+    payload, status = _ask_status(
+        "cables-page", "/cables-page",
+        [("i", int(offset)), ("i", int(limit))])
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    if status.startswith("err"):
+        return {"ok": False, "offset": int(offset), "limit": int(limit),
+                "status": status, "raw": payload, "note": _status_note(status)}
+    # payload = "<returned>/<total>|<items>"
+    try:
+        head, items = payload.split("|", 1)
+        returned_s, total_s = head.split("/", 1)
+        returned, total = int(returned_s), int(total_s)
+    except ValueError:
+        return {"ok": False, "offset": int(offset), "limit": int(limit),
+                "status": status, "raw": payload, "note": "unparseable page payload"}
+    out = []
+    for item in items.split(","):
+        f = item.split(":")
+        if len(f) != 5:
+            continue
+        try:
+            cid, im, ip, om, op = (int(x) for x in f)
+        except ValueError:
+            continue
+        out.append({"cable_id": cid, "input_module": im, "input_port": ip,
+                    "output_module": om, "output_port": op})
+    return {"ok": True, "offset": int(offset), "limit": int(limit),
+            "returned": returned, "total": total,
+            "has_more": int(offset) + returned < total,
+            "count": len(out), "cables": out, "status": status}
+
+
+def log_get(from_index=0, limit=32):
+    """Read Cardinal's in-process log ring buffer (C3, 2026-10-22).
+
+    Cardinal's own logger writes to stderr, which a GUI standalone has nowhere
+    to send — until now nothing was readable in-process. This reads the ring
+    buffer incrementally: pass `next` back in to get only what is new.
+
+      from_index  — sequence number to start from (0 = oldest available)
+      limit       — page size, capped at 64 by the server
+
+    Returns first/next + the lines. `first` may exceed from_index if older
+    entries were evicted (2000-line ring) — the reply says so honestly.
+    """
+    payload, status = _ask_status(
+        "log-get", "/log-get",
+        [("i", int(from_index)), ("i", int(limit))])
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    if status.startswith("err"):
+        return {"ok": False, "from_index": int(from_index), "limit": int(limit),
+                "status": status, "raw": payload, "note": _status_note(status)}
+    # payload = "<first>/<next>|<lines, \\n separated>"
+    try:
+        head, items = payload.split("|", 1)
+        first_s, next_s = head.split("/", 1)
+        first, nxt = int(first_s), int(next_s)
+    except ValueError:
+        return {"ok": False, "from_index": int(from_index), "limit": int(limit),
+                "status": status, "raw": payload, "note": "unparseable payload"}
+    lines = items.split("\n") if items else []
+    return {"ok": True, "from_index": int(from_index), "limit": int(limit),
+            "first": first, "next": nxt, "has_more": nxt > first + len(lines),
+            "count": len(lines), "lines": lines, "status": status}
+
+
+def add_module(plugin, model, x, y):
+    """Add a module to the running rack, like right-click -> Add module.
+
+    `plugin` and `model` are the two slugs Cardinal uses (e.g. "Bogaudio-VCO"
+    and "VCO-2"); x/y are GRID CELLS (1 cell = 15 px wide, 1 row = 380 px).
+    The new module lands in the rack and can be undone with cardinal_undo.
+
+    Slugs are not guessable — list the running ones first with
+    cardinal_plugins (or cardinal_module_search) to get them right.
+    """
+    payload, status = _ask_status("module-add", "/module-add",
+                                   (("s", "%s|%s" % (plugin, model)),
+                                    ("i", int(x)), ("i", int(y))))
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    if status.startswith("err"):
+        # note: the older write tools use _hist(), which drops the status and
+        # would report ok=True for a rejected slug. This one keeps it honest.
+        return {"ok": False, "status": status, "raw": payload,
+                "note": _status_note(status)}
+    return {"ok": True, "result": payload, "status": status}
+
+
+def load_skipped():
+    """List modules/cables the last /load skipped (C2, 2026-10-22).
+
+    Missing plugins and broken cables used to vanish silently — cable skips
+    are deliberately not even logged upstream, and module skips only reached
+    warningLog without ids. Each entry carries kind ("module"/"cable"), the
+    id from the patch file, and a sanitized reason.
+    """
+    payload, status = _ask_status("load-skipped", "/load-skipped", [])
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    if status.startswith("err"):
+        return {"ok": False, "status": status, "raw": payload,
+                "note": _status_note(status)}
+    # payload = "<n>|kind:id:reason,kind:id:reason,..."
+    try:
+        head, items = payload.split("|", 1)
+        n = int(head)
+    except ValueError:
+        return {"ok": False, "status": status, "raw": payload,
+                "note": "unparseable payload"}
+    skips = []
+    if items:
+        for entry in items.split(","):
+            f = entry.split(":", 2)
+            if len(f) == 3:
+                try:
+                    skips.append({"kind": f[0], "id": int(f[1]), "reason": f[2]})
+                except ValueError:
+                    skips.append({"kind": f[0], "id": None, "reason": f[2]})
+    return {"ok": True, "count": n, "skips": skips, "status": status}
+
+
 def transport():
     """Transport state: playing / bar / beat / bpm / tick / bypassed.
 
@@ -1359,6 +1497,21 @@ def _hist(what):
     return {"ok": True, "result": what}
 
 
+def _hist_status(payload, status):
+    """Like _hist() but keeps the error status.
+
+    _hist() reports ok=True for everything the OSC bridge answered, including
+    err:<CODE> replies — so a rejected edit (unknown module id, nothing to
+    undo, ...) looked successful. Write tools use this instead (2026-10-22).
+    """
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    if status and status.startswith("err"):
+        return {"ok": False, "status": status, "raw": payload,
+                "note": _status_note(status)}
+    return {"ok": True, "result": payload, "status": status}
+
+
 def set_param_by_display(module_id, param, value):
     """Set a knob the way a HUMAN sets it — by its DISPLAYED value.
 
@@ -1395,28 +1548,28 @@ def cable_add(module_id, input_port, target_module_id, output_port):
     ⚠️ One input accepts ONE cable — a second connection on the same input
     displaces the first. That is a hard engine rule, not a tool choice.
     """
-    payload = _ask("cable-add", "/cable-add",
+    payload, status = _ask_status("cable-add", "/cable-add",
                    (("h", int(module_id)), ("i", int(input_port)),
                     ("h", int(target_module_id)), ("i", int(output_port))))
-    return _hist(payload)
+    return _hist_status(payload, status)
 
 
 def cable_remove(cable_id):
     """Right-click a cable -> Disconnect."""
-    payload = _ask("cable-remove", "/cable-remove", (("h", int(cable_id)),))
-    return _hist(payload)
+    payload, status = _ask_status("cable-remove", "/cable-remove", (("h", int(cable_id)),))
+    return _hist_status(payload, status)
 
 
 def undo():
     """Ctrl+Z on the running rack. Returns the name of the action undone."""
-    payload = _ask("undo", "/undo")
-    return _hist(payload)
+    payload, status = _ask_status("undo", "/undo")
+    return _hist_status(payload, status)
 
 
 def redo():
     """Ctrl+Shift+Z on the running rack."""
-    payload = _ask("redo", "/redo")
-    return _hist(payload)
+    payload, status = _ask_status("redo", "/redo")
+    return _hist_status(payload, status)
 
 
 def module_json(module_id):
@@ -1438,8 +1591,8 @@ def module_json(module_id):
 
 def module_remove(module_id):
     """Select a module and press Delete — removes it and its cables."""
-    payload = _ask("module-remove", "/module-remove", (("h", int(module_id)),))
-    return _hist(payload)
+    payload, status = _ask_status("module-remove", "/module-remove", (("h", int(module_id)),))
+    return _hist_status(payload, status)
 
 
 def module_move(module_id, x, y):
@@ -1448,9 +1601,47 @@ def module_move(module_id, x, y):
     ⚠️ Units follow the .vcv file: x is in GRID cells, y is a ROW INDEX
     (VCV stores pos[0] as cell x and pos[1] as row y). Same as the file format.
     """
-    payload = _ask("module-move", "/module-move",
+    payload, status = _ask_status("module-move", "/module-move",
                    (("h", int(module_id)), ("i", int(x)), ("i", int(y))))
-    return _hist(payload)
+    return _hist_status(payload, status)
+
+
+def module_copy(module_id, with_cables=True):
+    """Duplicate a module in the running rack (B3, 2026-10-21).
+
+    The OSC twin of the human right-click "Duplicate" / "Duplicate with
+    cables" action (ModuleWidget::cloneAction). Returns the NEW module's id.
+
+      with_cables=True (default) — cables on the source's INPUT ports are
+      cloned onto the new module (upstream fans out; a self-patch reconnects
+      to the clone). Same semantics as the human action, and it can never
+      violate the one-cable-per-input-port rule.
+
+    The whole duplication is ONE history entry, so cardinal_undo reverts the
+    module and its cloned cables in a single step.
+    """
+    payload, status = _ask_status(
+        "module-copy", "/module-copy",
+        [("h", int(module_id)), ("i", 1 if with_cables else 0)])
+    if payload is None:
+        return dict(PROBE_UNSUPPORTED)
+    if status.startswith("err"):
+        return {"ok": False, "module_id": int(module_id),
+                "with_cables": bool(with_cables),
+                "status": status, "raw": payload, "note": _status_note(status)}
+    # payload = "<newModuleId> copied_cables=<n>"
+    try:
+        id_part, cables_part = payload.split(" ", 1)
+        new_id = int(id_part)
+        copied = int(cables_part.split("=", 1)[1]) if "=" in cables_part else None
+    except ValueError:
+        return {"ok": False, "module_id": int(module_id),
+                "status": status, "raw": payload,
+                "note": "unparseable payload"}
+    return {"ok": True, "module_id": int(module_id),
+            "with_cables": bool(with_cables),
+            "new_module_id": new_id, "cables_copied": copied,
+            "status": status}
 
 
 def midi_out(port, status, data1, data2=0, frame=-1):
@@ -2803,6 +2994,29 @@ TOOLS = [
         "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
+        "name": "cardinal_cables_page",
+        "description": "★ READ one PAGE of the running rack's wiring (B2, 2026-10-21): "
+                       "same cable shape as cardinal_cables (id:input(module,port):"
+                       "output(module,port)) but paged — a poly-16 rack's full cable list "
+                       "can blow up a single datagram. offset = 0-based start, limit = page "
+                       "size (server caps at 64). Overshooting offset returns empty items "
+                       "but the real total; has_more tells you whether to fetch the next "
+                       "page. If the running Cardinal predates this endpoint it degrades "
+                       "to probe_not_supported (fall back to cardinal_cables).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "offset": {"type": "integer", "minimum": 0, "default": 0,
+                           "description": "0-based start index into the cable list"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 64, "default": 32,
+                          "description": "page size (server caps at 64)"},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
         "name": "cardinal_transport",
         "description": "★ READ the transport: playing / bar / beat / beats-per-bar / bpm / "
                        "tick / bypassed. Zero-hook — the data is already in the plugin "
@@ -2983,6 +3197,90 @@ TOOLS = [
                         "idempotentHint": True, "openWorldHint": False},
     },
     {
+        "name": "cardinal_log_get",
+        "description": "★ READ Cardinal's in-process log (C3, 2026-10-22): the standalone's "
+                       "stderr goes nowhere, so this reads the 2000-line ring buffer that "
+                       "the engine now feeds. Incremental: pass the previous reply's `next` "
+                       "as from_index to get only what is new. from_index=0 starts at the "
+                       "oldest available line. Answers 'what did the engine just complain "
+                       "about' without a console window.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "from_index": {"type": "integer", "minimum": 0, "default": 0,
+                               "description": "sequence number to start from (0 = oldest)"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 64, "default": 32,
+                          "description": "page size (server caps at 64)"},
+            },
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_add_module",
+        "description": "★ WRITE add a module to the running rack (2026-10-22): the OSC twin "
+                       "of right-click -> Add module. Give the plugin slug and model slug "
+                       "(e.g. 'Bogaudio-VCO' + 'VCO-2') plus grid coordinates x/y in cells. "
+                       "The module is really instantiated (not just recorded) and can be "
+                       "removed again with cardinal_undo. Slugs are not guessable — list "
+                       "them first with cardinal_plugins or cardinal_module_search.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "plugin": {"type": "string", "description": "plugin slug, e.g. 'Bogaudio-VCO'"},
+                "model": {"type": "string", "description": "model slug, e.g. 'VCO-2'"},
+                "x": {"type": "integer", "description": "grid cell column (1 cell = 15 px)"},
+                "y": {"type": "integer", "description": "grid row (1 row = 380 px)"},
+            },
+            "required": ["plugin", "model", "x", "y"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_load_skipped",
+        "description": "★ READ what the last load SKIPPED (C2, 2026-10-22): modules whose "
+                       "plugin/model is missing, and cables that failed to connect. Upstream "
+                       "Rack drops these silently (cable skips aren't even logged). Each entry "
+                       "has kind ('module'/'cable'), the patch-file id, and a reason. Call it "
+                       "right after cardinal_load_patch when a rack loads 'fine' but modules "
+                       "or wiring are missing.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_module_copy",
+        "description": "★ WRITE duplicate a module in the running rack — the OSC twin of "
+                       "the human right-click \"Duplicate\" / \"Duplicate with cables\". "
+                       "Returns the NEW module id. with_cables=true (default) also clones "
+                       "the cables on the source's INPUT ports (upstream fans out; a "
+                       "self-patch reconnects to the clone) — it can never violate the "
+                       "one-cable-per-input-port rule. ONE history entry: cardinal_undo "
+                       "reverts module + cloned cables in a single step.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "module_id": {"type": "integer", "minimum": 0,
+                              "description": "source module id (from cardinal_patch_info / live_modules)"},
+                "with_cables": {"type": "boolean", "default": True,
+                                "description": "also clone cables on the source's input ports"},
+            },
+            "required": ["module_id"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
+    {
         "name": "cardinal_midi_out",
         "description": "★ Inject a raw MIDI message into the live rack — what a "
                        "hardware keyboard sends, without needing the keyboard. "
@@ -3150,6 +3448,8 @@ DISPATCH = {
     # ---------------- B 组读数（第二批注入的只读端点，2026-10-20）----------
     "cardinal_build_info": lambda a: build_info(),
     "cardinal_cables": lambda a: cables(a.get("module_id")),
+    "cardinal_cables_page": lambda a: cables_page(
+        a.get("offset", 0), a.get("limit", 32)),
     "cardinal_transport": lambda a: transport(),
     "cardinal_engine_info": lambda a: engine_info(),
     "cardinal_plugins": lambda a: plugins(a.get("plugin")),
@@ -3165,6 +3465,13 @@ DISPATCH = {
     "cardinal_module_remove": lambda a: module_remove(a["module_id"]),
     "cardinal_module_move": lambda a: module_move(
         a["module_id"], a["x"], a["y"]),
+    "cardinal_module_copy": lambda a: module_copy(
+        a["module_id"], a.get("with_cables", True)),
+    "cardinal_log_get": lambda a: log_get(
+        a.get("from_index", 0), a.get("limit", 32)),
+    "cardinal_load_skipped": lambda a: load_skipped(),
+    "cardinal_add_module": lambda a: add_module(
+        a["plugin"], a["model"], a["x"], a["y"]),
     "cardinal_midi_out": lambda a: midi_out(
         a["port"], a["status"], a["data1"],
         a.get("data2", 0), a.get("frame", -1)),

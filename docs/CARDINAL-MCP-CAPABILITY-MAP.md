@@ -469,6 +469,11 @@ src/Rack/src/history.cpp:278  bool State::canRedo()
 - Cardinal 自带 `plugins/` 就有 200+ 插件目录，真实机架 200+ 模块很常见
 - 超 MTU 后 liblo 可能返回 `EMSGSIZE` 或**静默丢包** → MCP 侧表现为超时，**无法区分「机架太大」和「Cardinal 挂了」**
 
+**落地方式（2026-10-21）**：契约不变，但**不改造旧端点**，而是加**分页孪生端点** ⇒ 旧客户端零破坏：
+`/modules-page "ii"`（E2）+ `/cables-page "ii"`（B2，10-21 下午）。payload = `"<returned>/<total>|<items>"`，
+limit 上限 64；越界 offset → returned=0 但 total 真实；非法参数 → `err:E_BAD_ARGS`。MCP 侧对应
+`cardinal_modules_page` / `cardinal_cables_page`。
+
 **契约**：所有列表类 handler（`/modules` `/cables`）支持 `offset`/`limit`，回复固定带 `count` 和 `total`：
 ```
 /modules          → 第一页（默认 limit）

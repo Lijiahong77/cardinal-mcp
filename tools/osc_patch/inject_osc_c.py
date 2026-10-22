@@ -17,6 +17,7 @@
 #
 # ⭐ 正确的重放方式：
 #     python3 /mnt/d/Cardinal/tools/osc_patch/replay_osc.py
+# ⚠️ 本脚本的已知坑清单见 `injectors-LEGACY-NOTES.md`（重跑前必读）。
 # 详见 `tools/osc_patch/README.md`。
 # ============================================================================
 

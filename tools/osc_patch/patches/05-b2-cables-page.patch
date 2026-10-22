@@ -1,0 +1,89 @@
+diff --git a/src/CardinalCommon.cpp b/src/CardinalCommon.cpp
+index cf8ef88..570e3fb 100644
+--- a/src/CardinalCommon.cpp
++++ b/src/CardinalCommon.cpp
+@@ -958,6 +958,76 @@ static int osc_cables_one_handler(const char*, const char* types, lo_arg** argv,
+     return osc_cables_handler_impl(m, self, true, argv[0]->h);
+ }
+ 
++// ==== CARDINAL-MCP-B2-CABLES-PAGE-BEGIN ====
++// ------------------------------------------------------------ /cables-page
++// B2 (2026-10-21): 分页版 /cables（全量）。入参 "ii" = offset, limit。
++// 回复: /resp "cables-page" "<returned>/<total>|id:inMod:inId:outMod:outId,..."
++// limit 上限 64；offset 越界返回空 items 但 total 仍报真实总数。
++// 注: 空 items 即 "0/N|"（尾部无内容）；单模块过滤仍走 /cables "h"（线少，无需分页）。
++static int osc_cables_page_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
++{
++    d_debug("osc_cables_page_handler()");
++    DISTRHO_SAFE_ASSERT_RETURN(argc == 2, 0);
++
++    const lo_address source = lo_message_get_source(m);
++    const lo_server server = static_cast<Initializer*>(self)->oscServer;
++
++    CardinalBasePlugin* const plugin = static_cast<Initializer*>(self)->remotePluginInstance;
++    if (plugin == nullptr)
++    {
++        cardinalOscReply(source, server, "cables-page", "", "err:E_NO_PLUGIN");
++        return 0;
++    }
++
++    const int64_t offset = argv[0]->i;
++    const int64_t limit = argv[1]->i;
++    if (offset < 0 || limit <= 0 || limit > 64)
++    {
++        cardinalOscReply(source, server, "cables-page", "", "err:E_BAD_ARGS");
++        return 0;
++    }
++
++    CardinalPluginContext* const context = plugin->context;
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(context);
++#endif
++
++    const std::vector<int64_t> ids = context->engine->getCableIds();
++    const size_t total = ids.size();
++    std::string items;
++    size_t count = 0;
++    const size_t start = static_cast<size_t>(offset);
++
++    if (start < total)
++    {
++        for (size_t n = start; n < total && count < static_cast<size_t>(limit); ++n)
++        {
++            rack::engine::Cable* const c = context->engine->getCable(ids[n]);
++            if (c == NULL)
++                continue;
++            const int64_t inMod  = c->inputModule  != NULL ? c->inputModule->id  : -1;
++            const int64_t outMod = c->outputModule != NULL ? c->outputModule->id : -1;
++
++            if (!items.empty())
++                items += ",";
++            items += std::to_string(ids[n]) + ":" + std::to_string(inMod) + ":"
++                 + std::to_string(c->inputId) + ":" + std::to_string(outMod) + ":"
++                 + std::to_string(c->outputId);
++            ++count;
++        }
++    }
++
++#ifdef CARDINAL_INIT_OSC_THREAD
++    rack::contextSet(nullptr);
++#endif
++
++    const std::string payload = std::to_string(count) + "/" + std::to_string(total) + "|" + items;
++    cardinalOscReply(source, server, "cables-page", payload, "ok");
++    return 0;
++}
++// ==== CARDINAL-MCP-B2-CABLES-PAGE-END ====
++
+ // ---------------------------------------------------------------- B3 /transport
+ // 无入参。回复 /resp "transport" "playing=..|bar=..|beat=..|bpb=..|beatType=..|bpm=..|tick=..|ticksPerBeat=..|bypassed=.."
+ static int osc_transport_handler(const char*, const char*, lo_arg**, int, const lo_message m, void* const self)
+@@ -2635,6 +2705,7 @@ void Initializer::loadSettings(const bool isRealInstance)
+     REG("/build-info", "", osc_build_info_handler) \
+     REG("/cables", "", osc_cables_all_handler) \
+     REG("/cables", "h", osc_cables_one_handler) \
++    REG("/cables-page", "ii", osc_cables_page_handler) \
+     REG("/transport", "", osc_transport_handler) \
+     REG("/engine-info", "", osc_engine_info_handler) \
+     REG("/plugins", "", osc_plugins_list_handler) \
