@@ -9,7 +9,7 @@
 | 机架 | 状态 |
 |---|---|
 | `demo_S4_sampling.vcv` | ✅ **李 16:37 实机确认打开成功**。运行 35.8 fps、120 BPM、RUN 亮、4 条触发线就位 |
-| `demo_S5_fullkit.vcv` | ⏳ 结构复核通过（13 模块 / 20 线 / 16 个采样文件全在），**待李实机确认** |
+| `demo_S5_fullkit.vcv` | ✅ **李 10-23 验收通过**（"差不多吧，算你验收了"）。13 模块 / 20 线 / 12 采样槽全装载，双层滤波 + ADSR→VCA 呼吸链可听出分层 |
 
 > ⚠️ 16:25 前后这两份机架曾导致 Cardinal 崩溃，根因已修（详见文末 §6）。
 > **重做后 S4 已验证可开。**
@@ -154,12 +154,19 @@
 
 | 项 | 值 |
 |---|---|
-| 教学版机架 | `D:\Cardinal\patches\demo_S4_sampling.vcv`（6 模块 / 8 线）|
+| 教学版机架 | `D:\Cardinal\patches\demo_S4_sampling.vcv`（6 模块 / 9 线）|
 | 大阵仗机架 | `D:\Cardinal\patches\demo_S5_fullkit.vcv`（13 模块 / 20 线）|
 | 采样素材 | `D:\Cardinal\samples\*.wav`（14 个，共 1.8 MB，全部本机合成）|
 | 生成脚本 | `tmp\make_samples.py`（造音频）· `tmp\make_sampling_patch.py`（S4）· `tmp\make_fullkit_patch.py`（S5）|
 | 关键端口 | `samplerx8` 触发 IN 0–7 / 混音 OUT 16–17 · `VCF` 音频 IN 3 · `VCA-1` 音频 IN 1、控制 IN 0 |
-| 状态 | ✅ S4 已实机验证打开 · ⏳ S5 待验证 |
+| 状态 | ✅ S4 已实机验证打开 · ✅ S5 10-23 验收通过 |
+
+> 🔴 **采样路径必须存绝对路径（2026-10-23 复查钉死）**：
+> samplerx8 的 `AudioFile::load()`（`vgLib-2.0/AudioFile.h:471`）用 `std::ifstream file(filePath)`
+> **直接按进程 cwd 解析相对路径**，而 exe 从 `win64/` 启动 ⇒ `samples/kick.wav` 被解析到
+> `win64/samples/…` ⇒ 不存在 ⇒ 加载静默失败（面板显示 empty）。`samples_root_dir` 字段
+> **只用于「打开文件对话框时记住上次目录」，完全不参与加载**。→ 采样路径写绝对路径
+> `D:\Cardinal\samples\xxx.wav` 才是 samplerx8 的正常形态（10-17 `884d89a`「去绝对路径」是错的）。
 
 ---
 

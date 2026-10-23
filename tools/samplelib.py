@@ -33,8 +33,12 @@
 ## 存盘形态（SamplerX8.hpp:64-88）
 - `data.loaded_sample_path_1` .. `loaded_sample_path_8`（**1 起**，不是 0）
 - `data.samples_root_dir`
-- 存的是**相对路径**（实测 `samples/melody2/m_D4.wav`），靠 root 一起解析
-  ⇒ ⛔ 只写 path 不写 root = 加载失败。这是必须拦住的坑。
+- 🔴 **存的是绝对路径**（正确形态 `D:\Cardinal\samples\xxx.wav`）。2026-10-23 源码级复查钉死：
+  `AudioFile::load()`（`vgLib-2.0/AudioFile.h:471`）用 `std::ifstream file(filePath)` **直接按进程 cwd
+  解析相对路径**，exe 从 `win64/` 启动 ⇒ 相对路径全解析到 `win64/samples/…` ⇒ 不存在 ⇒ 静默失败（empty）。
+  `samples_root_dir` 字段**只用于「文件对话框记住上次目录」，完全不参与加载**。
+  ⇒ ⛔ 写相对路径 = 加载失败。10-17 `884d89a`「去绝对路径」就是踩了这个坑。
+- 历史遗留带 `samples/melody2/m_D4.wav` 相对路径的机架，需 `tools/relocate_samples.py` 反向改回绝对路径才能出声。
 - `dataFromJson`（:85-88）读到就 `sample_players[i].loadSample(path)`
 
 ## 本工具做什么
