@@ -2431,7 +2431,7 @@ index 77ad6d1..3f37227 100644
  			CardinalPluginContext* const context = static_cast<CardinalPluginContext*>(APP);
  			CardinalBasePlugin* const plugin = static_cast<CardinalBasePlugin*>(context->plugin);
 diff --git a/src/override/Window.cpp b/src/override/Window.cpp
-index 6457d04..45b9512 100644
+index 6457d04..b458984 100644
 --- a/src/override/Window.cpp
 +++ b/src/override/Window.cpp
 @@ -14,6 +14,7 @@
@@ -2442,7 +2442,17 @@ index 6457d04..45b9512 100644
  #include <map>
  #include <queue>
  #include <thread>
-@@ -582,6 +583,15 @@ static void Window__downscaleBitmap(uint8_t* pixels, int& width, int& height) {
+@@ -134,7 +135,8 @@ enum ScreenshotStep {
+ 	kScreenshotStepStarted,
+ 	kScreenshotStepFirstPass,
+ 	kScreenshotStepSecondPass,
+-	kScreenshotStepSaving
++	kScreenshotStepSaving,
++	kScreenshotStepCapture
+ };
+ #endif
+ 
+@@ -582,6 +584,15 @@ static void Window__downscaleBitmap(uint8_t* pixels, int& width, int& height) {
  	height = targetHeight;
  }
  
@@ -2458,8 +2468,61 @@ index 6457d04..45b9512 100644
  static void Window__writeImagePNG(void* context, void* data, int size) {
  	USE_NAMESPACE_DISTRHO
  	CardinalBaseUI* const ui = static_cast<CardinalBaseUI*>(context);
-@@ -730,9 +740,20 @@ void Window::step() {
- 			const int stride = winWidth * depth;
+@@ -715,26 +726,67 @@ void Window::step() {
+ 		constexpr const int depth = 3;
+ #endif
+ 
++		// Read the picture from NanoVG's own framebuffer.
++		// DPF draws inside onNanoDisplay(), where NanoVG has its FBO bound; the
++		// picture only reaches the default framebuffer later, in nvgEndFrame().
++		// While an FBO is bound, glReadBuffer(GL_FRONT/GL_BACK) is an
++		// GL_INVALID_OPERATION and glReadPixels writes nothing => black PNG.
++		// The FBO's read buffer is GL_COLOR_ATTACHMENT0 by default and holds the
++		// frame we just drew => read straight from it, at the FBO's real size.
++		// GL_FRAMEBUFFER_WIDTH / GL_FRAMEBUFFER_HEIGHT are GL 1.1 enums, but some
++		// headers only expose the GL 3.x spellings => use the raw numbers.
++		const GLenum kFramebufferWidth = 0x8B40;
++		const GLenum kFramebufferHeight = 0x8B41;
++		GLint fbW = 0, fbH = 0;
++		glGetIntegerv(kFramebufferWidth, &fbW);
++		glGetIntegerv(kFramebufferHeight, &fbH);
++		int fbWidth = (int) fbW;
++		int fbHeight = (int) fbH;
++		if (fbWidth <= 0 || fbHeight <= 0) {
++			fbWidth = winWidth;
++			fbHeight = winHeight;
++		}
++
+ 		// Allocate pixel color buffer
+-		uint8_t* const pixels = new uint8_t[winHeight * winWidth * 4];
++		uint8_t* const pixels = new uint8_t[fbHeight * fbWidth * 4];
+ 
+-		// glReadPixels defaults to GL_BACK, but the back-buffer is unstable, so use the front buffer (what the user sees)
+-		glReadBuffer(GL_FRONT);
+-		glReadPixels(0, 0, winWidth, winHeight, depth == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, pixels);
++		if (internal->generateScreenshotStep == kScreenshotStepCapture)
++		{
++			// NanoVG is a deferred renderer: the scene drawn inside onNanoDisplay() is
++			// only rasterized in nvgEndFrame(), which DPF calls AFTER this callback
++			// returns, and JUCE swaps the buffers after that. So while we are here no
++			// buffer holds the picture yet => wait one more frame and read the FRONT
++			// buffer, which by then holds the previous frame (rasterized + swapped).
++			glReadBuffer(GL_FRONT);
++			glReadPixels(0, 0, fbWidth, fbHeight, depth == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, pixels);
++		}
+ 
+-		if (internal->generateScreenshotStep == kScreenshotStepSaving)
++		if (internal->generateScreenshotStep == kScreenshotStepCapture)
+ 		{
++
+ 			// Write pixels to PNG
+-			Window__flipBitmap(pixels, winWidth, winHeight, depth);
+-			winHeight -= y;
+-			const int stride = winWidth * depth;
++			Window__flipBitmap(pixels, fbWidth, fbHeight, depth);
++			int outWidth = fbWidth;
++			int outHeight = fbHeight - y;
++			const int stride = fbWidth * depth;
  			uint8_t* const pixelsWithOffset = pixels + (stride * y);
  #ifdef STBI_WRITE_NO_STDIO
 -			Window__downscaleBitmap(pixelsWithOffset, winWidth, winHeight);
@@ -2470,19 +2533,22 @@ index 6457d04..45b9512 100644
 +				FILE* const f = std::fopen(g_screenshotFilePath.c_str(), "wb");
 +				if (f) {
 +					stbi_write_png_to_func(Window__writePngDump, f,
-+					                       winWidth, winHeight, depth, pixelsWithOffset, stride);
++					                       outWidth, outHeight, depth, pixelsWithOffset, stride);
 +					std::fclose(f);
 +				}
 +				g_screenshotFilePath.clear();
 +			} else {
-+				Window__downscaleBitmap(pixelsWithOffset, winWidth, winHeight);
++				Window__downscaleBitmap(pixelsWithOffset, outWidth, outHeight);
 +				stbi_write_png_to_func(Window__writeImagePNG, internal->ui,
-+				                       winWidth, winHeight, depth, pixelsWithOffset, stride);
++				                       outWidth, outHeight, depth, pixelsWithOffset, stride);
 +			}
  #else
- 			stbi_write_png("screenshot.png", winWidth, winHeight, depth, pixelsWithOffset, stride);
+-			stbi_write_png("screenshot.png", winWidth, winHeight, depth, pixelsWithOffset, stride);
++			stbi_write_png("screenshot.png", outWidth, outHeight, depth, pixelsWithOffset, stride);
  #endif
-@@ -909,6 +930,15 @@ void generateScreenshot() {
+ 
+ 			internal->generateScreenshotStep = kScreenshotStepNone;
+@@ -909,6 +961,15 @@ void generateScreenshot() {
  #endif
  }
  
