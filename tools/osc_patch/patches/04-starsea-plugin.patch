@@ -47,10 +47,10 @@ index 0000000..f131d80
 +}
 diff --git a/plugins/Starsea/res/MiniArranger.svg b/plugins/Starsea/res/MiniArranger.svg
 new file mode 100755
-index 0000000..fb5e864
+index 0000000..6de5ac2
 --- /dev/null
 +++ b/plugins/Starsea/res/MiniArranger.svg
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,115 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!-- Starsea / MiniArranger panel - 40HP (203.2mm x 147.3mm = 435px, 29 HP rows)
 +     NOTE: nanosvg (used by Rack for panels) does NOT render <text> elements,
@@ -146,6 +146,8 @@ index 0000000..fb5e864
 +  <circle cx="94.00" cy="74.00" r="4.0" fill="none" stroke="#2b333d" stroke-width="0.35"/>
 +  <circle cx="112.00" cy="74.00" r="5.6" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
 +  <circle cx="112.00" cy="74.00" r="4.0" fill="none" stroke="#2b333d" stroke-width="0.35"/>
++<circle cx="126.00" cy="74.00" r="5.6" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
++<circle cx="126.00" cy="74.00" r="4.0" fill="none" stroke="#2b333d" stroke-width="0.35"/>
 +  <circle cx="140.00" cy="74.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
 +  <circle cx="140.00" cy="74.00" r="3.7" fill="none" stroke="#2b333d" stroke-width="0.35"/>
 +  <circle cx="157.00" cy="74.00" r="5.2" fill="#1b2028" stroke="#3a454f" stroke-width="0.5"/>
@@ -759,10 +761,10 @@ index 0000000..a88d531
 +} // namespace StarseaArranger
 diff --git a/plugins/Starsea/src/MiniArranger.cpp b/plugins/Starsea/src/MiniArranger.cpp
 new file mode 100755
-index 0000000..0d9c552
+index 0000000..0205a8d
 --- /dev/null
 +++ b/plugins/Starsea/src/MiniArranger.cpp
-@@ -0,0 +1,1179 @@
+@@ -0,0 +1,1207 @@
 +/*
 + * Starsea plugin for Cardinal
 + * Module: MiniArranger - 多声部编曲机
@@ -824,6 +826,7 @@ index 0000000..0d9c552
 +		VALUE4_PARAM,
 +		RUN_BUTTON_PARAM,
 +		REC_BUTTON_PARAM,
++		TRACK_MEASURES_PARAM,   // 当前编辑轨的小节数（1..16 小节）
 +		NUM_PARAMS
 +	};
 +	enum InputIds {
@@ -890,6 +893,7 @@ index 0000000..0d9c552
 +	// ---- 旋钮值变化检测（回灌时同步，避免自触发写回）----
 +	float lastKnobValue[MA::MA_TRACKS] = {0.f};
 +	float lastStepKnob = 0.f;
++	float lastMeasuresKnob = 4.f;   // MEASURES 旋钮上次值（回灌同步）
 +
 +	// ---- UI 请求跳步（UI 线程写 -1 以外的值，音频线程消费）----
 +	std::atomic<int> stepJump{-1};
@@ -918,6 +922,7 @@ index 0000000..0d9c552
 +	std::atomic<int>   snapSteps{MA::MA_STEPS_PER_MEASURE * 4};
 +	std::atomic<int>   snapEditTrack{0};
 +	std::atomic<int>   snapLayer{0};
++	std::atomic<int>   snapMeasures{4};   // 当前编辑轨小节数快照（UI 只读）
 +	std::atomic<bool>  snapRunning{false};
 +	std::atomic<bool>  snapRecording{false};
 +	std::atomic<int>   snapTotalNotes{0};
@@ -967,6 +972,7 @@ index 0000000..0d9c552
 +
 +		configButton(RUN_BUTTON_PARAM, "Run (toggle)");
 +		configButton(REC_BUTTON_PARAM, "Record (toggle)");
++		configParam(TRACK_MEASURES_PARAM, 1.f, 16.f, 4.f, "Track measures (bars)");
 +
 +		configInput(CLOCK_INPUT,     "Clock");
 +		configInput(RESET_INPUT,     "Reset");
@@ -1170,6 +1176,7 @@ index 0000000..0d9c552
 +		snapStep.store(s);
 +		snapEditTrack.store(unit.editTrack);
 +		snapLayer.store(int(std::round(params[LAYER_PARAM].getValue())));
++		snapMeasures.store(unit.tracks[unit.editTrack].measures);
 +		snapRunning.store(running);
 +		snapRecording.store(recording);
 +		snapTotalNotes.store(unit.totalNotes());
@@ -1394,6 +1401,13 @@ index 0000000..0d9c552
 +			lastStepKnob = sv;
 +		}
 +
++		// 5a+. MEASURES 旋钮跟随当前编辑轨的小节数
++		if (trackChanged) {
++			const float mv = float(unit.tracks[unit.editTrack].measures);
++			params[TRACK_MEASURES_PARAM].setValue(mv);
++			lastMeasuresKnob = mv;
++		}
++
 +		// 5b. STEP 旋钮被拧 -> 跳步
 +		const float stepKnob = params[STEP_PARAM].getValue();
 +		if (std::fabs(stepKnob - lastStepKnob) > 1e-6f) {
@@ -1423,6 +1437,19 @@ index 0000000..0d9c552
 +				lastKnobValue[t] = v;
 +				unit.writeLayerNorm(t, layer, currentStep.load(), v, 60);
 +				dirty = true;
++			}
++		}
++
++		// 5d. MEASURES 旋钮被拧 → 写回当前编辑轨的小节数
++		{
++			const float mv = params[TRACK_MEASURES_PARAM].getValue();
++			if (std::fabs(mv - lastMeasuresKnob) > 1e-6f) {
++				lastMeasuresKnob = mv;
++				const int bars = clamp(int(std::round(mv)), 1, 16);
++				if (bars != unit.tracks[unit.editTrack].measures) {
++					unit.tracks[unit.editTrack].measures = bars;
++					dirty = true;
++				}
 +			}
 +		}
 +
@@ -1617,6 +1644,7 @@ index 0000000..0d9c552
 +		                                                 module, StarseaMiniArrangerModule::LAYER_PARAM));
 +		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(112.f, EDIT_Y)),
 +		                                                 module, StarseaMiniArrangerModule::TRACK_EDIT_PARAM));
++		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(126.f, EDIT_Y)), module, StarseaMiniArrangerModule::TRACK_MEASURES_PARAM));
 +		for (int t = 0; t < MA::MA_TRACKS; ++t)
 +			addParam(createParamCentered<MA::StarseaSmartKnob<RoundBlackKnob, StarseaMiniArrangerModule>>(mm2px(Vec(140.f + t * 17.f, EDIT_Y)),
 +			                                                        module, StarseaMiniArrangerModule::VALUE1_PARAM + t));
@@ -1864,6 +1892,7 @@ index 0000000..0d9c552
 +		put(76.f,  62.f, 6.5f, NVG_ALIGN_CENTER, cDim, "STEP");
 +		put(94.f,  62.f, 6.5f, NVG_ALIGN_CENTER, cDim, "LAYER");
 +		put(112.f, 62.f, 6.5f, NVG_ALIGN_CENTER, cDim, "EDIT");
++		put(126.f, 62.f, 6.5f, NVG_ALIGN_CENTER, cDim, "BARS");
 +		for (int t = 0; t < MA::MA_TRACKS; ++t)
 +			put(140.f + t * 17.f, 62.f, 6.5f, NVG_ALIGN_CENTER, trackCol[t],
 +			    string::f("TRK %d", t + 1).c_str());
@@ -1873,6 +1902,7 @@ index 0000000..0d9c552
 +			static const char* layerNames[MA::MA_NUM_LAYERS] = {"PITCH", "LENGTH", "VEL"};
 +			const int lay = clamp(m->snapLayer.load(), 0, MA::MA_NUM_LAYERS - 1);
 +			put(112.f, 88.f, 6.5f, NVG_ALIGN_CENTER, cHot, layerNames[lay]);
++			put(126.f, 88.f, 6.5f, NVG_ALIGN_CENTER, cPale, string::f("%d bars", m->snapMeasures.load()).c_str());
 +
 +			// 每轨当前步的值
 +			for (int t = 0; t < MA::MA_TRACKS; ++t) {

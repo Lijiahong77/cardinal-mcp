@@ -144,7 +144,21 @@ diff --git a/src/Rack/include/logger.hpp b/src/Rack/include/logger.hpp
 index d47725f..896fa47 100644
 --- a/src/Rack/include/logger.hpp
 +++ b/src/Rack/include/logger.hpp
-@@ -42,6 +42,13 @@ void log(Level level, const char* filename, int line, const char* func, const ch
+@@ -1,6 +1,13 @@
+ #pragma once
+ #include <common.hpp>
+ 
++// C3 (2026-10-22) 新增的 getLogLines 用到 std::vector / std::string /
++// uint64_t / size_t —— common.hpp 只包了 <functional>，这里必须自己带上，
++// 否则任何 include 本头文件的翻译单元都会编译失败（plugins 全量重编时暴露）。
++#include <cstdint>
++#include <string>
++#include <vector>
++
+ 
+ /** Example usage:
+ 
+@@ -42,6 +49,13 @@ void log(Level level, const char* filename, int line, const char* func, const ch
  */
  PRIVATE bool wasTruncated();
  

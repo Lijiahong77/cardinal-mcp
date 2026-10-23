@@ -1965,6 +1965,28 @@ def save_live(name, overwrite=True):
 
 # ================================================================ Screenshot
 
+def _screenshot_target(reply):
+    """Extract the PNG path from a `/screenshot` reply.
+
+    reply = ["screenshot", "<absolute path>", "ok"]  (E1+ three-segment)
+          = ["screenshot", "<absolute path>"]        (pre-E1 two-segment)
+
+    The path is ALWAYS reply[1]; the optional status is reply[2]. (A 2026-10-22
+    bug took reply[-1] here and read the "ok" status as the path — this is the
+    extracted, regression-tested form.)
+
+    Returns (target_path, status) or (None, None) when the reply is malformed
+    or the capture itself failed.
+    """
+    if not reply or len(reply) < 2 or reply[0] != "screenshot":
+        return None, None
+    target = reply[1]
+    status = reply[2] if len(reply) > 2 else "ok"
+    if target == "fail" or not target:
+        return None, None
+    return target, status
+
+
 def _wine_candidates(win_path):
     """Map a Windows path that Cardinal reported to paths we can actually open.
 
@@ -2020,12 +2042,10 @@ def screenshot(save_to=None, timeout=8.0):
                 "note": "sent but no reply (Cardinal OSC off? wrong port? "
                         "is this a build with the /screenshot endpoint?)"}
     reply = [str(x) for x in res]
-    if len(reply) < 2:
-        return {"ok": False, "reply": reply, "note": "unexpected reply shape"}
-    # Cardinal answers ["screenshot", "<absolute path>"] (or "fail").
-    target = reply[-1]
-    if target == "fail" or not target:
-        return {"ok": False, "reply": reply, "note": "Cardinal could not capture"}
+    target, _status = _screenshot_target(reply)
+    if target is None:
+        return {"ok": False, "reply": reply,
+                "note": "Cardinal could not capture (or malformed reply)"}
 
     cands = _wine_candidates(target)
 
@@ -3224,12 +3244,17 @@ TOOLS = [
                        "(e.g. 'Bogaudio-VCO' + 'VCO-2') plus grid coordinates x/y in cells. "
                        "The module is really instantiated (not just recorded) and can be "
                        "removed again with cardinal_undo. Slugs are not guessable — list "
-                       "them first with cardinal_plugins or cardinal_module_search.",
+                       "them first with cardinal_plugins or cardinal_module_search. "
+                       "🔴 plugin must be the PLUGIN slug, not the brand: cardinal_module_search "
+                       "returns BOTH a 'plugin' and a 'brand' field and they can differ "
+                       "(e.g. Fundamental has plugin=Fundamental but brand=VCV) — feed "
+                       "add_module the 'plugin' value, the 'brand' value will E_NO_MODEL.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "plugin": {"type": "string", "description": "plugin slug, e.g. 'Bogaudio-VCO'"},
-                "model": {"type": "string", "description": "model slug, e.g. 'VCO-2'"},
+                "plugin": {"type": "string", "description": "plugin slug (NOT brand) — "
+                            "use the 'plugin' field from cardinal_module_search, e.g. 'Fundamental'"},
+                "model": {"type": "string", "description": "model slug, e.g. 'VCO' or 'VCO-2'"},
                 "x": {"type": "integer", "description": "grid cell column (1 cell = 15 px)"},
                 "y": {"type": "integer", "description": "grid row (1 row = 380 px)"},
             },
