@@ -33,7 +33,7 @@
 ## 存盘形态（SamplerX8.hpp:64-88）
 - `data.loaded_sample_path_1` .. `loaded_sample_path_8`（**1 起**，不是 0）
 - `data.samples_root_dir`
-- 🔴 **存的是绝对路径**（正确形态 `D:\Cardinal\samples\xxx.wav`）。2026-10-23 源码级复查钉死：
+- 🔴 **存的是绝对路径**（正确形态 `D:/Cardinal/samples/xxx.wav`）。2026-10-23 源码级复查钉死：
   `AudioFile::load()`（`vgLib-2.0/AudioFile.h:471`）用 `std::ifstream file(filePath)` **直接按进程 cwd
   解析相对路径**，exe 从 `win64/` 启动 ⇒ 相对路径全解析到 `win64/samples/…` ⇒ 不存在 ⇒ 静默失败（empty）。
   `samples_root_dir` 字段**只用于「文件对话框记住上次目录」，完全不参与加载**。
