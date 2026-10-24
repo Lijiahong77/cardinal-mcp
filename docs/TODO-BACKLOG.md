@@ -123,6 +123,13 @@
   - **验证**：WINE 探针 **10/10**（41→42 模块、新 id 与型号正确、undo→41、redo→42、未知插件/未知型号/无分隔符三种错法全 `err:E_NO_MODEL`、失败调用零副作用）；MCP 层端到端 **5/5**。
   - 🔴 **两个新坑**：① **typespec 必须与参数顺序一致**——我先写成 `"ssi"`（s+s+i）而实际是 slug+int+int ⇒ liblo 不派发 ⇒ 端点永远哑（探针一眼看出）；② **`loadTemplate()` 不能在 OSC 侧调**（人类右键路径独有的「出厂预设」加载，`ModuleAdd::redo` 并不做；preset 应用会碰 UI 菜单/参数 ⇒ 调了之后 undo 就让 OSC 失联）。
   - patch = `tools/osc_patch/patches/10-module-add.patch`（基线取 C2 后状态，只含本批改动）；replay 第 10 组，端点 32→33。exe 已部署：103,015,424 B，MD5 `2c2ce802…`。
+- **M2 · 按名字加模块（`cardinal_add_module_named`）✅ 2026-10-24 完工**（李拍板：仅唯一命中直加 + 中文词表加前缀匹配）
+  - **由来**：M1 之后「加模块不用背 slug 对照表」的增强（PROGRESS §5 C 栏两项合一）。李 10-24 裁决：① 直加门槛 = **仅唯一命中**（零猜测，多个一律列候选）② 中文词表**修前缀匹配**。
+  - **实现**（纯 Python 层，**零 C++ / 零编译 / exe 不动**）：新文件 `tools/modresolve.py`（口语 query → 候选 / 唯一命中）：分词 → **品牌归一**（brand「VCV」→ plugin「Fundamental」，85 品牌映射从 manifest 现生成）→ 池内打分（复用 `modbrowser._score`）→ 三态判定 unique / ambiguous / no_match；`tools/modbrowser.py` 的 `_expand` 加 `_zh_lookup`（整词优先 + **最长前缀**，「滤波器」→「滤波」→ filter）；`cardinal_mcp.py` 注册 `cardinal_add_module_named`（60→61，TOOLS/DISPATCH 双注册）+ **无状态两段式**（query → 直加 / 列候选；pick=N → 落地第 N 个）。
+  - **为什么品牌词必须摘除**：`_score` 多词取 max，品牌词（0.45 分）被 tag 命中（1.2 分）淹没 —— 实测「Bogaudio VCO」直接喂 search 返回 **157 个且正确排 20 名开外**；摘除后收敛到 2 个。
+  - **停用词坑**：垃圾输入「xyzzy not a module」靠 "module" 的描述词频刷出 **1363 个假命中** ⇒ resolve 加 `_STOPWORDS`（剔完只剩虚词且无品牌词 → 诚实 no_match）。
+  - **验证**：单测 **21/21**（原 13 + 新 8：品牌归一 / 唯一直加喂对的 slug / 歧义不碰 OSC / pick 越界 / 停用词回归 / 中文前缀）；CLI 端到端：`--tools` 61、歧义路径回完整候选（带 manualUrl）、unique 路径在 OSC 不通时**如实报 `add_failed` + probe_not_supported**（无假 ok）。
+  - **真机落地验收 ✅ 2026-10-24（李在场，空白模板机架）**：`add_module_named("VCV VCF", 4, 2)` → `added=True`（新 id 7796350873299777，品牌归一 vcv→[Fundamental]）；数据层 7→8→7（undo 闭环）；截图确认 VCF 面板完整落位、不堆叠、原有模块完好；两次 undo 语义清晰（`move module` / `add module`）。机架恢复 7 模块原状，零残留。观察：(24,10)/(50,4) 落在当前视口外，(4,2) 可见（A1 同位置）——格坐标屏幕映射与左上直觉不同，非功能问题。
 - **C5 · 注入器遗留问题清理 ✅ 2026-10-22 深夜完工**（纯文档，零代码）
   - 6 个 `inject_osc_*.py` 的降级标记 B1 时已加齐；本次把散落各处的已知坑（e2 漏 `+` / e3 块边界 off-by-one + 探针选错基线 exe + 端口残留 / d 两个已修 bug / 三条通用坑：幂等判据、端点数数法、git apply 静默跳过）集中成 `tools/osc_patch/injectors-LEGACY-NOTES.md`，各注入器头部加指向行。
   - `__pycache__` 已清（本就已被 .gitignore 排除）。注入器仅剩考古价值，日常重放一律走 `replay_osc.py` + `patches/*.patch`。

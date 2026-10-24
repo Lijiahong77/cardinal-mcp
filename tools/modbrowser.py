@@ -192,6 +192,22 @@ ZH_VOCAB: dict[str, list[str]] = {
 _CJK = re.compile(r"[\u4e00-\u9fff]")
 
 
+def _zh_lookup(w: str) -> list[str] | None:
+    """中文词查表：整词优先，其次**最长前缀**（2026-10-24 李拍板加）。
+
+    「滤波器」整词不在表 → 取最长前缀 key「滤波」→ ["filter"]。
+    只做「key 是 w 的前缀」这一个方向，绝不做反向包含 —— 防止
+    「合成器」被短 key 误伤（词表 key 均 ≥2 字实词，见 ZH_VOCAB）。
+    """
+    if w in ZH_VOCAB:
+        return list(ZH_VOCAB[w])
+    best: str | None = None
+    for k in ZH_VOCAB:
+        if len(k) >= 2 and w.startswith(k) and (best is None or len(k) > len(best)):
+            best = k
+    return list(ZH_VOCAB[best]) if best else None
+
+
 def _expand(query: str) -> tuple[list[str], dict[str, list[str]], list[str]]:
     """分词 + 中文口语词表翻译（E10 裁决：检索本体只走英文）。
 
@@ -207,7 +223,7 @@ def _expand(query: str) -> tuple[list[str], dict[str, list[str]], list[str]]:
         if not w:
             continue
         if _CJK.search(w):
-            en = ZH_VOCAB.get(w)
+            en = _zh_lookup(w)
             if en:
                 trans[w] = list(en)
                 terms.extend(en)

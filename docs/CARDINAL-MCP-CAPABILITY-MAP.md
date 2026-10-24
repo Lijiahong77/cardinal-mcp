@@ -297,7 +297,7 @@ src/Makefile.cardinal.mk:153
 | 保存活体 patch | ✅ | `MCP侧` ✅ 已实现 | `save_live()` |
 | 导出/导入 | ✅ | `MCP侧` | `read_live()` 已实现读 |
 | **preset 读写**（单模块 preset） | ✅ | `MCP侧` | 解析插件 `presets/` 目录 |
-| **插件元数据查询**（某 slug 有哪些 model） | ✅ | `MCP侧` | 读 `plugins/<slug>/plugin.json` + `dspec.json` |
+| **插件元数据查询**（某 slug 有哪些 model） | ✅ | `MCP侧` ✅ 已实现 | 读 `plugins/<slug>/plugin.json` + `dspec.json`；实际已由 `cardinal_module_search`/`modbrowser`（PluginManifests）+ `cardinal_add_module_named`（口语→型号，10-24）覆盖 |
 | **samples 管理** | ⚠️ 部分 | `MCP侧` | 只能列目录、查存在；**加载 sample 到模块做不到**（需模块私有 API） |
 | **音频录制导出** | ❌ | — | 需要录音引擎，Cardinal 无此能力 |
 

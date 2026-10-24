@@ -62,6 +62,7 @@ REPO_ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import patchio  # noqa: E402  (local helper, imported after sys.path fix)
 import modbrowser  # noqa: E402  (module library, reads Cardinal's PluginManifests)
+import modresolve  # noqa: E402  (plain-language module name -> candidates/unique hit)
 import topology  # noqa: E402  (rack wiring / role recognition)
 import seq  # noqa: E402  (sequencer notes = piano-roll equivalent)
 import abc_export  # noqa: E402  (sequencer notes -> .abc text score)
@@ -1363,6 +1364,68 @@ def add_module(plugin, model, x, y):
         return {"ok": False, "status": status, "raw": payload,
                 "note": _status_note(status)}
     return {"ok": True, "result": payload, "status": status}
+
+
+def add_module_named(query, x, y, pick=None):
+    """Add a module by PLAIN-LANGUAGE name (2026-10-24, 李拍板组合方案).
+
+    You say "VCV VCF" or "Bogaudio VCO"; this resolves the exact
+    plugin|model slugs for you — no slug table memorization.
+
+    Stateless two-stage (no server-side session):
+      stage 1: resolve(query)
+                 unique hit   -> added directly (zero guessing)
+                 multiple     -> candidate list, you pick a number
+                 none         -> honest miss + suggestions
+      stage 2: call again with pick=N (1-based index from the list)
+                 -> lands candidate N; out-of-range re-lists candidates
+
+    李's ruling (10-24): direct add ONLY on a unique hit — never guess
+    among several. Undo is always available via cardinal_undo.
+    """
+    r = modresolve.resolve(query)
+    if r["status"] == "no_match":
+        return {"ok": False, "error": "no_match", "query": query,
+                "hint": r.get("hint"),
+                "brand_resolved": r.get("brand_resolved"),
+                "untranslated_zh": r.get("untranslated_zh")}
+
+    cands = r["candidates"]
+    if pick is not None:
+        pick = int(pick)
+        if not 1 <= pick <= len(cands):
+            return {"ok": False, "error": "bad_pick", "pick": pick,
+                    "n_candidates": r["matched"],
+                    "candidates": cands, "has_more": r.get("has_more"),
+                    "hint": "pick 须在 1..%d；候选列表原样重列，重挑一个"
+                            % len(cands)}
+        chosen = cands[pick - 1]
+    elif r["status"] == "unique" and len(cands) == 1:
+        chosen = cands[0]
+    else:
+        # 歧义不是错误：调用成功了，只是需要李点一个序号。
+        return {"ok": True, "added": False, "needs_pick": True,
+                "query": query, "n_candidates": r["matched"],
+                "candidates": cands, "has_more": r.get("has_more"),
+                "brand_resolved": r.get("brand_resolved"),
+                "hint": r.get("hint")}
+
+    # 落地：复用老工具的精确 slug 路径（_ask_status，err 如实报不假 ok）
+    res = add_module(chosen["plugin"], chosen["model"], x, y)
+    if not res.get("ok"):
+        return {"ok": False, "error": "add_failed", "chosen": chosen,
+                "add_result": res,
+                "hint": "slug 在 manifest 里存在但引擎拒绝了（插件未加载？）"
+                        "——可 cardinal_undo，或从候选里换一个 pick"}
+    return {"ok": True, "added": True, "query": query,
+            "matched_via": {
+                "brand_resolved": r.get("brand_resolved"),
+                "expanded_terms": r.get("expanded_terms"),
+                "match_score": chosen.get("match_score"),
+                "matched_terms": chosen.get("matched_terms"),
+            },
+            "picked": chosen, "add_result": res,
+            "note": "不满意可 cardinal_undo 撤销；位置不满意可 cardinal_module_move"}
 
 
 def load_skipped():
@@ -3266,6 +3329,36 @@ TOOLS = [
                         "idempotentHint": False, "openWorldHint": False},
     },
     {
+        "name": "cardinal_add_module_named",
+        "description": "★ WRITE add a module by PLAIN-LANGUAGE name (2026-10-24): "
+                       "say 'VCV VCF' or 'Bogaudio VCO' instead of slugs. "
+                       "Stateless two-stage: a UNIQUE match is added directly "
+                       "(zero guessing); multiple matches return a numbered "
+                       "candidate list — call again with pick=N to land one; "
+                       "no match returns an honest miss with suggestions. "
+                       "Brand words are normalized for you: the 'VCV' brand's "
+                       "plugin slug is 'Fundamental', and the candidates carry "
+                       "the exact plugin|model slugs cardinal_add_module needs. "
+                       "Undo with cardinal_undo. Keep cardinal_add_module for "
+                       "scripted exact-slug use.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "plain-language module name, "
+                          "e.g. 'VCV VCF', 'Bogaudio VCO', 'Fundamental 滤波'"},
+                "x": {"type": "integer", "description": "grid cell column (1 cell = 15 px)"},
+                "y": {"type": "integer", "description": "grid row (1 row = 380 px)"},
+                "pick": {"type": "integer", "description": "1-based index from the "
+                         "candidate list (stage 2). Omit for stage 1."},
+            },
+            "required": ["query", "x", "y"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": False, "openWorldHint": False},
+    },
+    {
         "name": "cardinal_load_skipped",
         "description": "★ READ what the last load SKIPPED (C2, 2026-10-22): modules whose "
                        "plugin/model is missing, and cables that failed to connect. Upstream "
@@ -3497,6 +3590,8 @@ DISPATCH = {
     "cardinal_load_skipped": lambda a: load_skipped(),
     "cardinal_add_module": lambda a: add_module(
         a["plugin"], a["model"], a["x"], a["y"]),
+    "cardinal_add_module_named": lambda a: add_module_named(
+        a["query"], a["x"], a["y"], a.get("pick")),
     "cardinal_midi_out": lambda a: midi_out(
         a["port"], a["status"], a["data1"],
         a.get("data2", 0), a.get("frame", -1)),

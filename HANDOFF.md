@@ -13,7 +13,7 @@
 
 | 问题 | 答案 |
 |---|---|
-| **这是什么项目** | 给 Cardinal 模块化合成器加一套 **MCP 遥控能力**（**57 个工具**）+ **OSC 端点**（**30 个**），让 AI 能在软件里读状态、改机架、加模块、导出乐谱。 |
+| **这是什么项目** | 给 Cardinal 模块化合成器加一套 **MCP 遥控能力**（**61 个工具**）+ **OSC 端点**（**33 个**），让 AI 能在软件里读状态、改机架、加模块、导出乐谱。 |
 | **现在能用吗** | **能。** 部署的 `D:\Cardinal\win64\CardinalNative.exe` 已通过真机验收（10-21 10:08 构建，含 E1 三段式 + E2 分页 + E3 注册表抽函数）。 |
 | **最需要注意什么** | ① `D:\Cardinal` 是你的 fork（可 push）；WSL 的 `~/Cardinal` 是上游 clone（**绝不能 push**）。<br>② WSL 源码树**已经是「带 OSC 的可编译状态」**（10-21 下午实测：30 端点注册全在，含 B2 `/cables-page` + B3 `/module-copy`）⇒ 改完直接编；`git checkout .` 冲掉工作区改动后跑一次 `replay_osc.py` 即可完全恢复（MenuBar 补丁现已在 `01-osc-core.patch` 里，B2 在 `05-b2-cables-page.patch` 里）。<br>③ 改 `.vcv` 只写文件**李看不见**，要走 OSC `/load` 推送。 |
 | **明天第一件事** | B2 这批改动（C++ patch + MCP 工具 + 文档）**未提交**，等李点头后提交推送（方法见 §2.1）。 |
@@ -27,7 +27,7 @@
 
 | 项 | 实际状态 / 位置 |
 |---|---|
-| **MCP 工具** | **60 个**（`tools/cardinal_mcp.py`，TOOLS == DISPATCH 已校验） |
+| **MCP 工具** | **61 个**（`tools/cardinal_mcp.py`，TOOLS == DISPATCH 已校验；10-24 增 `cardinal_add_module_named` 按名字加模块，纯 Python 层） |
 | **OSC 端点** | **33 个**（A 组读数 5 / B 组零 hook 5 / C 组模拟人类操作 9 + QuickJS 2 / D 组 `/screenshot` 1 / E 组 E1 三段式 + E2 分页 1 / B2 `/cables-page` 分页 1 / B3 `/module-copy` 复制 1 / C3 `/log-get` 日志 1 / C2 `/load-skipped` 1 / **M1 `/module-add` 加模块 1** + E3 注册表重构） |
 | **部署的 exe** | `D:\Cardinal\win64\CardinalNative.exe`，**103,015,424 B**，MD5 `2c2ce802e5842f3646befe8cbf0dfc69`，构建于 10-22 09:0x（含 E1 三段式 + E2 分页 + E3 注册表抽函数 + B2 `/cables-page` + B3 `/module-copy` + C6 写端点修复 + C3 日志环形缓冲 + `/log-get` + **C2 `/load` skipped 收集器** + **M1 `/module-add`** + 自动开 OSC 延后） |
 | **OSC 自动开启** | 已生效（`CARDINAL_OSC_AUTOSTART` 未设或 ≠ `0` 时，启动即开 2228 端口，不用再手点菜单） |
@@ -565,6 +565,9 @@ DISPLAY=:0 CARDINAL_OSC_AUTOSTART=1 wine bin/CardinalNative.exe
 
 #### 6.1b 🔴 后面还有的工作（2026-10-21 盘点 · 按「谁来做」分栏）
 
+> 🔴 **10-23/10-24 已收口**：本表是 10-21 的旧盘点，下面 B2/B3 的「⚠️ 未提交」早已提交进 `db51bb5`；B 栏四件（单元测试 / slug / 验收清单 / 每轨长度）、A1 真机验收、demo_S4/S5 验收、段落编排三问已答，全部在 10-22~10-24 完工并推送（HEAD `4a2e24f`）。
+> **最新也是最准的下一步清单，一律看 `docs/PROGRESS-2026-10-22.md` §5**（A 栏剩余 = audition 验收 + 扩展器试听口 + Song 模式；~~C 栏 = `/module-add` 模糊匹配 + 按名候选选择器~~ ✅ **已完工**：10-24 李拍板「仅唯一命中直加 + 中文前缀」，MCP 层落地 `cardinal_add_module_named`，见 `TODO-BACKLOG.md` M2）。本表仅作历史留档，别再按它开工。
+
 > **性质说明**：协议层（A/B/C/D/E 五组）**已全部完工**；B2 `/cables-page` + B3 `/module-copy` 是 10-21 下午补的收尾端点（E2 分页的 cables 孪生 / 原生 cloneAction 的 OSC 孪生），之后没有下一批端点可做。
 > 剩下的全是「**要么缺一次真机验收、要么缺一个李的拍板**」。
 
@@ -651,7 +654,8 @@ HostMIDI 复音 8 声道分轨录和弦，4+4 循环，每轨独立音色链。
 | `tools/rackgen.py` | 机架生成 DSL（新机架一律走它） |
 | `tools/layout_patch.py` | 排班 + 门禁（`check` / `guard` / `apply` / `widths`） |
 | `tools/topology.py` | 读接线 + 角色识别 + 信号可达性 |
-| `tools/modbrowser.py` | 模块检索（含中文词表） |
+| `tools/modbrowser.py` | 模块检索（含中文词表，10-24 加最长前缀匹配） |
+| `tools/modresolve.py` | 口语模块名 → 候选/唯一命中（品牌归一 + 停用词；按名字加模块的解析层，10-24 新增） |
 | `tools/seq.py` | 序列器音符读写 |
 | `tools/samplelib.py` | 采样槽装载 |
 | `tools/abc_export.py` | 序列器 → `.abc` 乐谱 |

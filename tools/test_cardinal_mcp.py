@@ -23,6 +23,8 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 import cardinal_mcp as m  # noqa: E402
+import modbrowser  # noqa: E402
+import modresolve  # noqa: E402
 
 
 class TestStatusParsing(unittest.TestCase):
@@ -123,6 +125,103 @@ class TestPatchDirResolution(unittest.TestCase):
         # 不设 env 时，默认落到 repo 的 patches/（README 承诺的 fresh-clone）。
         p = m._default_patch_dir()
         self.assertTrue(p.endswith("patches"), p)
+
+
+class TestAddModuleNamed(unittest.TestCase):
+    """「按名字加模块」：品牌归一 / 唯一直加 / 候选 pick / 停用词（2026-10-24）。
+
+    依赖本机 PluginManifests（Cardinal 安装目录自带，与运行引擎同源）——
+    读不到就 skip，绝不假绿。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.has_lib = bool(modbrowser.LIB.load().modules)
+
+    def setUp(self):
+        if not self.has_lib:
+            self.skipTest("PluginManifests 不在本机")
+
+    def test_vcv_vcf_unique(self):
+        # VCV 是 brand 名、Fundamental 才是 plugin slug —— 归一后唯一命中。
+        r = modresolve.resolve("VCV VCF")
+        self.assertEqual(r["status"], "unique")
+        self.assertEqual(r["brand_resolved"].get("vcv"), ["Fundamental"])
+        self.assertEqual(r["candidates"][0]["plugin"], "Fundamental")
+        self.assertEqual(r["candidates"][0]["model"], "VCF")
+
+    def test_fundamental_vcf_unique(self):
+        # 直接说 plugin slug 名也要认（李的两种说法都要通）。
+        r = modresolve.resolve("Fundamental VCF")
+        self.assertEqual(r["status"], "unique")
+        self.assertEqual(r["candidates"][0]["model"], "VCF")
+
+    def test_bogaudio_vco_ambiguous(self):
+        # 多个候选绝不猜（李 10-24 拍板：仅唯一命中才直加）。
+        r = modresolve.resolve("Bogaudio VCO")
+        self.assertEqual(r["status"], "ambiguous")
+        self.assertEqual(r["matched"], 2)
+        self.assertTrue(all(c["plugin"] == "Bogaudio" for c in r["candidates"]))
+        self.assertIn("Bogaudio-VCO", {c["model"] for c in r["candidates"]})
+
+    def test_zh_prefix_translation(self):
+        # 「滤波器」整词不在词表 → 最长前缀「滤波」→ filter（10-24 拍板）。
+        r = modresolve.resolve("滤波器")
+        self.assertIn("filter", r["expanded_terms"])
+        self.assertGreater(r["matched"], 0)
+
+    def test_stopword_garbage_no_match(self):
+        # 「not a module」曾靠 desc 词频刷出 1363 个假命中 —— 停用词回归。
+        r = modresolve.resolve("xyzzy not a module")
+        self.assertEqual(r["status"], "no_match")
+        self.assertEqual(r["matched"], 0)
+
+    def test_needs_pick_never_touches_osc(self):
+        # 歧义阶段只列候选，不发 OSC（Cardinal 没开也不能假失败/假成功）。
+        calls = []
+        orig = m.add_module
+        m.add_module = lambda *a, **k: calls.append(a) or {"ok": True}
+        try:
+            out = m.add_module_named("Bogaudio VCO", 4, 3)
+        finally:
+            m.add_module = orig
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["added"])
+        self.assertTrue(out["needs_pick"])
+        self.assertEqual(out["n_candidates"], 2)
+        self.assertEqual(calls, [])
+
+    def test_pick_out_of_range(self):
+        # pick 越界：报错 + 原样重列候选，且不落地。
+        calls = []
+        orig = m.add_module
+        m.add_module = lambda *a, **k: calls.append(a) or {"ok": True}
+        try:
+            out = m.add_module_named("Bogaudio VCO", 4, 3, pick=99)
+        finally:
+            m.add_module = orig
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["error"], "bad_pick")
+        self.assertEqual(calls, [])
+
+    def test_unique_add_uses_candidate_slugs(self):
+        # 唯一命中直加：喂给 add_module 的必须是候选里归一后的 plugin|model。
+        seen = {}
+
+        def fake_add(plugin, model, x, y):
+            seen.update(plugin=plugin, model=model, x=x, y=y)
+            return {"ok": True, "result": "42", "status": "ok"}
+
+        orig = m.add_module
+        m.add_module = fake_add
+        try:
+            out = m.add_module_named("VCV VCF", 7, 2)
+        finally:
+            m.add_module = orig
+        self.assertTrue(out["ok"])
+        self.assertTrue(out["added"])
+        self.assertEqual(seen, {"plugin": "Fundamental", "model": "VCF",
+                                "x": 7, "y": 2})
 
 
 if __name__ == "__main__":
