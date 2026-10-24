@@ -32,7 +32,7 @@
   | 9 | 09-c2-load-skipped.patch | `src/override/Engine.cpp` + `src/Rack/include/engine/Engine.hpp` + `src/Rack/src/patch.cpp` + `src/CardinalCommon.cpp`（C2 `/load` skipped 收集器 + `/load-skipped` 端点） | Cardinal `8aa0fc7` + 01-08 应用后 |
   | 10 | 10-module-add.patch | `src/CardinalCommon.cpp`（`/module-add` 端点：按 plugin\|model slug + 格坐标加模块；顺带修 JS `addModule` 的 push-only 缺陷） | Cardinal `8aa0fc7` + 01-09 应用后 |
 | 11 | 11-songroll-build.patch | `plugins/Makefile`（SongRoll wildcard）+ `plugins/plugins.cpp`（`addModel(modelSongRollModule)`） | Cardinal `8aa0fc7` + 01-10 应用后 |
-| 12 | 12-songroll-module.patch | SongRoll 复活（**rcm-modules 子模块**，应用根 `plugins/rcm-modules`）：`.cppx` 复活为 `.cpp`（Data/Module/Transport）+ Rack 2 API 修（`rack::dsp::` 全限定）+ UI 七文件暂存 `.bak`（Rack 1 代码待适配）+ 胶文件重写（最简 SVG Widget） | 子模块 HEAD `c4a243e` |
+| 12 | 12-songroll-module.patch | SongRoll 复活+阶段2/3（**rcm-modules 子模块**，应用根 `plugins/rcm-modules`）：`.cppx` 复活为 `.cpp`（Data/Module/Transport）+ Rack 2 API 修（`rack::dsp::` 全限定）+ 阶段2引擎（10/11 端口+EOP 推进+JSON）+ 阶段3 UI 移植（Rack 1→2：VirtualWidget→Widget、onMouseDown→onButton、SequentialLayout Vec spacing、事件直改 data+push undo）+ 胶文件重写 | 子模块 HEAD `c4a243e` |
 
 ★ 幂等
   每一组都先 `git apply --check`：能干净应用 ⇒ 跳过（已应用过）；
@@ -103,7 +103,7 @@ PATCHES = [
     ("09-c2-load-skipped.patch", "C2 /load skipped 收集器 + /load-skipped 端点（override/Engine + Rack + CardinalCommon）", ""),
     ("10-module-add.patch", "M1 /module-add 端点（slug + 格坐标加模块）+ JS addModule 修复", ""),
     ("11-songroll-build.patch", "SongRoll 复活·注册链：Makefile wildcard + plugins.cpp addModel", ""),
-    ("12-songroll-module.patch", "SongRoll 复活·模块本体（rcm-modules 子模块）：.cppx 复活 + Rack 2 API 修 + UI 暂存 .bak + 胶文件重写", "plugins/rcm-modules"),
+    ("12-songroll-module.patch", "SongRoll 复活+阶段2/3·模块本体（rcm-modules 子模块）：引擎（10/11 端口+EOP 推进+JSON）+ UI Rack 2 移植 + 胶文件", "plugins/rcm-modules"),
 ]
 
 # 幂等兜底标记：多层 patch 叠同一文件时（01/05/06/07/09/10 全改
