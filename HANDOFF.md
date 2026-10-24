@@ -207,6 +207,8 @@ wsl.exe -e bash -lc '
 ✔ 已应用      08-c3-log-get.patch            C3 日志环形缓冲 + /log-get
 ✔ 已应用      09-c2-load-skipped.patch       C2 /load skipped 收集器 + /load-skipped
 ✔ 已应用      10-module-add.patch           M1 /module-add（slug + 格坐标加模块）
+✔ 已应用      11-songroll-build.patch      SongRoll 复活·注册链（Makefile + plugins.cpp）
+✔ 已应用      12-songroll-module.patch     SongRoll 复活·模块本体（rcm-modules 子模块）
 
 端点数     : 33 / 33
 ✅ 校验通过：33 端点 + 所有标记齐全

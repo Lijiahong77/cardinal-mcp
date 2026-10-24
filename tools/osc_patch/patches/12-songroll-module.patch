@@ -1,0 +1,120 @@
+diff --git a/plugin.json b/plugin.json
+index 2f2efc6..dd16433 100644
+--- a/plugin.json
++++ b/plugin.json
+@@ -74,6 +74,7 @@
+ 		},
+ 		{
+ 			"slug": "rcm-pianoroll",
++			{"slug": "rcm-songroll", "name": "Song Roll", "description": "Song-level section arranger", "tags": ["Sequencer"]},
+ 			"name": "Piano Roll",
+ 			"description": "Simple Piano Roll for sequencing",
+ 			"tags": ["Sequencer"]
+diff --git a/src/SongRoll/ClockDivControlWidget.cppx b/src/SongRoll/ClockDivControlWidget.cpp.bak-20261024
+similarity index 100%
+rename from src/SongRoll/ClockDivControlWidget.cppx
+rename to src/SongRoll/ClockDivControlWidget.cpp.bak-20261024
+diff --git a/src/SongRoll/PatternControlWidget.cppx b/src/SongRoll/PatternControlWidget.cpp.bak-20261024
+similarity index 100%
+rename from src/SongRoll/PatternControlWidget.cppx
+rename to src/SongRoll/PatternControlWidget.cpp.bak-20261024
+diff --git a/src/SongRoll/PatternControllerSlice.cppx b/src/SongRoll/PatternControllerSlice.cpp.bak-20261024
+similarity index 100%
+rename from src/SongRoll/PatternControllerSlice.cppx
+rename to src/SongRoll/PatternControllerSlice.cpp.bak-20261024
+diff --git a/src/SongRoll/PatternHeaderWidget.cppx b/src/SongRoll/PatternHeaderWidget.cpp.bak-20261024
+similarity index 100%
+rename from src/SongRoll/PatternHeaderWidget.cppx
+rename to src/SongRoll/PatternHeaderWidget.cpp.bak-20261024
+diff --git a/src/SongRoll/RepeatControlWidget.cppx b/src/SongRoll/RepeatControlWidget.cpp.bak-20261024
+similarity index 100%
+rename from src/SongRoll/RepeatControlWidget.cppx
+rename to src/SongRoll/RepeatControlWidget.cpp.bak-20261024
+diff --git a/src/SongRoll/RollArea.cppx b/src/SongRoll/RollArea.cpp.bak-20261024
+similarity index 100%
+rename from src/SongRoll/RollArea.cppx
+rename to src/SongRoll/RollArea.cpp.bak-20261024
+diff --git a/src/SongRoll/SongRollData.cppx b/src/SongRoll/SongRollData.cpp
+similarity index 100%
+rename from src/SongRoll/SongRollData.cppx
+rename to src/SongRoll/SongRollData.cpp
+diff --git a/src/SongRoll/SongRollModule.cppx b/src/SongRoll/SongRollModule.cpp
+similarity index 100%
+rename from src/SongRoll/SongRollModule.cppx
+rename to src/SongRoll/SongRollModule.cpp
+diff --git a/src/SongRoll/SongRollModule.hpp b/src/SongRoll/SongRollModule.hpp
+index dcf6263..230a0a5 100644
+--- a/src/SongRoll/SongRollModule.hpp
++++ b/src/SongRoll/SongRollModule.hpp
+@@ -21,12 +21,12 @@ namespace SongRoll {
+       NUM_LIGHTS
+     };
+ 
+-    rack::SchmittTrigger clockInputTrigger;
+-    rack::SchmittTrigger resetInputTrigger;
+-    rack::SchmittTrigger runInputTrigger;
++    rack::dsp::SchmittTrigger clockInputTrigger;
++    rack::dsp::SchmittTrigger resetInputTrigger;
++    rack::dsp::SchmittTrigger runInputTrigger;
+ 
+     ValueChangeTrigger<bool> runInputActive;
+-    rack::RingBuffer<float, 16> clockBuffer;
++    rack::dsp::RingBuffer<float, 16> clockBuffer;
+     int clockDelay = 0;
+ 
+     SongRollData songRollData;
+diff --git a/src/SongRoll/SongRollWidget.cppx b/src/SongRoll/SongRollWidget.cpp.bak-20261024
+similarity index 100%
+rename from src/SongRoll/SongRollWidget.cppx
+rename to src/SongRoll/SongRollWidget.cpp.bak-20261024
+diff --git a/src/SongRoll/Transport.cppx b/src/SongRoll/Transport.cpp
+similarity index 100%
+rename from src/SongRoll/Transport.cppx
+rename to src/SongRoll/Transport.cpp
+diff --git a/src/SongRollModule.cpp b/src/SongRollModule.cpp
+new file mode 100644
+index 0000000..21ac7ce
+--- /dev/null
++++ b/src/SongRollModule.cpp
+@@ -0,0 +1,23 @@
++#include "rack.hpp"
++#include "dsp/window.hpp"
++
++#include "plugin.hpp"
++#include "SongRoll/SongRollModule.hpp"
++
++using namespace rack;
++using namespace SongRoll;
++
++extern Plugin* plugin;
++
++// Stage-1 minimal widget: SVG panel only.
++// SongRoll UI widgets are Rack 1-era code (EventDragMove / VirtualWidget /
++// BaseWidget::dataToJson no longer exist in Rack 2) - parked as
++// *.cpp.bak-20261024, pending a Rack 2 port. Engine ships first.
++struct SongRollWidget : ModuleWidget {
++	SongRollWidget(SongRollModule* module) {
++		setModule(module);
++		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SongRoll.svg")));
++	}
++};
++
++Model *modelSongRollModule = createModel<SongRollModule, SongRollWidget>("rcm-songroll");
+diff --git a/src/SongRollModule.cppx b/src/SongRollModule.cppx
+deleted file mode 100644
+index 0c50dc3..0000000
+--- a/src/SongRollModule.cppx
++++ /dev/null
+@@ -1,12 +0,0 @@
+-#include "GVerbWidget.hpp"
+-
+-#include "SongRoll/SongRollModule.hpp"
+-#include "SongRoll/SongRollWidget.hpp"
+-
+-using namespace SongRoll;
+-
+-// Specify the Module and ModuleWidget subclass, human-readable
+-// author name for categorization per plugin, module slug (should never
+-// change), human-readable module name, and any number of tags
+-// (found in `include/tags.hpp`) separated by commas.
+-Model *modelSongRollModule = createModel<SongRollModule, SongRollWidget>("rcm-songroll");

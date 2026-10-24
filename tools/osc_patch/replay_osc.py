@@ -31,6 +31,8 @@
   | 8 | 08-c3-log-get.patch | `src/CardinalCommon.cpp`（C3 `/log-get` 端点）+ `src/Rack/src/logger.cpp` + `src/Rack/include/logger.hpp`（进程内日志环形缓冲） | Cardinal `8aa0fc7` + 01-07 应用后（logger 两文件相对 Rack 子模块 HEAD） |
   | 9 | 09-c2-load-skipped.patch | `src/override/Engine.cpp` + `src/Rack/include/engine/Engine.hpp` + `src/Rack/src/patch.cpp` + `src/CardinalCommon.cpp`（C2 `/load` skipped 收集器 + `/load-skipped` 端点） | Cardinal `8aa0fc7` + 01-08 应用后 |
   | 10 | 10-module-add.patch | `src/CardinalCommon.cpp`（`/module-add` 端点：按 plugin\|model slug + 格坐标加模块；顺带修 JS `addModule` 的 push-only 缺陷） | Cardinal `8aa0fc7` + 01-09 应用后 |
+| 11 | 11-songroll-build.patch | `plugins/Makefile`（SongRoll wildcard）+ `plugins/plugins.cpp`（`addModel(modelSongRollModule)`） | Cardinal `8aa0fc7` + 01-10 应用后 |
+| 12 | 12-songroll-module.patch | SongRoll 复活（**rcm-modules 子模块**，应用根 `plugins/rcm-modules`）：`.cppx` 复活为 `.cpp`（Data/Module/Transport）+ Rack 2 API 修（`rack::dsp::` 全限定）+ UI 七文件暂存 `.bak`（Rack 1 代码待适配）+ 胶文件重写（最简 SVG Widget） | 子模块 HEAD `c4a243e` |
 
 ★ 幂等
   每一组都先 `git apply --check`：能干净应用 ⇒ 跳过（已应用过）；
@@ -100,7 +102,31 @@ PATCHES = [
     ("08-c3-log-get.patch", "C3 日志环形缓冲 + /log-get 端点（含 Rack logger.cpp/hpp）", ""),
     ("09-c2-load-skipped.patch", "C2 /load skipped 收集器 + /load-skipped 端点（override/Engine + Rack + CardinalCommon）", ""),
     ("10-module-add.patch", "M1 /module-add 端点（slug + 格坐标加模块）+ JS addModule 修复", ""),
+    ("11-songroll-build.patch", "SongRoll 复活·注册链：Makefile wildcard + plugins.cpp addModel", ""),
+    ("12-songroll-module.patch", "SongRoll 复活·模块本体（rcm-modules 子模块）：.cppx 复活 + Rack 2 API 修 + UI 暂存 .bak + 胶文件重写", "plugins/rcm-modules"),
 ]
+
+# 幂等兜底标记：多层 patch 叠同一文件时（01/05/06/07/09/10 全改
+# CardinalCommon.cpp），早期 patch 的**反 apply 会被后期 patch 的叠加
+# 推挤破坏**（2026-10-24 实测：01 失败在 :180、06 在 :1592、08/09 在 :1664，
+# 全是后续组追加区）⇒ 反 apply 判据对这些组误报冲突。
+# 兜底 = 该组的**独有标记**全部在树里 ⇒ 改动确实在，判 skipped。
+# 路径相对 CARDINAL_ROOT（同 VERIFY_MARKS）。只给实测有叠加的组配。
+PATCH_MARKS = {
+    "01-osc-core.patch": [
+        ("src/CardinalCommon.cpp", "CARDINAL-MCP-READ-PROBES-BEGIN"),
+        ("src/override/MenuBar.cpp", "oscAutostartEnabled"),
+    ],
+    "06-b3-module-copy.patch": [
+        ("src/CardinalCommon.cpp", 'REG("/module-copy"'),
+    ],
+    "08-c3-log-get.patch": [
+        ("src/CardinalCommon.cpp", 'REG("/log-get"'),
+    ],
+    "09-c2-load-skipped.patch": [
+        ("src/override/Engine.cpp", "addLoadSkip"),
+    ],
+}
 
 # 校验点：应用完后这些标记必须存在（防止 patch 被裁剪/漏 apply）
 VERIFY_MARKS = [
@@ -136,6 +162,10 @@ VERIFY_MARKS = [
     ("src/Rack/src/patch.cpp", "oscLoadActive", "Rack fromJson 条件化"),
     ("plugins/Starsea/src/MiniArranger.cpp", "StarseaMiniArranger", "MiniArranger 模块"),
     ("plugins/Starsea/src/MiniArrangerExpander.cpp", "MiniArrangerExpander", "扩展器模块"),
+    ("plugins/Makefile", "rcm-modules/src/SongRoll/*.cpp", "SongRoll 编译规则"),
+    ("plugins/plugins.cpp", "addModel(modelSongRollModule)", "SongRoll addModel"),
+    ("plugins/rcm-modules/plugin.json", '"rcm-songroll"', "SongRoll manifest 条目"),
+    ("plugins/rcm-modules/src/SongRoll/SongRollModule.cpp", "modelSongRollModule", "SongRoll 引擎实现"),
 ]
 
 # OSC 端点总数（M1 后 = 33）
@@ -249,6 +279,15 @@ def apply_one(root, patch_dir, name, desc, apply_root_rel, dry_run=False):
     rc_rev, _ = run_git(["apply", "--check", "-R", ppath], apply_root)
     if rc_rev == 0:
         return "skipped", "已应用过（反向检查确认，幂等跳过）"
+
+    # ---- 幂等兜底：反 apply 被后续 patch 叠加推挤时（PATCH_MARKS 注释），
+    #      用该组独有标记判定「改动是否确实在树里」
+    marks = PATCH_MARKS.get(name, [])
+    if marks:
+        missing = [(rel, mk) for rel, mk in marks
+                   if mk not in read_text(os.path.join(root, rel))]
+        if not missing:
+            return "skipped", "已应用过（标记兜底：反 apply 被后续叠加推挤，但独有标记俱在）"
 
     # 真的冲突
     low = out.lower()
