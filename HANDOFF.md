@@ -13,7 +13,7 @@
 
 | 问题 | 答案 |
 |---|---|
-| **这是什么项目** | 给 Cardinal 模块化合成器加一套 **MCP 遥控能力**（**61 个工具**）+ **OSC 端点**（**33 个**），让 AI 能在软件里读状态、改机架、加模块、导出乐谱。 |
+| **这是什么项目** | 给 Cardinal 模块化合成器加一套 **MCP 遥控能力**（**64 个工具**）+ **OSC 端点**（**33 个**），让 AI 能在软件里读状态、改机架、加模块、导出乐谱、排歌。 |
 | **现在能用吗** | **能。** 部署的 `D:\Cardinal\win64\CardinalNative.exe` 已通过真机验收（10-21 10:08 构建，含 E1 三段式 + E2 分页 + E3 注册表抽函数）。 |
 | **最需要注意什么** | ① `D:\Cardinal` 是你的 fork（可 push）；WSL 的 `~/Cardinal` 是上游 clone（**绝不能 push**）。<br>② WSL 源码树**已经是「带 OSC 的可编译状态」**（10-21 下午实测：30 端点注册全在，含 B2 `/cables-page` + B3 `/module-copy`）⇒ 改完直接编；`git checkout .` 冲掉工作区改动后跑一次 `replay_osc.py` 即可完全恢复（MenuBar 补丁现已在 `01-osc-core.patch` 里，B2 在 `05-b2-cables-page.patch` 里）。<br>③ 改 `.vcv` 只写文件**李看不见**，要走 OSC `/load` 推送。 |
 | **明天第一件事** | B2 这批改动（C++ patch + MCP 工具 + 文档）**未提交**，等李点头后提交推送（方法见 §2.1）。 |
@@ -27,7 +27,7 @@
 
 | 项 | 实际状态 / 位置 |
 |---|---|
-| **MCP 工具** | **61 个**（`tools/cardinal_mcp.py`，TOOLS == DISPATCH 已校验；10-24 增 `cardinal_add_module_named` 按名字加模块，纯 Python 层） |
+| **MCP 工具** | **64 个**（`tools/cardinal_mcp.py`，TOOLS == DISPATCH 已校验；10-24 增 `cardinal_add_module_named` 按名字加模块 + `cardinal_songroll_read/write/edit` 排歌段落表，纯 Python 层） |
 | **OSC 端点** | **33 个**（A 组读数 5 / B 组零 hook 5 / C 组模拟人类操作 9 + QuickJS 2 / D 组 `/screenshot` 1 / E 组 E1 三段式 + E2 分页 1 / B2 `/cables-page` 分页 1 / B3 `/module-copy` 复制 1 / C3 `/log-get` 日志 1 / C2 `/load-skipped` 1 / **M1 `/module-add` 加模块 1** + E3 注册表重构） |
 | **部署的 exe** | `D:\Cardinal\win64\CardinalNative.exe`，**103,015,424 B**，MD5 `2c2ce802e5842f3646befe8cbf0dfc69`，构建于 10-22 09:0x（含 E1 三段式 + E2 分页 + E3 注册表抽函数 + B2 `/cables-page` + B3 `/module-copy` + C6 写端点修复 + C3 日志环形缓冲 + `/log-get` + **C2 `/load` skipped 收集器** + **M1 `/module-add`** + 自动开 OSC 延后） |
 | **OSC 自动开启** | 已生效（`CARDINAL_OSC_AUTOSTART` 未设或 ≠ `0` 时，启动即开 2228 端口，不用再手点菜单） |

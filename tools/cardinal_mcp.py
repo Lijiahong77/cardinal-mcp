@@ -65,6 +65,7 @@ import modbrowser  # noqa: E402  (module library, reads Cardinal's PluginManifes
 import modresolve  # noqa: E402  (plain-language module name -> candidates/unique hit)
 import topology  # noqa: E402  (rack wiring / role recognition)
 import seq  # noqa: E402  (sequencer notes = piano-roll equivalent)
+import songroll  # noqa: E402  (SongRoll sections = song arrangement table)
 import abc_export  # noqa: E402  (sequencer notes -> .abc text score)
 import samplelib  # noqa: E402  (sampler slots = right-click 'Load sample' equivalent)
 import interaction_map  # noqa: E402  (human UI operation -> source code index)
@@ -2900,6 +2901,100 @@ TOOLS = [
         "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
     {
+        "name": "cardinal_songroll_read",
+        "description": "Read a SongRoll section table (song arrangement: how many sections, "
+                       "which pattern each channel plays in each section, how many repeats). "
+                       "Returns a human summary plus the raw JSON. SongRoll = the song-level "
+                       "arranger: sections advance on end-of-pattern events, so a section is "
+                       "'which pattern + how many times', not a list of notes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string"},
+                "module": {"type": "string", "description": "e.g. songroll (default: first one found)"},
+            },
+            "required": ["patch"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_songroll_write",
+        "description": "Write a whole SongRoll section table (full replacement, validated "
+                       "before touching disk). Each section needs exactly 8 channels, each "
+                       "channel: pattern 1..64 (1-based), repeats 1..64, repeat_mode "
+                       "0=no limit / 1=at least / 2=at most, clock_div 0=off / 1..64.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string"},
+                "module": {"type": "string"},
+                "sections": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "channels": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "pattern": {"type": "integer", "minimum": 1, "maximum": 64},
+                                        "repeats": {"type": "integer", "minimum": 1, "maximum": 64},
+                                        "repeat_mode": {"type": "integer", "minimum": 0, "maximum": 2},
+                                        "clock_div": {"type": "integer", "minimum": 0, "maximum": 64},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                "load_after": {"type": "boolean", "default": False,
+                               "description": "Reload the patch in Cardinal so the change takes effect (interrupts audio)"},
+            },
+            "required": ["patch", "sections"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "openWorldHint": False},
+    },
+    {
+        "name": "cardinal_songroll_edit",
+        "description": "Edit a SongRoll section table with one human-level operation: add / "
+                       "remove / duplicate / move a section, change one channel's pattern / "
+                       "repeats / repeat mode / clock division, or set the run switch. "
+                       "E.g. 'play the chorus twice more' = op=set_channel, section=<chorus>, "
+                       "channel=1, repeats=<n+2>.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch": {"type": "string"},
+                "module": {"type": "string"},
+                "op": {"type": "string",
+                       "enum": ["add_section", "remove_section", "duplicate_section",
+                                "move_section", "set_channel", "set_running"]},
+                "section": {"type": "integer", "minimum": 0, "description": "0-based section index"},
+                "channel": {"type": "integer", "minimum": 1, "maximum": 8},
+                "pattern": {"type": "integer", "minimum": 1, "maximum": 64},
+                "repeats": {"type": "integer", "minimum": 1, "maximum": 64},
+                "mode": {"type": "integer", "minimum": 0, "maximum": 2,
+                         "description": "0=no limit 1=at least 2=at most"},
+                "clock_div": {"type": "integer", "minimum": 0, "maximum": 64},
+                "index": {"type": "integer", "minimum": 0, "description": "0-based section index (remove/duplicate)"},
+                "after": {"type": "integer", "minimum": 0, "description": "insert after this 0-based section (add)"},
+                "src": {"type": "integer", "minimum": 0},
+                "dst": {"type": "integer", "minimum": 0},
+                "running": {"type": "boolean"},
+                "load_after": {"type": "boolean", "default": False},
+            },
+            "required": ["patch", "op"],
+            "additionalProperties": False,
+        },
+        "outputSchema": {"type": "object"},
+        "annotations": {"readOnlyHint": False, "openWorldHint": False},
+    },
+    {
         "name": "cardinal_export_abc",
         "description": "Export sequencer notes (rcm-pianoroll or Starsea-MiniArranger) to an "
                        "editable .abc text score — the 'see and edit music as text' deliverable. "
@@ -3554,6 +3649,20 @@ DISPATCH = {
     "cardinal_seq_set_running": lambda a: seq.set_running(
         a["patch"], a["module"], a["running"],
         a.get("pattern", 0), a.get("track", 0), a.get("load_after", False)),
+    # --- song arrangement table (SongRoll sections) ---
+    "cardinal_songroll_read": lambda a: songroll.read_sections(
+        a["patch"], a.get("module")),
+    "cardinal_songroll_write": lambda a: songroll.write_sections(
+        a["patch"], a.get("module"), a["sections"],
+        True, a.get("load_after", False)),
+    "cardinal_songroll_edit": lambda a: songroll.edit(
+        a["patch"], a.get("module"), a["op"],
+        section=a.get("section"), channel=a.get("channel"),
+        pattern=a.get("pattern"), repeats=a.get("repeats"),
+        mode=a.get("mode"), clock_div=a.get("clock_div"),
+        index=a.get("index"), after=a.get("after"),
+        src=a.get("src"), dst=a.get("dst"), running=a.get("running"),
+        backup=True, load_after=a.get("load_after", False)),
     # --- sampler slots (equivalent of right-click -> Load sample) ---
     "cardinal_samples_list": lambda a: samplelib.list_samples(
         a.get("subdir", ""), a.get("limit", 300)),

@@ -14,7 +14,9 @@
 失败即回归：每一处	assert 都对应一次真实的血泪教训。
 """
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 # 让 `import cardinal_mcp` 能找到同目录的兄弟模块（patchio 等）。
@@ -25,6 +27,8 @@ if HERE not in sys.path:
 import cardinal_mcp as m  # noqa: E402
 import modbrowser  # noqa: E402
 import modresolve  # noqa: E402
+import patchio  # noqa: E402
+import songroll  # noqa: E402
 
 
 class TestStatusParsing(unittest.TestCase):
@@ -222,6 +226,147 @@ class TestAddModuleNamed(unittest.TestCase):
         self.assertTrue(out["added"])
         self.assertEqual(seen, {"plugin": "Fundamental", "model": "VCF",
                                 "x": 7, "y": 2})
+
+
+class TestSongRollTable(unittest.TestCase):
+    """阶段 4 · SongRoll 段落表（tools/songroll.py）的离线回归。
+
+    锁住三件真踩过的事：
+    1. pattern 是 **1-based**（引擎字段），而 UI 控件是 0-based —— 差 1 就错
+    2. repeats 引擎不限（UI 控件才 clamp 到 64）—— 自检按引擎语义，不能按 UI
+    3. 越界必须拦在写盘之前（文件不许被改）
+    """
+
+    def _fixture(self):
+        """造一份含 SongRoll 的机架：1 段 8 通道，pattern 1..8"""
+        tmp = tempfile.mkdtemp(prefix="songroll_test_")
+        path = os.path.join(tmp, "t.vcv")
+        chans = [{"pattern": c + 1, "repeats": 1, "repeat_mode": 1, "clock_div": 1}
+                 for c in range(8)]
+        patch = {
+            "version": "2.0.0",
+            "modules": [{
+                "id": 111, "plugin": "rcm", "model": "rcm-songroll",
+                "pos": [0, 0], "params": [],
+                "data": {"songRoll": {"sections": [{"channels": chans}]},
+                         "running": False, "currentSection": 0},
+            }],
+            "cables": [],
+        }
+        patchio.write_patch(path, patch, as_archive=True)
+        return tmp, path
+
+    def test_validate_requires_eight_channels(self):
+        ok, why = songroll._validate_sections(
+            [{"channels": [{"pattern": 1, "repeats": 1, "repeat_mode": 1,
+                            "clock_div": 1}]}])
+        self.assertFalse(ok)
+        self.assertIn("通道", why)
+
+    def test_validate_pattern_is_one_based(self):
+        """pattern=0 非法（1-based，0 是 UI 控件的 0-based 基准）"""
+        chans = [{"pattern": 0, "repeats": 1, "repeat_mode": 1, "clock_div": 1}] * 8
+        ok, why = songroll._validate_sections([{"channels": chans}])
+        self.assertFalse(ok)
+        self.assertIn("pattern", why)
+
+    def test_validate_repeats_allows_more_than_ui_clamp(self):
+        """引擎不限 repeats（UI 控件才 64）—— 自检不能把合法数据判非法"""
+        chans = [{"pattern": 1, "repeats": 200, "repeat_mode": 1, "clock_div": 1}] * 8
+        ok, why = songroll._validate_sections([{"channels": chans}])
+        self.assertTrue(ok, why)
+
+    def test_validate_rejects_bad_mode_and_clock_div(self):
+        chans = [{"pattern": 1, "repeats": 1, "repeat_mode": 9, "clock_div": 1}] * 8
+        ok, _ = songroll._validate_sections([{"channels": chans}])
+        self.assertFalse(ok)
+        chans = [{"pattern": 1, "repeats": 1, "repeat_mode": 1, "clock_div": 99}] * 8
+        ok, _ = songroll._validate_sections([{"channels": chans}])
+        self.assertFalse(ok)
+
+    def test_read_reports_human_summary(self):
+        tmp, path = self._fixture()
+        try:
+            out = songroll.read_sections(path)
+            self.assertTrue(out["ok"], out.get("error"))
+            self.assertEqual(out["section_count"], 1)
+            self.assertIn("1 段", out["summary"])
+            self.assertIn("ch1:1", out["summary"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_edit_set_channel_writes_one_based_pattern(self):
+        tmp, path = self._fixture()
+        try:
+            out = songroll.edit(path, None, "set_channel", section=0, channel=3,
+                                pattern=7)
+            self.assertTrue(out["ok"], out.get("error"))
+            secs = songroll.read_sections(path)["sections"]
+            self.assertEqual(secs[0]["channels"][2]["pattern"], 7)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_edit_out_of_range_does_not_touch_file(self):
+        tmp, path = self._fixture()
+        try:
+            before = open(path, "rb").read()
+            out = songroll.edit(path, None, "set_channel", section=0, channel=1,
+                                pattern=99)
+            self.assertFalse(out["ok"])
+            self.assertIn("越界", out["error"])
+            self.assertEqual(before, open(path, "rb").read())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_edit_add_and_duplicate_and_remove(self):
+        tmp, path = self._fixture()
+        try:
+            self.assertTrue(songroll.edit(path, None, "add_section")["ok"])
+            self.assertEqual(songroll.read_sections(path)["section_count"], 2)
+            self.assertTrue(songroll.edit(path, None, "duplicate_section", index=0)["ok"])
+            self.assertEqual(songroll.read_sections(path)["section_count"], 3)
+            self.assertTrue(songroll.edit(path, None, "remove_section", index=0)["ok"])
+            self.assertEqual(songroll.read_sections(path)["section_count"], 2)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_edit_move_section(self):
+        tmp, path = self._fixture()
+        try:
+            songroll.edit(path, None, "add_section")
+            songroll.edit(path, None, "set_channel", section=0, channel=1, pattern=5)
+            out = songroll.edit(path, None, "move_section", src=0, dst=1)
+            self.assertTrue(out["ok"], out.get("error"))
+            secs = songroll.read_sections(path)["sections"]
+            self.assertEqual(secs[1]["channels"][0]["pattern"], 5)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_missing_songroll_is_honest_error(self):
+        tmp = tempfile.mkdtemp(prefix="songroll_test_")
+        path = os.path.join(tmp, "none.vcv")
+        patchio.write_patch(path, {"version": "2.0.0", "modules": [], "cables": []},
+                            as_archive=True)
+        try:
+            out = songroll.read_sections(path)
+            self.assertFalse(out["ok"])
+            self.assertIn("没有 SongRoll", out["error"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_write_preserves_archive_format(self):
+        """原文件是 tar.zst 就还写 tar.zst —— /load 只吃 tar.zst"""
+        tmp, path = self._fixture()
+        try:
+            self.assertTrue(patchio.is_archive(open(path, "rb").read()))
+            chans = [{"pattern": c + 1, "repeats": 1, "repeat_mode": 1,
+                      "clock_div": 1} for c in range(8)]
+            out = songroll.write_sections(path, None, [{"channels": chans}])
+            self.assertTrue(out["ok"], out.get("error"))
+            self.assertTrue(patchio.is_archive(open(path, "rb").read()))
+            self.assertIsNotNone(patchio.read_patch(path))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 if __name__ == "__main__":
