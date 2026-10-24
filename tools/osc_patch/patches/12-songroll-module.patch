@@ -41,35 +41,369 @@ diff --git a/src/SongRoll/RollArea.cppx b/src/SongRoll/RollArea.cpp.bak-20261024
 similarity index 100%
 rename from src/SongRoll/RollArea.cppx
 rename to src/SongRoll/RollArea.cpp.bak-20261024
-diff --git a/src/SongRoll/SongRollData.cppx b/src/SongRoll/SongRollData.cpp
-similarity index 100%
-rename from src/SongRoll/SongRollData.cppx
-rename to src/SongRoll/SongRollData.cpp
-diff --git a/src/SongRoll/SongRollModule.cppx b/src/SongRoll/SongRollModule.cpp
-similarity index 100%
-rename from src/SongRoll/SongRollModule.cppx
-rename to src/SongRoll/SongRollModule.cpp
+diff --git a/src/SongRoll/SongRollData.cpp b/src/SongRoll/SongRollData.cpp
+new file mode 100644
+index 0000000..f06e5bf
+--- /dev/null
++++ b/src/SongRoll/SongRollData.cpp
+@@ -0,0 +1,81 @@
++#include "../SongRoll/SongRollData.hpp"
++
++using namespace SongRoll;
++
++Section::Section() {
++  channels.resize(SONGROLL_CHANNELS);
++}
++
++SongRollData::SongRollData() {
++  reset();
++}
++
++void SongRollData::reset() {
++  sections.clear();
++  Section sec;
++  for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
++    sec.channels[c].pattern = c + 1;
++    sec.channels[c].repeats = 1;
++    sec.channels[c].repeat_mode = ChannelConfig::REPEATS;
++    sec.channels[c].clock_div = 1;
++  }
++  sections.push_back(sec);
++}
++
++json_t *SongRollData::toJson() {
++  json_t *root = json_object();
++  json_t *arr = json_array();
++  for (const Section &sec : sections) {
++    json_t *so = json_object();
++    json_t *chs = json_array();
++    for (const ChannelConfig &ch : sec.channels) {
++      json_t *co = json_object();
++      json_object_set_new(co, "pattern", json_integer(ch.pattern));
++      json_object_set_new(co, "repeats", json_integer(ch.repeats));
++      json_object_set_new(co, "repeat_mode", json_integer(int(ch.repeat_mode)));
++      json_object_set_new(co, "clock_div", json_integer(ch.clock_div));
++      json_array_append_new(chs, co);
++    }
++    json_object_set_new(so, "channels", chs);
++    json_array_append_new(arr, so);
++  }
++  json_object_set_new(root, "sections", arr);
++  return root;
++}
++
++void SongRollData::fromJson(json_t *rootJ) {
++  if (rootJ == nullptr)
++    return;
++  json_t *arr = json_object_get(rootJ, "sections");
++  if (arr == nullptr || !json_is_array(arr))
++    return;
++  sections.clear();
++  size_t n = json_array_size(arr);
++  for (size_t i = 0; i < n; ++i) {
++    json_t *so = json_array_get(arr, i);
++    if (so == nullptr)
++      continue;
++    Section sec;
++    json_t *chs = json_object_get(so, "channels");
++    if (chs != nullptr && json_is_array(chs)) {
++      size_t m = json_array_size(chs);
++      for (size_t c = 0; c < sec.channels.size() && c < m; ++c) {
++        json_t *co = json_array_get(chs, c);
++        if (co == nullptr)
++          continue;
++        json_t *j;
++        if ((j = json_object_get(co, "pattern")) != nullptr)
++          sec.channels[c].pattern = int(json_integer_value(j));
++        if ((j = json_object_get(co, "repeats")) != nullptr)
++          sec.channels[c].repeats = int(json_integer_value(j));
++        if ((j = json_object_get(co, "repeat_mode")) != nullptr)
++          sec.channels[c].repeat_mode = ChannelConfig::eRepeatMode(int(json_integer_value(j)));
++        if ((j = json_object_get(co, "clock_div")) != nullptr)
++          sec.channels[c].clock_div = int(json_integer_value(j));
++      }
++    }
++    sections.push_back(sec);
++  }
++  if (sections.empty())
++    reset();
++}
+diff --git a/src/SongRoll/SongRollData.cppx b/src/SongRoll/SongRollData.cppx
+deleted file mode 100644
+index f8df26c..0000000
+--- a/src/SongRoll/SongRollData.cppx
++++ /dev/null
+@@ -1,15 +0,0 @@
+-#include "../SongRoll/SongRollData.hpp"
+-
+-using namespace SongRoll;
+-
+-Section::Section() {
+-  channels.resize(8);
+-}
+-
+-SongRollData::SongRollData() {
+-  sections.resize(1);
+-}
+-
+-void SongRollData::reset() {
+-
+-}
+diff --git a/src/SongRoll/SongRollData.hpp b/src/SongRoll/SongRollData.hpp
+index 64320c0..0c37541 100644
+--- a/src/SongRoll/SongRollData.hpp
++++ b/src/SongRoll/SongRollData.hpp
+@@ -1,5 +1,10 @@
+ #include <vector>
+ 
++#include "rack.hpp"
++
++// 通道数（原作者 Section 构造即 resize(8)；对应 MiniArranger 的 4+4 轨）
++#define SONGROLL_CHANNELS 8
++
+ namespace SongRoll {
+ 
+ 
+@@ -13,7 +18,7 @@ namespace SongRoll {
+ 
+     int pattern = 1;
+     int repeats = 1;
+-    eRepeatMode repeat_mode = eRepeatMode::FREE;
++    eRepeatMode repeat_mode = eRepeatMode::REPEATS;
+     int clock_div = 1;
+   };
+ 
+@@ -28,6 +33,8 @@ namespace SongRoll {
+     std::vector<Section> sections;
+     SongRollData();
+     void reset();
++    json_t *toJson();
++    void fromJson(json_t *rootJ);
+   };
+ 
+ }
+diff --git a/src/SongRoll/SongRollModule.cpp b/src/SongRoll/SongRollModule.cpp
+new file mode 100644
+index 0000000..3a16926
+--- /dev/null
++++ b/src/SongRoll/SongRollModule.cpp
+@@ -0,0 +1,103 @@
++#include "../SongRoll/SongRollModule.hpp"
++
++using namespace rack;
++using namespace SongRoll;
++
++SongRollModule::SongRollModule() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS), transport(&songRollData) {
++  onReset();
++}
++
++void SongRollModule::onReset() {
++  transport.reset();
++  songRollData.reset();
++  running = false;
++  enterSection(0);
++}
++
++void SongRollModule::enterSection(int idx) {
++  if (songRollData.sections.empty()) {
++    currentSection = 0;
++    for (int c = 0; c < SONGROLL_CHANNELS; ++c)
++      repeatsLeft[c] = 1;
++    return;
++  }
++  currentSection = clamp(idx, 0, int(songRollData.sections.size()) - 1);
++  const Section &sec = songRollData.sections[currentSection];
++  for (int c = 0; c < SONGROLL_CHANNELS; ++c)
++    repeatsLeft[c] = std::max(1, sec.channels[c].repeats);
++  // 切段当帧刷新输出（PianoRoll 下一帧就吃到新 pattern 号）
++  for (int c = 0; c < SONGROLL_CHANNELS; ++c)
++    outputs[PATTERN_OUTPUT + c].setVoltage(float(sec.channels[c].pattern - 1 + 48) / 12.f);
++  outputs[SECTION_NUM_OUTPUT].setVoltage(float(currentSection));
++}
++
++void SongRollModule::advanceSection() {
++  sectionEndPulse.trigger();
++  int next = currentSection + 1;
++  if (next >= int(songRollData.sections.size())) {
++    songEndPulse.trigger();
++    next = 0;
++  }
++  enterSection(next);
++}
++
++void SongRollModule::process(const ProcessArgs &args) {
++  // RUN：边沿翻转（照 PianoRoll transport.toggleRun）
++  if (runInputTrigger.process(inputs[RUN_INPUT].getVoltage()))
++    running = !running;
++
++  // RESET：边沿回第 0 段（不停 running，照 Hapax）
++  if (resetInputTrigger.process(inputs[RESET_INPUT].getVoltage()))
++    enterSection(0);
++
++  if (songRollData.sections.empty()) {
++    running = false;
++    outputs[SECTION_END_OUTPUT].setVoltage(0.f);
++    outputs[SONG_END_OUTPUT].setVoltage(0.f);
++    outputs[SECTION_NUM_OUTPUT].setVoltage(0.f);
++    return;
++  }
++
++  if (running) {
++    Section &sec = songRollData.sections[currentSection];
++    bool allDone = true;
++    for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
++      ChannelConfig &ch = sec.channels[c];
++      // FREE 模式：该通道不自行完成（段挂起等手动推进）——阶段 3 补 LIMIT 完整语义
++      if (ch.repeat_mode == ChannelConfig::REPEATS &&
++          eopTrigger[c].process(inputs[EOP_INPUT + c].getVoltage())) {
++        repeatsLeft[c] -= 1;
++      }
++      if (repeatsLeft[c] > 0)
++        allDone = false;
++    }
++    if (allDone)
++      advanceSection();
++  }
++
++  outputs[SECTION_END_OUTPUT].setVoltage(sectionEndPulse.process(args.sampleTime) ? 10.f : 0.f);
++  outputs[SONG_END_OUTPUT].setVoltage(songEndPulse.process(args.sampleTime) ? 10.f : 0.f);
++  outputs[SECTION_NUM_OUTPUT].setVoltage(float(currentSection));
++}
++
++json_t *SongRollModule::dataToJson() {
++  json_t *root = json_object();
++  json_object_set_new(root, "songRoll", songRollData.toJson());
++  json_object_set_new(root, "running", json_boolean(running));
++  json_object_set_new(root, "currentSection", json_integer(currentSection));
++  return root;
++}
++
++void SongRollModule::dataFromJson(json_t *rootJ) {
++  if (rootJ == nullptr)
++    return;
++  json_t *sr = json_object_get(rootJ, "songRoll");
++  if (sr != nullptr)
++    songRollData.fromJson(sr);
++  json_t *j = json_object_get(rootJ, "running");
++  if (j != nullptr)
++    running = json_is_true(j);
++  j = json_object_get(rootJ, "currentSection");
++  if (j != nullptr)
++    enterSection(int(json_integer_value(j)));
++}
+diff --git a/src/SongRoll/SongRollModule.cppx b/src/SongRoll/SongRollModule.cppx
+deleted file mode 100644
+index 1038058..0000000
+--- a/src/SongRoll/SongRollModule.cppx
++++ /dev/null
+@@ -1,29 +0,0 @@
+-#include "../SongRoll/SongRollModule.hpp"
+-
+-using namespace rack;
+-using namespace SongRoll;
+-
+-SongRollModule::SongRollModule() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS), runInputActive(false), transport(&songRollData) {
+-}
+-
+-void SongRollModule::onReset() {
+-  transport.reset();
+-  songRollData.reset();
+-}
+-
+-json_t *SongRollModule::dataToJson() {
+-  json_t *rootJ = Module::dataToJson();
+-  if (rootJ == NULL) {
+-      rootJ = json_object();
+-  }
+-
+-  return rootJ;
+-}
+-
+-void SongRollModule::dataFromJson(json_t *rootJ) {
+-  Module::dataFromJson(rootJ);
+-
+-}
+-
+-void SongRollModule::step() {
+-}
 diff --git a/src/SongRoll/SongRollModule.hpp b/src/SongRoll/SongRollModule.hpp
-index dcf6263..230a0a5 100644
+index dcf6263..dd451c3 100644
 --- a/src/SongRoll/SongRollModule.hpp
 +++ b/src/SongRoll/SongRollModule.hpp
-@@ -21,12 +21,12 @@ namespace SongRoll {
+@@ -3,42 +3,64 @@
+ #include "SongRollData.hpp"
+ #include "Transport.hpp"
+ 
+-#include "../ValueChangeTrigger.hpp"
++#include <algorithm>
+ 
+ namespace SongRoll {
+ 
++  // SongRoll = 排歌层：吃各通道的 end-of-pattern 触发，按 sections[] 推进，
++  // 输出每通道的 pattern 号（V/Oct 语义，PianoRoll PATTERN_IN 直接吃）。
++  //
++  // 端口布局（阶段 2；原作者 Rack 1 设计的 CLOCK/PATTERN/RUN/RECORD/VOCT...
++  // 已废——那时它想当完整序列器，现在定位是纯段推进器）：
++  //   IN  RESET(边沿回第0段) / RUN(边沿翻转) / EOP_INPUT+0..7(各通道 EOP 10V 脉冲)
++  //   OUT PATTERN_OUTPUT+0..7(段内各通道 pattern 号) / SECTION_END(段边界脉冲)
++  //       SECTION_NUM(当前段号, 1V/段【 Arrange START 语义待核实】) / SONG_END(回卷脉冲)
+   struct SongRollModule : rack::Module {
+     enum ParamIds {
+       NUM_PARAMS
+     };
+     enum InputIds {
++      RESET_INPUT,
++      RUN_INPUT,
++      EOP_INPUT, EOP_INPUT2, EOP_INPUT3, EOP_INPUT4,
++      EOP_INPUT5, EOP_INPUT6, EOP_INPUT7, EOP_INPUT8,
+       NUM_INPUTS
+     };
+     enum OutputIds {
++      PATTERN_OUTPUT, PATTERN_OUTPUT2, PATTERN_OUTPUT3, PATTERN_OUTPUT4,
++      PATTERN_OUTPUT5, PATTERN_OUTPUT6, PATTERN_OUTPUT7, PATTERN_OUTPUT8,
++      SECTION_END_OUTPUT,
++      SECTION_NUM_OUTPUT,
++      SONG_END_OUTPUT,
+       NUM_OUTPUTS
+     };
+     enum LightIds {
        NUM_LIGHTS
      };
  
 -    rack::SchmittTrigger clockInputTrigger;
 -    rack::SchmittTrigger resetInputTrigger;
 -    rack::SchmittTrigger runInputTrigger;
-+    rack::dsp::SchmittTrigger clockInputTrigger;
+-
+-    ValueChangeTrigger<bool> runInputActive;
+-    rack::RingBuffer<float, 16> clockBuffer;
+-    int clockDelay = 0;
 +    rack::dsp::SchmittTrigger resetInputTrigger;
 +    rack::dsp::SchmittTrigger runInputTrigger;
- 
-     ValueChangeTrigger<bool> runInputActive;
--    rack::RingBuffer<float, 16> clockBuffer;
-+    rack::dsp::RingBuffer<float, 16> clockBuffer;
-     int clockDelay = 0;
++    rack::dsp::SchmittTrigger eopTrigger[SONGROLL_CHANNELS];
++    rack::dsp::PulseGenerator sectionEndPulse;
++    rack::dsp::PulseGenerator songEndPulse;
  
      SongRollData songRollData;
+     Transport transport;
+ 
++    bool running = false;
++    int currentSection = 0;
++    int repeatsLeft[SONGROLL_CHANNELS];
++
+     SongRollModule();
+ 
+-    void step() override;
++    void process(const ProcessArgs &args) override;
+     void onReset() override;
+ 
+     json_t *dataToJson() override;
+     void dataFromJson(json_t *rootJ) override;
++
++    void enterSection(int idx);
++    void advanceSection();
+   };
+ 
+ }
 diff --git a/src/SongRoll/SongRollWidget.cppx b/src/SongRoll/SongRollWidget.cpp.bak-20261024
 similarity index 100%
 rename from src/SongRoll/SongRollWidget.cppx
@@ -80,29 +414,49 @@ rename from src/SongRoll/Transport.cppx
 rename to src/SongRoll/Transport.cpp
 diff --git a/src/SongRollModule.cpp b/src/SongRollModule.cpp
 new file mode 100644
-index 0000000..21ac7ce
+index 0000000..fb3e093
 --- /dev/null
 +++ b/src/SongRollModule.cpp
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,43 @@
 +#include "rack.hpp"
-+#include "dsp/window.hpp"
++#include "window.hpp"
 +
 +#include "plugin.hpp"
 +#include "SongRoll/SongRollModule.hpp"
++
++#include "helpers.hpp"
 +
 +using namespace rack;
 +using namespace SongRoll;
 +
 +extern Plugin* plugin;
 +
-+// Stage-1 minimal widget: SVG panel only.
-+// SongRoll UI widgets are Rack 1-era code (EventDragMove / VirtualWidget /
-+// BaseWidget::dataToJson no longer exist in Rack 2) - parked as
-+// *.cpp.bak-20261024, pending a Rack 2 port. Engine ships first.
++// Stage 2.5: minimal widget + port stubs. The original Rack 1 UI (RollArea etc,
++// parked as *.bak) is not revived yet, but port stubs are mandatory: OSC
++// /cable-add goes through CableWidget::setCable, which locates ports via the
++// ModuleWidget's port child widgets (getInput/getOutput) - no stubs, no cables.
++// Panel res/SongRoll.svg: 158.75 x 100.54 mm = 600 x 380 px = 31HP.
 +struct SongRollWidget : ModuleWidget {
 +	SongRollWidget(SongRollModule* module) {
 +		setModule(module);
 +		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SongRoll.svg")));
++
++		// Input column x=15px: RESET / RUN / EOP1..8 (10 ports, 13px pitch)
++		static const float IN_X = 15.f;
++		static const float IN_Y0 = 20.f, IN_DY = 13.f;
++		addInput(createInput<PJ301MPort>(Vec(IN_X, IN_Y0), module, SongRollModule::RESET_INPUT));
++		addInput(createInput<PJ301MPort>(Vec(IN_X, IN_Y0 + IN_DY), module, SongRollModule::RUN_INPUT));
++		for (int c = 0; c < SONGROLL_CHANNELS; ++c)
++			addInput(createInput<PJ301MPort>(Vec(IN_X, IN_Y0 + (2 + c) * IN_DY), module, SongRollModule::EOP_INPUT + c));
++
++		// Output column x=570px: PATTERN1..8 / SECTION_END / SECTION_NUM / SONG_END (11 ports)
++		static const float OUT_X = 570.f;
++		static const float OUT_Y0 = 20.f, OUT_DY = 13.f;
++		for (int c = 0; c < SONGROLL_CHANNELS; ++c)
++			addOutput(createOutput<PJ301MPort>(Vec(OUT_X, OUT_Y0 + c * OUT_DY), module, SongRollModule::PATTERN_OUTPUT + c));
++		addOutput(createOutput<PJ301MPort>(Vec(OUT_X, OUT_Y0 + 8 * OUT_DY), module, SongRollModule::SECTION_END_OUTPUT));
++		addOutput(createOutput<PJ301MPort>(Vec(OUT_X, OUT_Y0 + 9 * OUT_DY), module, SongRollModule::SECTION_NUM_OUTPUT));
++		addOutput(createOutput<PJ301MPort>(Vec(OUT_X, OUT_Y0 + 10 * OUT_DY), module, SongRollModule::SONG_END_OUTPUT));
 +	}
 +};
 +
