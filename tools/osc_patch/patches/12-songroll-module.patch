@@ -1,15 +1,22 @@
 diff --git a/plugin.json b/plugin.json
-index 2f2efc6..dd16433 100644
+index 2f2efc6..12f8fca 100644
 --- a/plugin.json
 +++ b/plugin.json
-@@ -74,6 +74,7 @@
- 		},
- 		{
- 			"slug": "rcm-pianoroll",
-+			{"slug": "rcm-songroll", "name": "Song Roll", "description": "Song-level section arranger", "tags": ["Sequencer"]},
+@@ -77,6 +77,12 @@
  			"name": "Piano Roll",
  			"description": "Simple Piano Roll for sequencing",
  			"tags": ["Sequencer"]
+-		}
++		},
++			{
++				"slug": "rcm-songroll",
++				"name": "Song Roll",
++				"description": "Song-level section arranger",
++				"tags": ["Sequencer"]
++			}
+ 	]
+ }
+\ No newline at end of file
 diff --git a/src/SongRoll/ClockDivControlWidget.cppx b/src/SongRoll/ClockDivControlWidget.cpp.bak-20261024
 similarity index 100%
 rename from src/SongRoll/ClockDivControlWidget.cppx

@@ -356,6 +356,14 @@ wsl.exe -e bash -lc '
 
 两个 MD5 必须一致。`win64/Cardinal.exe` 是 **JACK 版，别用**。
 
+> 🔴 **plugins 层有改动时（新模块 / 改 manifest），只拷 exe 会起不来**（2026-10-24 SongRoll 复活实炸）：Rack 2 `Plugin.cpp:158` 硬校验「代码里 `addModel` 注册的 Model 必须在 manifest 里，否则启动抛异常终止」——症状 = **只有进程、没有窗口**（32K 内存卡在启动早期，OSC 120 帧延后永远走不到）。运行时 manifest 的唯一来源是 `win64/resources/PluginManifests/<slug>.json`（`bin/` 下不生成它，lv2 布局只在 `make package` 产出）。⇒ plugins 层改动后，exe 之外还要同步：
+> ```bash
+> # 1) manifest：WSL 源码树的 plugin.json → 部署态 PluginManifests（文件名 = 插件目录名！rcm 的目录叫 rcm-modules ⇒ rcm-modules.json）
+> cp ~/Cardinal/plugins/<插件目录>/plugin.json /mnt/d/Cardinal/win64/resources/PluginManifests/<插件目录>.json
+> # 2) 新面板 SVG（若有）：plugins/<插件目录>/res/ → win64/resources/<插件目录>/res/
+> ```
+> 另：plugin.json 加条目时，新对象要插在**模块条目对象的闭合 `}` 之后**——插在对象内部（如 slug 行后）会把 JSON 写坏（dpf 解析报错，编译不读 json 所以不暴露，运行时才炸）。
+
 ---
 
 ### 2.6 第六步：验证（数据为主，画面最后看一眼）
