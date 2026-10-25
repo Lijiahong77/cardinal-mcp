@@ -36,7 +36,10 @@ tools/osc_patch/
 │   ├── 07-c6-write-endpoints.patch C6 写端点修复（4 端点手动执行化）
 │   ├── 08-c3-log-get.patch        C3 日志环形缓冲 + /log-get（含 Rack logger）
 │   ├── 09-c2-load-skipped.patch   C2 /load skipped 收集器 + /load-skipped
-│   └── 10-module-add.patch       M1 /module-add（按 slug + 格坐标加模块）
+│   ├── 10-module-add.patch       M1 /module-add（按 slug + 格坐标加模块）
+│   ├── 11-songroll-build.patch    SongRoll 复活·注册链（Makefile wildcard + addModel）
+│   ├── 12-songroll-module.patch   SongRoll 模块本体（引擎 + UI Rack 2 移植 + 胶文件）
+│   └── 13-songroll-panel.patch    SongRoll 新面板（res/SongRoll.svg 重画 600×380）
 ├── inject_osc_read.py           ┐
 ├── inject_osc_b.py              │
 ├── inject_osc_c.py              ├─ 历史记录：记录每个批次当初改了什么
@@ -110,6 +113,9 @@ CARDINAL_ROOT=/home/lijia/_replay CARDINAL_PATCH_DIR=/home/lijia/_patches \
 | `08-c3-log-get.patch` | Cardinal `8aa0fc7` + 01-07 应用后 | C3：`src/CardinalCommon.cpp`（`/log-get` 端点）+ `src/Rack/src/logger.cpp` + `src/Rack/include/logger.hpp`（进程内日志环形缓冲，2000 条） |
 | `09-c2-load-skipped.patch` | Cardinal `8aa0fc7` + 01-08 应用后 | C2：`src/override/Engine.cpp`（**Cardinal 真正编译的 Engine 副本**）+ `src/Rack/include/engine/Engine.hpp` + `src/Rack/src/patch.cpp` + `src/CardinalCommon.cpp`（`/load` skipped 收集器 + `/load-skipped` 端点） |
 | `10-module-add.patch` | Cardinal `8aa0fc7` + 01-09 应用后 | M1：`src/CardinalCommon.cpp`——`/module-add "sii"`（plugin\|model slug + 格坐标 → 手动执行加模块 + push 记录可 undo）+ 顺带修 JS `cardinal.addModule` 的 push-only 缺陷 |
+| `11-songroll-build.patch` | Cardinal `8aa0fc7` + 01-10 应用后 | SongRoll 复活·注册链：`plugins/Makefile`（SongRoll wildcard）+ `plugins/plugins.cpp`（`addModel(modelSongRollModule)`） |
+| `12-songroll-module.patch` | rcm-modules 子模块 HEAD `c4a243e` | SongRoll 模块本体（**应用根 `plugins/rcm-modules`**）：`.cppx`→`.cpp` 复活 + Rack 2 API 修 + 阶段2 引擎（10/11 端口、EOP 推进、JSON）+ 阶段3 UI 移植 + 胶文件 |
+| `13-songroll-panel.patch` | rcm-modules 子模块 HEAD `c4a243e` + 12 应用后 | SongRoll 新面板（**应用根 `plugins/rcm-modules`**）：`res/SongRoll.svg` 重画 600×380（旧 Inkscape 面板整file替换），端口圆圈图案与真 PortWidget 坐标一一对应 |
 
 ⚠️ **upstream 变了 patch 可能失效**。届时 `git apply --check` 会明确报冲突，
 脚本**立刻停下**（绝不 `--reject` 硬塞）—— 需人工看差异。

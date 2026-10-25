@@ -2548,14 +2548,16 @@ index 6457d04..b458984 100644
  #endif
  
  			internal->generateScreenshotStep = kScreenshotStepNone;
-@@ -909,6 +961,15 @@ void generateScreenshot() {
+@@ -909,6 +961,17 @@ void generateScreenshot() {
  #endif
  }
  
 +// D1: 全尺寸落盘入口。设置目标路径后触发截图，Window__writePngDump 会把
 +// 原始分辨率 PNG 写到该路径（保存分支见上）。
 +void generateScreenshotToFile(const std::string& path) {
++#ifdef STBI_WRITE_NO_STDIO
 +	g_screenshotFilePath = path;
++#endif
 +#ifdef CARDINAL_WINDOW_CAN_GENERATE_SCREENSHOTS
 +	APP->window->internal->generateScreenshotStep = kScreenshotStepStarted;
 +#endif

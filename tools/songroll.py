@@ -10,8 +10,11 @@
     data.currentSection 整数：当前段号（编辑器跟随它）
 
     · 通道数 = 8（SONGROLL_CHANNELS，与 MiniArranger 的 4+4 轨对应）
-    · pattern 1..64（**1-based**）：PATTERN# 输出电压 =(pattern-1+48)/12，
+    · pattern 1..64（**1-based**）：PATTERN# 输出电压 =(pattern-1)/12，
       PianoRoll 的 PATTERN_IN 收成索引 pattern-1（0..63）——两边差 1，别混
+      （PianoRoll: setPattern(clamp(quantizePitch(v)-48,0,63))，而 quantizePitch
+        是 V/Oct 且 0V=C4 ⇒ 净效果 round(v*12) ⇒ 0V 就是 pattern 0；
+        加 48/12 的 C4 偏移会让 pattern 号整体 +48）
     · repeat_mode：0=FREE（不限）1=REPEATS（至少）2=LIMIT（至多）
     · clock_div：0=关，1..64
 

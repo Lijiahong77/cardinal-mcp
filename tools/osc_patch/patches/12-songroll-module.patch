@@ -782,10 +782,10 @@ index c30db27..2e557ad 100644
  }
 diff --git a/src/SongRoll/SongRollData.cpp b/src/SongRoll/SongRollData.cpp
 new file mode 100644
-index 0000000..f06e5bf
+index 0000000..0c1e4e5
 --- /dev/null
 +++ b/src/SongRoll/SongRollData.cpp
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,84 @@
 +#include "../SongRoll/SongRollData.hpp"
 +
 +using namespace SongRoll;
@@ -853,11 +853,14 @@ index 0000000..f06e5bf
 +          continue;
 +        json_t *j;
 +        if ((j = json_object_get(co, "pattern")) != nullptr)
-+          sec.channels[c].pattern = int(json_integer_value(j));
++          sec.channels[c].pattern = rack::math::clamp(int(json_integer_value(j)), 1, 64);
 +        if ((j = json_object_get(co, "repeats")) != nullptr)
 +          sec.channels[c].repeats = int(json_integer_value(j));
-+        if ((j = json_object_get(co, "repeat_mode")) != nullptr)
-+          sec.channels[c].repeat_mode = ChannelConfig::eRepeatMode(int(json_integer_value(j)));
++        if ((j = json_object_get(co, "repeat_mode")) != nullptr) {
++          // clamp 到合法枚举范围：json 里的脏值（如 99）转 eRepeatMode 是 UB
++          const int rm = rack::math::clamp(int(json_integer_value(j)), 0, 2);
++          sec.channels[c].repeat_mode = ChannelConfig::eRepeatMode(rm);
++        }
 +        if ((j = json_object_get(co, "clock_div")) != nullptr)
 +          sec.channels[c].clock_div = int(json_integer_value(j));
 +      }
@@ -924,24 +927,43 @@ index 64320c0..2043206 100644
  }
 diff --git a/src/SongRoll/SongRollModule.cpp b/src/SongRoll/SongRollModule.cpp
 new file mode 100644
-index 0000000..acb7c04
+index 0000000..1624fe9
 --- /dev/null
 +++ b/src/SongRoll/SongRollModule.cpp
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,149 @@
 +#include "SongRollModule.hpp"
 +
 +using namespace rack;
 +using namespace SongRoll;
 +
-+SongRollModule::SongRollModule() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS), transport(&songRollData) {
-+  onReset();
-+}
-+
-+void SongRollModule::onReset() {
++void SongRollModule::resetState() {
 +  transport.reset();
 +  songRollData.reset();
 +  running = false;
 +  enterSection(0);
++}
++
++SongRollModule::SongRollModule() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS), transport(&songRollData) {
++  // Port names + descriptions. These are what PortTooltip shows on hover.
++  configInput(RESET_INPUT, "Reset")->description = "Trigger jumps back to section 1";
++  configInput(RUN_INPUT, "Run")->description = "Trigger toggles run / stop";
++  for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
++    configInput(EOP_INPUT + c, string::f("EOP %d", c + 1))
++        ->description = string::f("End-of-pattern trigger from channel %d (PianoRoll EOP out)", c + 1);
++  }
++  for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
++    configOutput(PATTERN_OUTPUT + c, string::f("Pattern %d", c + 1))
++        ->description = string::f("Pattern number for channel %d, 1/12V per pattern (0V = pattern 1, 1/12V = pattern 2 ...)", c + 1);
++  }
++  configOutput(SECTION_END_OUTPUT, "Section end")->description = "10V pulse at every section boundary";
++  configOutput(SECTION_NUM_OUTPUT, "Section num")->description = "Current section number (1V per section)";
++  configOutput(SONG_END_OUTPUT, "Song end")->description = "10V pulse when the song wraps back to section 1";
++
++  resetState();
++}
++
++void SongRollModule::onReset(const ResetEvent &e) {
++  resetState();
 +}
 +
 +void SongRollModule::enterSection(int idx) {
@@ -957,7 +979,10 @@ index 0000000..acb7c04
 +    repeatsLeft[c] = std::max(1, sec.channels[c].repeats);
 +  // 切段当帧刷新输出（PianoRoll 下一帧就吃到新 pattern 号）
 +  for (int c = 0; c < SONGROLL_CHANNELS; ++c)
-+    outputs[PATTERN_OUTPUT + c].setVoltage(float(sec.channels[c].pattern - 1 + 48) / 12.f);
++    // PATTERN_OUTPUT 走 PianoRoll 的 PATTERN_INPUT 语义：
++        //   quantizePitch(v) - 48 == round(v*12)  =>  0V = pattern 0（1-based 的 pattern 1）
++        //   每 1/12 V 递增一个 pattern；不能加 48/12 的 C4 偏移，否则 pattern 号整体 +48
++        outputs[PATTERN_OUTPUT + c].setVoltage(float(sec.channels[c].pattern - 1) / 12.f);
 +  outputs[SECTION_NUM_OUTPUT].setVoltage(float(currentSection));
 +}
 +
@@ -982,11 +1007,35 @@ index 0000000..acb7c04
 +
 +  if (songRollData.sections.empty()) {
 +    running = false;
++    for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
++      outputs[PATTERN_OUTPUT + c].setChannels(1);
++      outputs[PATTERN_OUTPUT + c].setVoltage(0.f);
++    }
++    outputs[SECTION_END_OUTPUT].setChannels(1);
 +    outputs[SECTION_END_OUTPUT].setVoltage(0.f);
++    outputs[SONG_END_OUTPUT].setChannels(1);
 +    outputs[SONG_END_OUTPUT].setVoltage(0.f);
++    outputs[SECTION_NUM_OUTPUT].setChannels(1);
 +    outputs[SECTION_NUM_OUTPUT].setVoltage(0.f);
 +    return;
 +  }
++
++  // 每帧刷新 PATTERN 输出：Rack 的 Engine_updateConnected() 会在任何 cable
++  // 增删时把「未接线的端口」电压全部清零（Port_setDisconnected），而切段
++  // 之间不会有 enterSection() 来重设，输出就会永久停在 0V。每帧重写可自愈。
++  {
++    const Section &sec = songRollData.sections[currentSection];
++    for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
++      outputs[PATTERN_OUTPUT + c].setChannels(1);
++      // PATTERN_OUTPUT 走 PianoRoll 的 PATTERN_INPUT 语义：
++        //   quantizePitch(v) - 48 == round(v*12)  =>  0V = pattern 0（1-based 的 pattern 1）
++        //   每 1/12 V 递增一个 pattern；不能加 48/12 的 C4 偏移，否则 pattern 号整体 +48
++        outputs[PATTERN_OUTPUT + c].setVoltage(float(sec.channels[c].pattern - 1) / 12.f);
++    }
++  }
++  outputs[SECTION_END_OUTPUT].setChannels(1);
++  outputs[SECTION_NUM_OUTPUT].setChannels(1);
++  outputs[SONG_END_OUTPUT].setChannels(1);
 +
 +  if (running) {
 +    Section &sec = songRollData.sections[currentSection];
@@ -1067,10 +1116,10 @@ index 1038058..0000000
 -void SongRollModule::step() {
 -}
 diff --git a/src/SongRoll/SongRollModule.hpp b/src/SongRoll/SongRollModule.hpp
-index dcf6263..dd451c3 100644
+index dcf6263..0f1a864 100644
 --- a/src/SongRoll/SongRollModule.hpp
 +++ b/src/SongRoll/SongRollModule.hpp
-@@ -3,42 +3,64 @@
+@@ -3,42 +3,67 @@
  #include "SongRollData.hpp"
  #include "Transport.hpp"
  
@@ -1133,23 +1182,27 @@ index dcf6263..dd451c3 100644
      SongRollModule();
  
 -    void step() override;
+-    void onReset() override;
 +    void process(const ProcessArgs &args) override;
-     void onReset() override;
++    void onReset(const ResetEvent &e) override;
  
      json_t *dataToJson() override;
      void dataFromJson(json_t *rootJ) override;
 +
 +    void enterSection(int idx);
 +    void advanceSection();
++
++  private:
++    void resetState();
    };
  
  }
 diff --git a/src/SongRoll/SongRollWidget.cpp b/src/SongRoll/SongRollWidget.cpp
 new file mode 100644
-index 0000000..32af257
+index 0000000..ae02112
 --- /dev/null
 +++ b/src/SongRoll/SongRollWidget.cpp
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,113 @@
 +#include "rack.hpp"
 +#include "window.hpp"
 +#include "helpers.hpp"
@@ -1165,31 +1218,49 @@ index 0000000..32af257
 +
 +extern Plugin* plugin;
 +
-+SongRollWidget::SongRollWidget(SongRollModule* module) {
-+  this->module = module;
++// standalone module for the module browser
++// ModelBox::createPreview() 会调 createModuleWidget(NULL)，module 为 NULL 时
++// 若直接传给 RollArea 会解引用 NULL 崩溃（浏览器一搜索就崩的根因）。
++// static 避免与 PianoRollWidget.cpp 里同名的全局 browserModule 冲突。
++static SongRollModule browserModule;
 +
-+  backgroundHue = 0.33f;
-+  backgroundSaturation = 1.f;
-+  backgroundLuminosity = 0.25f;
++SongRollWidget::SongRollWidget(SongRollModule* module) {
++  setModule(module);
++  SongRollModule* originalmodule = module;
++  module = this->module = module == NULL ? &browserModule : module;
++
++  // 背景色写基类 colourData：BaseWidget::draw() 用的就是它，
++  // 若用子类同名成员会导致「同属性画两遍、颜色还不一致」。
++  colourData.backgroundHue = 0.33f;
++  colourData.backgroundSaturation = 1.f;
++  colourData.backgroundLuminosity = 0.25f;
 +
 +  setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SongRoll.svg")));
 +
-+  // 输入列 x=15px：RESET / RUN / EOP1..8
-+  static const float IN_X = 15.f;
-+  static const float IN_Y0 = 20.f, IN_DY = 13.f;
-+  addInput(createInput<PJ301MPort>(Vec(IN_X, IN_Y0), module, SongRollModule::RESET_INPUT));
-+  addInput(createInput<PJ301MPort>(Vec(IN_X, IN_Y0 + IN_DY), module, SongRollModule::RUN_INPUT));
-+  for (int c = 0; c < SONGROLL_CHANNELS; ++c)
-+    addInput(createInput<PJ301MPort>(Vec(IN_X, IN_Y0 + (2 + c) * IN_DY), module, SongRollModule::EOP_INPUT + c));
++  // 输入：左区 2 列 x 5 行（RESET/RUN/EOP1-3 在 x=16，EOP4-8 在 x=52）
++  addInput(createInput<PJ301MPort>(Vec(16, 45),  originalmodule, SongRollModule::RESET_INPUT));
++  addInput(createInput<PJ301MPort>(Vec(16, 100), originalmodule, SongRollModule::RUN_INPUT));
++  addInput(createInput<PJ301MPort>(Vec(16, 155), originalmodule, SongRollModule::EOP_INPUT + 0));
++  addInput(createInput<PJ301MPort>(Vec(16, 210), originalmodule, SongRollModule::EOP_INPUT + 1));
++  addInput(createInput<PJ301MPort>(Vec(16, 265), originalmodule, SongRollModule::EOP_INPUT + 2));
++  addInput(createInput<PJ301MPort>(Vec(52, 45),  originalmodule, SongRollModule::EOP_INPUT + 3));
++  addInput(createInput<PJ301MPort>(Vec(52, 100), originalmodule, SongRollModule::EOP_INPUT + 4));
++  addInput(createInput<PJ301MPort>(Vec(52, 155), originalmodule, SongRollModule::EOP_INPUT + 5));
++  addInput(createInput<PJ301MPort>(Vec(52, 210), originalmodule, SongRollModule::EOP_INPUT + 6));
++  addInput(createInput<PJ301MPort>(Vec(52, 265), originalmodule, SongRollModule::EOP_INPUT + 7));
 +
-+  // 输出列 x=570px：PATTERN1..8 / SECTION_END / SECTION_NUM / SONG_END
-+  static const float OUT_X = 570.f;
-+  static const float OUT_Y0 = 20.f, OUT_DY = 13.f;
-+  for (int c = 0; c < SONGROLL_CHANNELS; ++c)
-+    addOutput(createOutput<PJ301MPort>(Vec(OUT_X, OUT_Y0 + c * OUT_DY), module, SongRollModule::PATTERN_OUTPUT + c));
-+  addOutput(createOutput<PJ301MPort>(Vec(OUT_X, OUT_Y0 + 8 * OUT_DY), module, SongRollModule::SECTION_END_OUTPUT));
-+  addOutput(createOutput<PJ301MPort>(Vec(OUT_X, OUT_Y0 + 9 * OUT_DY), module, SongRollModule::SECTION_NUM_OUTPUT));
-+  addOutput(createOutput<PJ301MPort>(Vec(OUT_X, OUT_Y0 + 10 * OUT_DY), module, SongRollModule::SONG_END_OUTPUT));
++  // 输出：右区 2 列 x 6 行（P1-6 在 x=530，P7/P8/SEC_END/SEC_NUM/SONG_END 在 x=570）
++  addOutput(createOutput<PJ301MPort>(Vec(530, 40),  originalmodule, SongRollModule::PATTERN_OUTPUT + 0));
++  addOutput(createOutput<PJ301MPort>(Vec(530, 84),  originalmodule, SongRollModule::PATTERN_OUTPUT + 1));
++  addOutput(createOutput<PJ301MPort>(Vec(530, 128), originalmodule, SongRollModule::PATTERN_OUTPUT + 2));
++  addOutput(createOutput<PJ301MPort>(Vec(530, 172), originalmodule, SongRollModule::PATTERN_OUTPUT + 3));
++  addOutput(createOutput<PJ301MPort>(Vec(530, 216), originalmodule, SongRollModule::PATTERN_OUTPUT + 4));
++  addOutput(createOutput<PJ301MPort>(Vec(530, 260), originalmodule, SongRollModule::PATTERN_OUTPUT + 5));
++  addOutput(createOutput<PJ301MPort>(Vec(570, 40),  originalmodule, SongRollModule::PATTERN_OUTPUT + 6));
++  addOutput(createOutput<PJ301MPort>(Vec(570, 84),  originalmodule, SongRollModule::PATTERN_OUTPUT + 7));
++  addOutput(createOutput<PJ301MPort>(Vec(570, 128), originalmodule, SongRollModule::SECTION_END_OUTPUT));
++  addOutput(createOutput<PJ301MPort>(Vec(570, 172), originalmodule, SongRollModule::SECTION_NUM_OUTPUT));
++  addOutput(createOutput<PJ301MPort>(Vec(570, 216), originalmodule, SongRollModule::SONG_END_OUTPUT));
 +
 +  auto* rollArea = new RollArea(getRollArea(), module);
 +  addChild(rollArea);
@@ -1199,12 +1270,13 @@ index 0000000..32af257
 +}
 +
 +Rect SongRollWidget::getRollArea() {
-+  return Rect(Vec(16, 380 - 218 - 145), Vec(477, 217));
++  return Rect(Vec(74, 30), Vec(434, 270));
 +}
 +
 +void SongRollWidget::drawBackgroundColour(NVGcontext* ctx) {
 +  nvgBeginPath(ctx);
-+  nvgFillColor(ctx, nvgHSL(backgroundHue, backgroundSaturation, backgroundLuminosity));
++  nvgFillColor(ctx, nvgHSL(colourData.backgroundHue, colourData.backgroundSaturation,
++                            colourData.backgroundLuminosity));
 +  nvgRect(ctx, 0, 0, box.size.x, box.size.y);
 +  nvgFill(ctx);
 +}
@@ -1249,10 +1321,10 @@ similarity index 100%
 rename from src/SongRoll/SongRollWidget.cppx
 rename to src/SongRoll/SongRollWidget.cpp.bak-20261024
 diff --git a/src/SongRoll/SongRollWidget.hpp b/src/SongRoll/SongRollWidget.hpp
-index 270d70f..699c7d2 100644
+index 270d70f..983afd4 100644
 --- a/src/SongRoll/SongRollWidget.hpp
 +++ b/src/SongRoll/SongRollWidget.hpp
-@@ -1,39 +1,29 @@
+@@ -1,39 +1,25 @@
 -#include <tuple>
 -#include <limits>
 -
@@ -1272,17 +1344,13 @@ index 270d70f..699c7d2 100644
      SongRollModule* module;
  
 -    SongRollWidget(SongRollModule *module);
-+    float backgroundHue = 0.33f;
-+    float backgroundSaturation = 1.f;
-+    float backgroundLuminosity = 0.25f;
- 
--    Rect getRollArea();
 +    SongRollWidget(SongRollModule* module);
+ 
+     Rect getRollArea();
  
 -    void drawBackgroundColour(NVGcontext* ctx);
 -    void drawPatternEditors(NVGcontext* ctx);
-+    Rect getRollArea();
- 
+-
 -    // Event Handlers
 +    void drawBackgroundColour(NVGcontext* vg);
 +    void drawPatternEditors(NVGcontext* vg);

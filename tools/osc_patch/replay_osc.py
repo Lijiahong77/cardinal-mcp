@@ -33,6 +33,7 @@
   | 10 | 10-module-add.patch | `src/CardinalCommon.cpp`（`/module-add` 端点：按 plugin\|model slug + 格坐标加模块；顺带修 JS `addModule` 的 push-only 缺陷） | Cardinal `8aa0fc7` + 01-09 应用后 |
 | 11 | 11-songroll-build.patch | `plugins/Makefile`（SongRoll wildcard）+ `plugins/plugins.cpp`（`addModel(modelSongRollModule)`） | Cardinal `8aa0fc7` + 01-10 应用后 |
 | 12 | 12-songroll-module.patch | SongRoll 复活+阶段2/3（**rcm-modules 子模块**，应用根 `plugins/rcm-modules`）：`.cppx` 复活为 `.cpp`（Data/Module/Transport）+ Rack 2 API 修（`rack::dsp::` 全限定）+ 阶段2引擎（10/11 端口+EOP 推进+JSON）+ 阶段3 UI 移植（Rack 1→2：VirtualWidget→Widget、onMouseDown→onButton、SequentialLayout Vec spacing、事件直改 data+push undo）+ 胶文件重写 | 子模块 HEAD `c4a243e` |
+| 13 | 13-songroll-panel.patch | SongRoll **新面板**（**rcm-modules 子模块**，应用根 `plugins/rcm-modules`）：`res/SongRoll.svg` 重画为 600×380（旧 Inkscape 面板整file替换）——端口圆圈图案与真 PortWidget 坐标一一对应，消除「图案与端口不符 + 底部截断」 | 子模块 HEAD `c4a243e` + 12 应用后 |
 
 ★ 幂等
   每一组都先 `git apply --check`：能干净应用 ⇒ 跳过（已应用过）；
@@ -104,6 +105,7 @@ PATCHES = [
     ("10-module-add.patch", "M1 /module-add 端点（slug + 格坐标加模块）+ JS addModule 修复", ""),
     ("11-songroll-build.patch", "SongRoll 复活·注册链：Makefile wildcard + plugins.cpp addModel", ""),
     ("12-songroll-module.patch", "SongRoll 复活+阶段2/3·模块本体（rcm-modules 子模块）：引擎（10/11 端口+EOP 推进+JSON）+ UI Rack 2 移植 + 胶文件", "plugins/rcm-modules"),
+    ("13-songroll-panel.patch", "SongRoll 新面板（rcm-modules 子模块）：res/SongRoll.svg 重画 600×380，端口图案与真 PortWidget 坐标一一对应", "plugins/rcm-modules"),
 ]
 
 # 幂等兜底标记：多层 patch 叠同一文件时（01/05/06/07/09/10 全改
