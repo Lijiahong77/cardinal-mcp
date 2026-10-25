@@ -2468,7 +2468,7 @@ index 6457d04..b458984 100644
  static void Window__writeImagePNG(void* context, void* data, int size) {
  	USE_NAMESPACE_DISTRHO
  	CardinalBaseUI* const ui = static_cast<CardinalBaseUI*>(context);
-@@ -715,26 +726,67 @@ void Window::step() {
+@@ -715,26 +726,69 @@ void Window::step() {
  		constexpr const int depth = 3;
  #endif
  
@@ -2507,6 +2507,8 @@ index 6457d04..b458984 100644
 +			// returns, and JUCE swaps the buffers after that. So while we are here no
 +			// buffer holds the picture yet => wait one more frame and read the FRONT
 +			// buffer, which by then holds the previous frame (rasterized + swapped).
++			// Fix skew: 3 bytes/px rows must not be padded to 4-byte alignment by GL.
++			glPixelStorei(GL_PACK_ALIGNMENT, 1);
 +			glReadBuffer(GL_FRONT);
 +			glReadPixels(0, 0, fbWidth, fbHeight, depth == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 +		}
