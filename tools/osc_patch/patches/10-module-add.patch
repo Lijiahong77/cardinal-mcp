@@ -2,7 +2,7 @@ diff --git a/src/CardinalCommon.cpp b/src/CardinalCommon.cpp
 index a326f5b..c948d77 100644
 --- a/src/CardinalCommon.cpp
 +++ b/src/CardinalCommon.cpp
-@@ -1664,6 +1664,131 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
+@@ -1664,40 +1664,132 @@ static int osc_module_move_handler(const char*, const char* types, lo_arg** argv
      return 0;
  }
  
@@ -97,44 +97,45 @@ index a326f5b..c948d77 100644
 +}
 +// ==== CARDINAL-MCP-MODULE-ADD-END ====
 +
-+// ==== CARDINAL-MCP-C2-LOAD-SKIPPED-BEGIN ====
-+// ------------------------------------------------------------ /load-skipped
-+// C2 (2026-10-22): 读上一次 /load 被跳过的模块/线。
-+// 无参。回复: /resp "load-skipped" "<n>|kind:id:reason,kind:id:reason,..."
-+// reason 已消毒（: , | 换行替换为 _）并截断 80 字符，防止破坏分隔格式。
-+// 与 warningLog 互补：那里是异常文本，这里带 id 和 kind 的结构化清单。
-+static int osc_load_skipped_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
-+{
-+    d_debug("osc_load_skipped_handler()");
-+    DISTRHO_SAFE_ASSERT_RETURN(argc == 0, 0);
+ // ==== CARDINAL-MCP-C2-LOAD-SKIPPED-BEGIN ====
+ // ------------------------------------------------------------ /load-skipped
+ // C2 (2026-10-22): 读上一次 /load 被跳过的模块/线。
+ // 无参。回复: /resp "load-skipped" "<n>|kind:id:reason,kind:id:reason,..."
+ // reason 已消毒（: , | 换行替换为 _）并截断 80 字符，防止破坏分隔格式。
+ // 与 warningLog 互补：那里是异常文本，这里带 id 和 kind 的结构化清单。
+ static int osc_load_skipped_handler(const char*, const char* types, lo_arg** argv, int argc, const lo_message m, void* const self)
+ {
+     d_debug("osc_load_skipped_handler()");
+     DISTRHO_SAFE_ASSERT_RETURN(argc == 0, 0);
+ 
+     const lo_address source = lo_message_get_source(m);
+     const lo_server server = static_cast<Initializer*>(self)->oscServer;
+ 
+     const std::vector<rack::LoadSkip> skips = rack::getLoadSkips();
+     std::string items;
+     for (size_t i = 0; i < skips.size(); ++i)
+     {
+         if (i)
+             items += ",";
+         std::string reason = skips[i].reason;
+         for (char& ch : reason)
+             if (ch == ':' || ch == ',' || ch == '|' || ch == '\n' || ch == '\r')
+                 ch = '_';
+         if (reason.size() > 80)
+             reason.resize(80);
+         items += skips[i].kind + ":" + std::to_string(skips[i].id) + ":" + reason;
+     }
+     const std::string payload = std::to_string(skips.size()) + "|" + items;
+     cardinalOscReply(source, server, "load-skipped", payload, "ok");
+     return 0;
+ }
+ // ==== CARDINAL-MCP-C2-LOAD-SKIPPED-END ====
 +
-+    const lo_address source = lo_message_get_source(m);
-+    const lo_server server = static_cast<Initializer*>(self)->oscServer;
-+
-+    const std::vector<rack::LoadSkip> skips = rack::getLoadSkips();
-+    std::string items;
-+    for (size_t i = 0; i < skips.size(); ++i)
-+    {
-+        if (i)
-+            items += ",";
-+        std::string reason = skips[i].reason;
-+        for (char& ch : reason)
-+            if (ch == ':' || ch == ',' || ch == '|' || ch == '\n' || ch == '\r')
-+                ch = '_';
-+        if (reason.size() > 80)
-+            reason.resize(80);
-+        items += skips[i].kind + ":" + std::to_string(skips[i].id) + ":" + reason;
-+    }
-+    const std::string payload = std::to_string(skips.size()) + "|" + items;
-+    cardinalOscReply(source, server, "load-skipped", payload, "ok");
-+    return 0;
-+}
-+// ==== CARDINAL-MCP-C2-LOAD-SKIPPED-END ====
-+
+ 
  // ==== CARDINAL-MCP-C3-LOG-GET-BEGIN ====
  // ------------------------------------------------------------ /log-get
  // C3 (2026-10-22): 增量读进程内日志环形缓冲。
-@@ -2204,9 +2329,17 @@ static JSValue jsApiAddModule(JSContext* ctx, JSValueConst this_val, int argc, J
+@@ -2238,9 +2330,17 @@ static JSValue jsApiAddModule(JSContext* ctx, JSValueConst this_val, int argc, J
      }
      if (model == NULL)
          return JS_ThrowInternalError(ctx, "no model (need plugin|model full slug)");
@@ -155,29 +156,35 @@ index a326f5b..c948d77 100644
      APP->history->push(a);
      return JS_NewStringLen(ctx, "ok", 2);
  }
-@@ -2491,6 +2624,8 @@ static int osc_js_list_handler(const char*, const char*, lo_arg**, int, const lo
+@@ -2525,10 +2625,12 @@ static int osc_js_list_handler(const char*, const char*, lo_arg**, int, const lo
  
  // ==== CARDINAL-MCP-C-GROUP-END ====
  
 +
 +
+ 
+ 
+ 
+ 
  static int osc_fallback_handler(const char* const path, const char* const types, lo_arg**, int, lo_message, void*)
  {
      d_stderr("Cardinal OSC unhandled message \"%s\" with types \"%s\"", path, types);
-@@ -2981,6 +3116,8 @@ void Initializer::loadSettings(const bool isRealInstance)
+@@ -3019,7 +3121,8 @@ void Initializer::loadSettings(const bool isRealInstance)
      REG("/module-move", "hii", osc_module_move_handler) \
      REG("/module-copy", "hi", osc_module_copy_handler) \
      REG("/log-get", "ii", osc_log_get_handler) \
-+    REG("/load-skipped", "", osc_load_skipped_handler) \
+     REG("/load-skipped", "", osc_load_skipped_handler) \
 +    REG("/module-add", "sii", osc_module_add_handler) \
      REG("/midi-out", "iiii", osc_midi_out_handler) \
      REG("/osc-js-run", "i", osc_js_run_handler) \
      REG("/osc-js-list", "", osc_js_list_handler) \
-@@ -3291,6 +3428,7 @@ void loadTemplate(const bool factory)
+@@ -3330,8 +3433,9 @@ void loadTemplate(const bool factory)
              remoteUtils::sendFullPatchToRemote(remoteDetails);
  }
  
 +
+ 
+ 
  void loadTemplateDialog(const bool factory)
  {
  #ifndef HEADLESS_BEHAVIOUR

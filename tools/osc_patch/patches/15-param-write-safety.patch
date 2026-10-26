@@ -1,0 +1,187 @@
+diff --git a/src/CardinalCommon.cpp b/src/CardinalCommon.cpp
+--- a/src/CardinalCommon.cpp
++++ b/src/CardinalCommon.cpp
+@@ -15,6 +15,7 @@
+  */
+ 
+ #include "CardinalCommon.hpp"
++#include "ParamWriteSafety.hpp"
+ 
+ // B 组前置声明（全局作用域；由 inject_osc_b.py 插入）
+ namespace rack { namespace plugin {
+@@ -1238,14 +1239,12 @@
+ 
+     std::string payload;
+     const char* status = "ok";
+-    rack::engine::Module* const module = context->engine->getModule(moduleId);
+-    rack::engine::ParamQuantity* const pq = module != NULL
+-        ? module->getParamQuantity(paramId) : NULL;
+-    if (pq != NULL)
+-    {
+-        const float oldValue = pq->getValue();
+-        pq->setDisplayValue(displayValue);   // 引擎按量纲换算存储值（275ms→0.275）
+-        const float newValue = pq->getValue();
++    const auto result = rack::engine::Engine_writeParamById(
++        context->engine, moduleId, paramId, displayValue, true);
++    if (result.status == rack::engine::ParamWriteStatus::Ok)
++    {
++        const float oldValue = result.oldValue;
++        const float newValue = result.newValue;
+         rack::history::ParamChange* a = new rack::history::ParamChange;
+         a->moduleId = moduleId;
+         a->paramId = paramId;
+@@ -1256,7 +1255,7 @@
+     }
+     else
+     {
+-        if (module == NULL)
++        if (result.status == rack::engine::ParamWriteStatus::NoModule)
+         {
+             payload = "no-module";
+             status = "err:E_NO_MODULE";
+@@ -2260,13 +2259,12 @@
+     CardinalBasePlugin* const plugin = static_cast<Initializer*>(g_osc_js_self)->remotePluginInstance;
+     if (plugin == nullptr)
+         return JS_ThrowInternalError(ctx, "no plugin");
+-    rack::engine::Module* const module = plugin->context->engine->getModule(mid);
+-    rack::engine::ParamQuantity* const pq = module != NULL ? module->getParamQuantity(pid) : NULL;
+-    if (pq == NULL)
++    const auto result = rack::engine::Engine_writeParamById(
++        plugin->context->engine, mid, pid, (float) dv, true);
++    if (result.status != rack::engine::ParamWriteStatus::Ok)
+         return JS_ThrowInternalError(ctx, "no module/param");
+-    const float oldValue = pq->getValue();
+-    pq->setDisplayValue((float) dv);
+-    const float newValue = pq->getValue();
++    const float oldValue = result.oldValue;
++    const float newValue = result.newValue;
+     rack::history::ParamChange* a = new rack::history::ParamChange;
+     a->moduleId = mid; a->paramId = pid; a->oldValue = oldValue; a->newValue = newValue;
+     APP->history->push(a);
+@@ -2744,10 +2742,10 @@
+         rack::contextSet(context);
+        #endif
+ 
+-        rack::engine::Module* const module = context->engine->getModule(moduleId);
+-        DISTRHO_SAFE_ASSERT_RETURN(module != nullptr, 0);
+-
+-        context->engine->setParamValue(module, paramId, paramValue);
++        // Keep raw /param's no-reply protocol and raw value semantics.
++        // Lookup and write share one engine lifetime lock.
++        rack::engine::Engine_writeParamById(
++            context->engine, moduleId, paramId, paramValue, false);
+ 
+        #ifdef CARDINAL_INIT_OSC_THREAD
+         rack::contextSet(nullptr);
+diff --git a/src/override/Engine.cpp b/src/override/Engine.cpp
+--- a/src/override/Engine.cpp
++++ b/src/override/Engine.cpp
+@@ -39,6 +39,7 @@
+ #endif
+ 
+ #include "../CardinalRemote.hpp"
++#include "../ParamWriteSafety.hpp"
+ #include "DistrhoUtils.hpp"
+ 
+ 
+@@ -1077,7 +1078,43 @@
+ }
+ 
+ 
++static bool Engine_isValidParam(Module* module, int paramId) {
++	return module != nullptr && paramId >= 0
++		&& static_cast<std::size_t>(paramId) < module->params.size();
++}
++
++
++ParamWriteResult Engine_writeParamById(Engine* engine, int64_t moduleId,
++                                      int paramId, float value, bool display) {
++	if (engine == nullptr)
++		return {ParamWriteStatus::NoModule};
++	// Control-thread operation only. Serialize with removal and stepBlock;
++	// the legacy pointer-based setters stay non-locking for DSP callers.
++	std::lock_guard<SharedMutex> lock(engine->internal->mutex);
++	Module* module = engine->getModule_NoLock(moduleId);
++	if (module == nullptr)
++		return {ParamWriteStatus::NoModule};
++	if (!Engine_isValidParam(module, paramId))
++		return {ParamWriteStatus::BadParam};
++	if (!display) {
++		const float oldValue = engine->getParamValue(module, paramId);
++		engine->setParamValue(module, paramId, value);
++		return {ParamWriteStatus::Ok, oldValue, engine->getParamValue(module, paramId)};
++	}
++	if (static_cast<std::size_t>(paramId) >= module->paramQuantities.size())
++		return {ParamWriteStatus::BadParam};
++	ParamQuantity* pq = module->getParamQuantity(paramId);
++	if (pq == nullptr)
++		return {ParamWriteStatus::BadParam};
++	const float oldValue = pq->getValue();
++	pq->setDisplayValue(value);
++	return {ParamWriteStatus::Ok, oldValue, pq->getValue()};
++}
++
++
+ void Engine::setParamValue(Module* module, int paramId, float value) {
++	if (!Engine_isValidParam(module, paramId))
++		return;
+ 	// If param is being smoothed, cancel smoothing.
+ 	if (internal->smoothModule == module && internal->smoothParamId == paramId) {
+ 		internal->smoothModule = NULL;
+@@ -1091,14 +1128,19 @@
+ 
+ 
+ float Engine::getParamValue(Module* module, int paramId) {
++	if (!Engine_isValidParam(module, paramId))
++		return 0.f;
+ 	return module->params[paramId].getValue();
+ }
+ 
+ 
+ void Engine::setParamSmoothValue(Module* module, int paramId, float value) {
++	if (!Engine_isValidParam(module, paramId))
++		return;
+ 	// If another param is being smoothed, jump value
+ 	if (internal->smoothModule && !(internal->smoothModule == module && internal->smoothParamId == paramId)) {
+-		internal->smoothModule->params[internal->smoothParamId].setValue(internal->smoothValue);
++		if (Engine_isValidParam(internal->smoothModule, internal->smoothParamId))
++			internal->smoothModule->params[internal->smoothParamId].setValue(internal->smoothValue);
+ 	}
+ 	internal->smoothParamId = paramId;
+ 	internal->smoothValue = value;
+@@ -1108,6 +1150,8 @@
+ 
+ 
+ float Engine::getParamSmoothValue(Module* module, int paramId) {
++	if (!Engine_isValidParam(module, paramId))
++		return 0.f;
+ 	if (internal->smoothModule == module && internal->smoothParamId == paramId)
+ 		return internal->smoothValue;
+ 	return module->params[paramId].getValue();
+diff --git a/src/ParamWriteSafety.hpp b/src/ParamWriteSafety.hpp
+new file mode 100644
+--- /dev/null
++++ b/src/ParamWriteSafety.hpp
+@@ -0,0 +1,22 @@
++// Internal Cardinal control-thread entry point; not a Rack Engine ABI change.
++#pragma once
++#include <cstdint>
++
++namespace rack {
++namespace engine {
++struct Engine;
++enum class ParamWriteStatus { Ok, NoModule, BadParam };
++struct ParamWriteResult {
++    ParamWriteStatus status;
++    float oldValue;
++    float newValue;
++    ParamWriteResult(ParamWriteStatus status_, float oldValue_ = 0.f,
++                     float newValue_ = 0.f)
++        : status(status_), oldValue(oldValue_), newValue(newValue_) {}
++};
++// Holds the engine lifetime lock through lookup, conversion and write.
++// Call without already holding the engine mutex (OSC/JS control entry only).
++ParamWriteResult Engine_writeParamById(Engine* engine, int64_t moduleId,
++                                      int paramId, float value, bool display);
++}
++}

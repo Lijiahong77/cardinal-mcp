@@ -1,0 +1,358 @@
+diff --git a/src/SongRoll/ClockDivControlWidget.cpp b/src/SongRoll/ClockDivControlWidget.cpp
+--- a/src/SongRoll/ClockDivControlWidget.cpp
++++ b/src/SongRoll/ClockDivControlWidget.cpp
+@@ -99,6 +99,7 @@
+     if (module == nullptr)
+       return;
+ 
++    std::unique_lock<std::recursive_mutex> lock(module->stateMutex);
+     SongRollData& data = module->songRollData;
+     if (data.sections.empty())
+       return;
+@@ -112,7 +113,9 @@
+     else if (plus.contains(e.pos))
+       clock_div = clamp(clock_div + 1, 0, 64);
+     data.sections[sec].channels[channel].clock_div = clock_div;
++    module->stopFirst();
+     json_t* newModuleJ = module->toJson();
++    lock.unlock();
+ 
+     history::ModuleChange* h = new history::ModuleChange;
+     h->name = "change clock div";
+diff --git a/src/SongRoll/PatternControllerSlice.cpp b/src/SongRoll/PatternControllerSlice.cpp
+--- a/src/SongRoll/PatternControllerSlice.cpp
++++ b/src/SongRoll/PatternControllerSlice.cpp
+@@ -40,8 +40,10 @@
+       Widget::step();
+       return;
+     }
++    std::unique_lock<std::recursive_mutex> lock(module->stateMutex);
+     SongRollData& data = module->songRollData;
+     if (data.sections.empty()) {
++      lock.unlock();
+       Widget::step();
+       return;
+     }
+@@ -63,6 +65,7 @@
+     header->repeats = std::max(1, ch.repeats);
+     header->repeats_completed = std::max(0, ch.repeats - module->repeatsLeft[channel]);
+     header->active = true;
++    lock.unlock(); // No module references escape into layout/child steps.
+ 
+     for (auto* widget : layout->children) {
+       widget->box.size.x = box.size.x;
+diff --git a/src/SongRoll/PatternControlWidget.cpp b/src/SongRoll/PatternControlWidget.cpp
+--- a/src/SongRoll/PatternControlWidget.cpp
++++ b/src/SongRoll/PatternControlWidget.cpp
+@@ -60,6 +60,7 @@
+     if (module == nullptr)
+       return;
+ 
++    std::unique_lock<std::recursive_mutex> lock(module->stateMutex);
+     SongRollData& data = module->songRollData;
+     if (data.sections.empty())
+       return;
+@@ -76,7 +77,9 @@
+     json_t* oldModuleJ = module->toJson();
+     data.sections[sec].channels[channel].pattern = newPattern;
+     pattern = newPattern - 1;   // widget display field 0-based
++    module->stopFirst();
+     json_t* newModuleJ = module->toJson();
++    lock.unlock();
+ 
+     history::ModuleChange* h = new history::ModuleChange;
+     h->name = "change pattern";
+diff --git a/src/SongRoll/RepeatControlWidget.cpp b/src/SongRoll/RepeatControlWidget.cpp
+--- a/src/SongRoll/RepeatControlWidget.cpp
++++ b/src/SongRoll/RepeatControlWidget.cpp
+@@ -83,6 +83,7 @@
+     if (module == nullptr)
+       return;
+ 
++    std::unique_lock<std::recursive_mutex> lock(module->stateMutex);
+     SongRollData& data = module->songRollData;
+     if (data.sections.empty())
+       return;
+@@ -100,7 +101,9 @@
+       repeat_mode = (repeat_mode + 1) % 3;
+     data.sections[sec].channels[channel].repeats = repeats;
+     data.sections[sec].channels[channel].repeat_mode = ChannelConfig::eRepeatMode(repeat_mode);
++    module->stopFirst();
+     json_t* newModuleJ = module->toJson();
++    lock.unlock();
+ 
+     history::ModuleChange* h = new history::ModuleChange;
+     h->name = "change repeats";
+diff --git a/src/SongRoll/RollArea.cpp b/src/SongRoll/RollArea.cpp
+--- a/src/SongRoll/RollArea.cpp
++++ b/src/SongRoll/RollArea.cpp
+@@ -8,12 +8,14 @@
+   RollArea::RollArea(Rect box, SongRollModule* module) : module(module) {
+     this->box = box;
+ 
+-    SongRollData& data = module->songRollData;
+-    if (data.sections.empty())
+-      return;
+-
+-    const int numChannels = (int)data.sections[0].channels.size();
+-    const float channelWidth = box.size.x / data.sections[0].channels.size();
++    int numChannels = SONGROLL_CHANNELS;
++    if (module) {
++      std::lock_guard<std::recursive_mutex> lock(module->stateMutex);
++      if (module->songRollData.sections.empty())
++        return;
++      numChannels = int(module->songRollData.sections[0].channels.size());
++    }
++    const float channelWidth = box.size.x / numChannels;
+     for (int i = 0; i < numChannels; i++) {
+       auto* slice = new PatternControllerSlice(i, module);
+       slice->box.pos.x = (channelWidth * i);
+diff --git a/src/SongRoll/SongRollModule.cpp b/src/SongRoll/SongRollModule.cpp
+--- a/src/SongRoll/SongRollModule.cpp
++++ b/src/SongRoll/SongRollModule.cpp
+@@ -4,10 +4,10 @@
+ using namespace SongRoll;
+ 
+ void SongRollModule::resetState() {
++  std::lock_guard<std::recursive_mutex> lock(stateMutex);
+   transport.reset();
+   songRollData.reset();
+-  running = false;
+-  enterSection(0);
++  stopFirst();
+ }
+ 
+ SongRollModule::SongRollModule() : Module(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS), transport(&songRollData) {
+@@ -33,7 +33,23 @@
+   resetState();
+ }
+ 
++void SongRollModule::stopFirst() {
++  std::lock_guard<std::recursive_mutex> lock(stateMutex);
++  running = false;
++  sectionEndPulse.reset();
++  songEndPulse.reset();
++  eventCancelPending.store(true, std::memory_order_release);
++  runInputTrigger.reset();
++  runNeedsLow = true;
++  for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
++    eopTrigger[c].reset();
++    eopNeedsLow[c] = true;
++  }
++  enterSection(0);
++}
++
+ void SongRollModule::enterSection(int idx) {
++  std::lock_guard<std::recursive_mutex> lock(stateMutex);
+   if (songRollData.sections.empty()) {
+     currentSection = 0;
+     for (int c = 0; c < SONGROLL_CHANNELS; ++c)
+@@ -44,16 +60,11 @@
+   const Section &sec = songRollData.sections[currentSection];
+   for (int c = 0; c < SONGROLL_CHANNELS; ++c)
+     repeatsLeft[c] = std::max(1, sec.channels[c].repeats);
+-  // 切段当帧刷新输出（PianoRoll 下一帧就吃到新 pattern 号）
+-  for (int c = 0; c < SONGROLL_CHANNELS; ++c)
+-    // PATTERN_OUTPUT 走 PianoRoll 的 PATTERN_INPUT 语义：
+-        //   quantizePitch(v) - 48 == round(v*12)  =>  0V = pattern 0（1-based 的 pattern 1）
+-        //   每 1/12 V 递增一个 pattern；不能加 48/12 的 C4 偏移，否则 pattern 号整体 +48
+-        outputs[PATTERN_OUTPUT + c].setVoltage(float(sec.channels[c].pattern - 1) / 12.f);
+-  outputs[SECTION_NUM_OUTPUT].setVoltage(float(currentSection));
++  // Outputs are owned exclusively by process(), including JSON/UI transitions.
+ }
+ 
+ void SongRollModule::advanceSection() {
++  std::lock_guard<std::recursive_mutex> lock(stateMutex);
+   sectionEndPulse.trigger();
+   int next = currentSection + 1;
+   if (next >= int(songRollData.sections.size())) {
+@@ -64,9 +75,46 @@
+ }
+ 
+ void SongRollModule::process(const ProcessArgs &args) {
+-  // RUN：边沿翻转（照 PianoRoll transport.toggleRun）
+-  if (runInputTrigger.process(inputs[RUN_INPUT].getVoltage()))
++  std::unique_lock<std::recursive_mutex> lock(stateMutex, std::try_to_lock);
++  if (!lock.owns_lock()) {
++    // No arrangement/runtime/trigger/pulse access without the mutex.
++    // Read-only contention freezes the last event levels (and pulse time).
++    // A real edit cancels them; leave its flag set until success owns the lock.
++    if (eventCancelPending.load(std::memory_order_acquire)) {
++      sectionEndHigh = false;
++      songEndHigh = false;
++    }
++    outputs[SECTION_END_OUTPUT].setChannels(1);
++    outputs[SECTION_END_OUTPUT].setVoltage(sectionEndHigh ? 10.f : 0.f);
++    outputs[SONG_END_OUTPUT].setChannels(1);
++    outputs[SONG_END_OUTPUT].setVoltage(songEndHigh ? 10.f : 0.f);
++    return;
++  }
++  // Writers hold stateMutex, so no new cancellation can race this acknowledgement.
++  // stopFirst already reset the protected pulses; never resurrect a cancelled level.
++  if (eventCancelPending.exchange(false, std::memory_order_acq_rel)) {
++    sectionEndHigh = false;
++    songEndHigh = false;
++  }
++
++  const float runVoltage = inputs[RUN_INPUT].getVoltage();
++  const bool runEdge = runInputTrigger.process(runVoltage);
++  if (runNeedsLow) {
++    if (runVoltage <= 0.f)
++      runNeedsLow = false;
++  }
++  else if (runEdge)
+     running = !running;
++
++  // Track EOP even while stopped: old highs cannot become fresh start edges.
++  bool eopEdge[SONGROLL_CHANNELS];
++  for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
++    const float voltage = inputs[EOP_INPUT + c].getVoltage();
++    const bool edge = eopTrigger[c].process(voltage);
++    eopEdge[c] = edge && !eopNeedsLow[c];
++    if (voltage <= 0.f)
++      eopNeedsLow[c] = false;
++  }
+ 
+   // RESET：边沿回第 0 段（不停 running，照 Hapax）
+   if (resetInputTrigger.process(inputs[RESET_INPUT].getVoltage()))
+@@ -74,6 +122,8 @@
+ 
+   if (songRollData.sections.empty()) {
+     running = false;
++    sectionEndHigh = false;
++    songEndHigh = false;
+     for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
+       outputs[PATTERN_OUTPUT + c].setChannels(1);
+       outputs[PATTERN_OUTPUT + c].setVoltage(0.f);
+@@ -85,6 +135,27 @@
+     outputs[SECTION_NUM_OUTPUT].setChannels(1);
+     outputs[SECTION_NUM_OUTPUT].setVoltage(0.f);
+     return;
++  }
++
++  outputs[SECTION_END_OUTPUT].setChannels(1);
++  outputs[SECTION_NUM_OUTPUT].setChannels(1);
++  outputs[SONG_END_OUTPUT].setChannels(1);
++
++  if (running) {
++    Section &sec = songRollData.sections[currentSection];
++    bool allDone = true;
++    for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
++      ChannelConfig &ch = sec.channels[c];
++      // FREE 模式：该通道不自行完成（段挂起等手动推进）——阶段 3 补 LIMIT 完整语义
++      if (ch.repeat_mode == ChannelConfig::REPEATS &&
++          eopEdge[c]) {
++        repeatsLeft[c] -= 1;
++      }
++      if (repeatsLeft[c] > 0)
++        allDone = false;
++    }
++    if (allDone)
++      advanceSection();
+   }
+ 
+   // 每帧刷新 PATTERN 输出：Rack 的 Engine_updateConnected() 会在任何 cable
+@@ -100,33 +171,15 @@
+         outputs[PATTERN_OUTPUT + c].setVoltage(float(sec.channels[c].pattern - 1) / 12.f);
+     }
+   }
+-  outputs[SECTION_END_OUTPUT].setChannels(1);
+-  outputs[SECTION_NUM_OUTPUT].setChannels(1);
+-  outputs[SONG_END_OUTPUT].setChannels(1);
+-
+-  if (running) {
+-    Section &sec = songRollData.sections[currentSection];
+-    bool allDone = true;
+-    for (int c = 0; c < SONGROLL_CHANNELS; ++c) {
+-      ChannelConfig &ch = sec.channels[c];
+-      // FREE 模式：该通道不自行完成（段挂起等手动推进）——阶段 3 补 LIMIT 完整语义
+-      if (ch.repeat_mode == ChannelConfig::REPEATS &&
+-          eopTrigger[c].process(inputs[EOP_INPUT + c].getVoltage())) {
+-        repeatsLeft[c] -= 1;
+-      }
+-      if (repeatsLeft[c] > 0)
+-        allDone = false;
+-    }
+-    if (allDone)
+-      advanceSection();
+-  }
+-
+-  outputs[SECTION_END_OUTPUT].setVoltage(sectionEndPulse.process(args.sampleTime) ? 10.f : 0.f);
+-  outputs[SONG_END_OUTPUT].setVoltage(songEndPulse.process(args.sampleTime) ? 10.f : 0.f);
++  sectionEndHigh = sectionEndPulse.process(args.sampleTime);
++  songEndHigh = songEndPulse.process(args.sampleTime);
++  outputs[SECTION_END_OUTPUT].setVoltage(sectionEndHigh ? 10.f : 0.f);
++  outputs[SONG_END_OUTPUT].setVoltage(songEndHigh ? 10.f : 0.f);
+   outputs[SECTION_NUM_OUTPUT].setVoltage(float(currentSection));
+ }
+ 
+ json_t *SongRollModule::dataToJson() {
++  std::lock_guard<std::recursive_mutex> lock(stateMutex);
+   json_t *root = json_object();
+   json_object_set_new(root, "songRoll", songRollData.toJson());
+   json_object_set_new(root, "running", json_boolean(running));
+@@ -137,13 +190,17 @@
+ void SongRollModule::dataFromJson(json_t *rootJ) {
+   if (rootJ == nullptr)
+     return;
++  // Parse/reclaim private replacement vectors outside the shared-state lock.
+   json_t *sr = json_object_get(rootJ, "songRoll");
+-  if (sr != nullptr)
+-    songRollData.fromJson(sr);
+-  json_t *j = json_object_get(rootJ, "running");
+-  if (j != nullptr)
+-    running = json_is_true(j);
+-  j = json_object_get(rootJ, "currentSection");
+-  if (j != nullptr)
+-    enterSection(int(json_integer_value(j)));
+-}
++  const bool replace = sr && json_is_array(json_object_get(sr, "sections"));
++  SongRollData incoming;
++  if (replace)
++    incoming.fromJson(sr);
++  {
++    std::lock_guard<std::recursive_mutex> lock(stateMutex);
++    if (replace)
++      songRollData.sections.swap(incoming.sections);
++    // Saved running/currentSection deliberately never resume historical playback.
++    stopFirst();
++  }
++}
+diff --git a/src/SongRoll/SongRollModule.hpp b/src/SongRoll/SongRollModule.hpp
+--- a/src/SongRoll/SongRollModule.hpp
++++ b/src/SongRoll/SongRollModule.hpp
+@@ -4,6 +4,8 @@
+ #include "Transport.hpp"
+ 
+ #include <algorithm>
++#include <mutex>
++#include <atomic>
+ 
+ namespace SongRoll {
+ 
+@@ -38,6 +40,17 @@
+       NUM_LIGHTS
+     };
+ 
++    // All arrangement/runtime readers use this mutex. Never call Engine while held.
++    // Recursive for nested helpers and Module::toJson -> dataToJson in UI transactions.
++    std::recursive_mutex stateMutex;
++    // UI publishes cancellation; only a mutex-owning DSP sample acknowledges it.
++    std::atomic<bool> eventCancelPending{false};
++    // DSP-owned last event levels, never read or written by UI/JSON/reset.
++    bool sectionEndHigh = false;
++    bool songEndHigh = false;
++    bool runNeedsLow = false;
++    bool eopNeedsLow[SONGROLL_CHANNELS] = {};
++
+     rack::dsp::SchmittTrigger resetInputTrigger;
+     rack::dsp::SchmittTrigger runInputTrigger;
+     rack::dsp::SchmittTrigger eopTrigger[SONGROLL_CHANNELS];
+@@ -59,6 +72,7 @@
+     json_t *dataToJson() override;
+     void dataFromJson(json_t *rootJ) override;
+ 
++    void stopFirst();
+     void enterSection(int idx);
+     void advanceSection();
+ 

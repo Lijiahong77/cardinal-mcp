@@ -38,6 +38,7 @@ import os
 from typing import Any
 
 import patchio
+import editor_contracts as contracts
 
 PATCH_DIR = os.environ.get("CARDINAL_PATCH_DIR") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "patches"
@@ -234,14 +235,28 @@ def edit_note(
     track: int = 0,
     clear: bool = False,
     backup: bool = True,
-    load_after: bool = False,
-) -> dict[str, Any]:
+    load_after: bool = False, module_id: int | None = None) -> dict[str, Any]:
     """改一个音符 —— 相当于人在 piano-roll 上点一格。
 
     rcm-pianoroll：measure+step 定位，改字段即改。
     Starsea：按 step 找（跨 measure 的全局步号），length 改了会截断重叠音符。
     clear=True  且 pitch 给 None ⇒ 删掉这个音符（rcm 写成休止格）。
     """
+    error = contracts.input_error(
+        ints={**dict(measure=measure, step=step, pattern=pattern, track=track),
+              **({'length': length} if length is not None else {})},
+        bools={**dict(clear=clear, backup=backup, load_after=load_after),
+               **{k: v for k, v in dict(active=active, retrigger=retrigger).items() if v is not None}},
+        numbers={} if velocity is None else {'velocity': velocity})
+    if error:
+        return error
+    if velocity is not None and not 0 <= velocity <= 1:
+        return {'ok': False, 'error': 'velocity must be in 0..1'}
+    if pitch is not None:
+        try:
+            contracts.integer(pitch, 'pitch', -2**31, 2**31 - 1)
+        except ValueError as exc:
+            return {'ok': False, 'error': str(exc)}
     path = _resolve(patch_name)
     out: dict[str, Any] = {"patch": patch_name, "module": module,
                            "target": {"measure": measure, "step": step}}
@@ -256,13 +271,11 @@ def edit_note(
         return out
 
     seqs = _find_seq_modules(d)
-    targets = [s for s in seqs if module.lower() in s[0].get("model", "").lower()
-               or module.lower() in f"{s[0].get('plugin')}|{s[0].get('model')}".lower()]
-    if not targets:
-        out["error"] = f"机架里没有名为 {module} 的序列器"
-        out["found"] = [f"{m.get('plugin')}|{m.get('model')}" for m, _ in seqs]
+    m, error = contracts.select_target(d.get("modules") or [], [m for m, _ in seqs], module, module_id)
+    if error:
+        out.update(error)
         return out
-    m, kind = targets[0]
+    kind = next(kind for candidate, kind in seqs if candidate is m)
     data = m["data"]
 
     if kind == "rcm":
@@ -276,41 +289,24 @@ def edit_note(
         out.update(r)
         return out
 
-    if backup:
-        import shutil
-
-        bak = path + ".bak-seq"
-        shutil.copy2(path, bak)
-        out["backup"] = bak
-        out["backup_note"] = "⚠️ Cardinal 若开着，之后在它里 Ctrl+S 会覆盖这次改动。"
-
-    try:
-        patchio.write_patch(path, d)
-    except Exception as e:  # noqa: BLE001
-        out["error"] = f"写盘失败（已备份，可回滚）：{e}"
-        return out
     out.update(r)
-    out["written"] = path
-    out["note"] = (
-        "文件已改。若 Cardinal 开着，要看到效果需重新加载"
-        "（load_patch 会中断音频，先确认）。"
-    )
-    if load_after:
-        import cardinal_mcp as cm
-
-        out["loaded"] = cm.load_patch(os.path.basename(path))
-    return out
+    return contracts.save_edit(out, path, d, ".bak-seq" if backup else None, load_after)
 
 
 def _edit_rcm(data, measure, step, pitch, velocity, retrigger, active,
               clear, pattern) -> dict[str, Any]:
     pats = data.get("patterns") or []
-    if pattern >= len(pats):
+    if not 0 <= pattern < len(pats):
         return {"ok": False, "error": f"pattern {pattern} 不存在（共 {len(pats)}）"}
     p = pats[pattern]
-    spm = p.get("beatsPerMeasure", 4) * p.get("divisionsPerBeat", 4)
+    try:
+        beats = contracts.integer(p.get('beatsPerMeasure', 4), 'beatsPerMeasure', 1)
+        divisions = contracts.integer(p.get('divisionsPerBeat', 4), 'divisionsPerBeat', 1)
+    except ValueError as exc:
+        return {'ok': False, 'error': str(exc)}
+    spm = beats * divisions
     measures = p.get("measures") or []
-    if measure >= len(measures):
+    if not 0 <= measure < len(measures):
         return {"ok": False,
                 "error": f"小节 {measure} 不存在（共 {len(measures)} 小节）",
                 "number_of_measures": p.get("numberOfMeasures")}
@@ -378,18 +374,19 @@ def _edit_rcm(data, measure, step, pitch, velocity, retrigger, active,
 def _edit_starsea(data, track, measure, step, pitch, length, velocity, clear) -> dict[str, Any]:
     arr = data.setdefault("arranger", {})
     tracks = arr.setdefault("tracks", [])
-    if track >= len(tracks):
+    if not 0 <= track < len(tracks):
         return {"ok": False, "error": f"轨道 {track} 不存在（共 {len(tracks)} 轨）"}
     t = tracks[track]
     notes = t.setdefault("notes", [])
-    # ⚠️ Starsea 的每小节格数：源码 songSteps()/soundingAt() 按
-    #    MA_STEPS_PER_MEASURE 推算（ArrangerData.hpp:78），每轨 measures 可不同。
-    #    实测轨0 measures=8、64 个音符、step 间隔 2 ⇒ 每小节 16 格（4/4 × 4分音符）。
-    #    这里与真实数据对齐；万一引擎改了会退化为 16 并在 notes 里注明。
-    measures = int(t.get("measures") or 4)
-    spm = int(t.get("stepsPerMeasure") or 16)
+    # MiniArranger's source fixes MA_STEPS_PER_MEASURE at 16. Unknown
+    # stepsPerMeasure metadata must not silently move notes to another measure.
+    try:
+        measures = contracts.integer(t.get('measures', 4), 'track measures', 1, 64)
+        spm = contracts.integer(t.get('stepsPerMeasure', 16), 'stepsPerMeasure', 16, 16)
+    except ValueError as exc:
+        return {'ok': False, 'error': str(exc)}
     global_step = measure * spm + step
-    if global_step >= measures * spm:
+    if not (0 <= measure < measures and 0 <= step < spm):
         return {"ok": False,
                 "error": f"小节 {measure} 第 {step} 格超出该轨范围"
                          f"（共 {measures} 小节 × {spm} 格）",
@@ -454,8 +451,12 @@ def _edit_starsea(data, track, measure, step, pitch, length, velocity, clear) ->
 
 
 def set_running(patch_name: str, module: str, running: bool,
-                pattern: int = 0, track: int = 0, load_after: bool = False) -> dict[str, Any]:
+                pattern: int = 0, track: int = 0, load_after: bool = False, module_id: int | None = None) -> dict[str, Any]:
     """让序列器跑起来 / 停下来（对应人按 RUN 按钮）。"""
+    error = contracts.input_error(ints=dict(pattern=pattern, track=track),
+                                  bools=dict(running=running, load_after=load_after))
+    if error:
+        return error
     path = _resolve(patch_name)
     out: dict[str, Any] = {"patch": patch_name, "module": module, "running": running}
     if not path:
@@ -468,15 +469,20 @@ def set_running(patch_name: str, module: str, running: bool,
         return out
 
     seqs = _find_seq_modules(d)
-    targets = [s for s in seqs if module.lower() in s[0].get("model", "").lower()
-               or module.lower() in f"{s[0].get('plugin')}|{s[0].get('model')}".lower()]
-    if not targets:
-        out["error"] = f"机架里没有 {module}"
-        out["found"] = [f"{m.get('plugin')}|{m.get('model')}" for m, _ in seqs]
+    m, error = contracts.select_target(d.get("modules") or [], [m for m, _ in seqs], module, module_id)
+    if error:
+        out.update(error)
         return out
-
-    m, kind = targets[0]
+    kind = next(kind for candidate, kind in seqs if candidate is m)
     data = m["data"]
+    if kind == 'rcm':
+        count = len(data.get('patterns') or [])
+        selected = pattern
+    else:
+        count = len((data.get('arranger') or {}).get('tracks') or [])
+        selected = track
+    if not 0 <= selected < count:
+        return {'ok': False, 'error': 'Selected pattern/track does not exist'}
     key = "sequenceRunning" if kind == "rcm" else "running"
     before = data.get(key)
     data[key] = bool(running)
@@ -485,22 +491,8 @@ def set_running(patch_name: str, module: str, running: bool,
     else:
         data.setdefault("arranger", {})["editTrack"] = track
 
-    import shutil
-
-    bak = path + ".bak-seq"
-    shutil.copy2(path, bak)
-    try:
-        patchio.write_patch(path, d)
-    except Exception as e:  # noqa: BLE001
-        out["error"] = f"写盘失败（已备份）：{e}"
-        return out
-    out.update({"ok": True, "field": key, "before": before, "after": bool(running),
-                "backup": bak, "written": path})
-    if load_after:
-        import cardinal_mcp as cm
-
-        out["loaded"] = cm.load_patch(os.path.basename(path))
-    return out
+    out.update({"field": key, "before": before, "after": bool(running)})
+    return contracts.save_edit(out, path, d, ".bak-seq", load_after)
 
 
 # ================================================================ 自检

@@ -531,13 +531,22 @@ def apply_recipe(patch_path, name, dry_run=False, weight=1.0):
     """
     import patchio
     import paramlib as pl
+    import editor_contracts as contracts
 
     r = recipe(name)
     if not r:
         return {"error": "no such recipe: {}".format(name)}
     if not os.path.exists(patch_path):
         return {"error": "patch file not found: {}".format(patch_path)}
-    weight = min(1.0, max(0.0, float(weight)))
+    try:
+        contracts.boolean(dry_run, 'dry_run')
+        contracts.number(weight, 'weight')
+        for setting in r['settings']:
+            contracts.integer(setting.get('index', 0), 'recipe index')
+            contracts.number(setting['value'], 'recipe target')
+    except ValueError as exc:
+        return {'ok': False, 'written': False, 'error': str(exc)}
+    weight = min(1.0, max(0.0, weight))
 
     patch = patchio.read_patch(patch_path)
     by_model = {}
@@ -552,49 +561,60 @@ def apply_recipe(patch_path, name, dry_run=False, weight=1.0):
             skipped.append({"module": model, "param": s["param"],
                             "why": "patch has no {} module".format(model)})
             continue
-        plugin = mods[0]["plugin"]
-        entry = pl.lookup(plugin, model)
-        if not entry:
-            skipped.append({"module": model, "param": s["param"], "why": "module not in dictionary"})
-            continue
-
-        want = s["param"].lower()
-        # A param name may have several slots (e.g. a drum's Sample); `index` picks which.
-        cands = []
-        for pid, p in entry["params"].items():
-            if (p.get("name") or "").lower() == want:
-                cands.append(int(pid))
-        if not cands:
-            for pid, p in entry["params"].items():
-                if want in (p.get("name") or "").lower():
-                    cands.append(int(pid))
-        if not cands:
-            skipped.append({"module": model, "param": s["param"],
-                            "why": "no such param name in this module"})
-            continue
-        cands.sort()
-        idx = s.get("index", 0)
-        if idx >= len(cands):
-            skipped.append({"module": model, "param": s["param"],
-                            "why": "only {} same-name slots, cannot take #{}".format(len(cands), idx)})
-            continue
-        pid = cands[idx]
-        pinfo = entry["params"].get(str(pid), {})
-        if pinfo.get("kind") == "reserved":
-            skipped.append({"module": model, "param": s["param"],
-                            "why": "param {} is a reserved placeholder ({}), refused".format(
-                                pid, pinfo.get("enum"))})
-            continue
-
-        target = float(s["value"])
-        lo, hi = pinfo.get("min"), pinfo.get("max")
-        # ★ A8 核心：逐实例应用，不再 mods[0]。同型号（2 个 VCA-1）每台都改。
         for inst, mod in enumerate(mods):
+            plugin = mod["plugin"]
+            entry = pl.lookup(plugin, model)
+            if not entry:
+                skipped.append({"module": model, "plugin": plugin, "module_id": mod["id"], "instance": inst, "param": s["param"], "why": "module not in dictionary"})
+                continue
+
+            want = s["param"].lower()
+            # A param name may have several slots (e.g. a drum's Sample); `index` picks which.
+            cands = []
+            for pid, p in entry["params"].items():
+                if (p.get("name") or "").lower() == want:
+                    cands.append(int(pid))
+            if not cands:
+                for pid, p in entry["params"].items():
+                    if want in (p.get("name") or "").lower():
+                        cands.append(int(pid))
+            if not cands:
+                skipped.append({"module": model, "plugin": plugin, "module_id": mod["id"], "instance": inst, "param": s["param"],
+                                "why": "no such param name in this module"})
+                continue
+            cands.sort()
+            idx = s.get("index", 0)
+            if idx >= len(cands):
+                skipped.append({"module": model, "plugin": plugin, "module_id": mod["id"], "instance": inst, "param": s["param"],
+                                "why": "only {} same-name slots, cannot take #{}".format(len(cands), idx)})
+                continue
+            pid = cands[idx]
+            pinfo = entry["params"].get(str(pid), {})
+            if pinfo.get("kind") == "reserved":
+                skipped.append({"module": model, "plugin": plugin, "module_id": mod["id"], "instance": inst, "param": s["param"],
+                                "why": "param {} is a reserved placeholder ({}), refused".format(
+                                    pid, pinfo.get("enum"))})
+                continue
+
+            target = float(s["value"])
+            lo, hi = pinfo.get("min"), pinfo.get("max")
+            try:
+                for field in ('min', 'max', 'default'):
+                    if pinfo.get(field) is not None:
+                        contracts.number(pinfo[field], 'parameter ' + field)
+                if lo is not None and hi is not None and lo > hi:
+                    raise ValueError('parameter min exceeds max')
+            except ValueError as exc:
+                return {'ok': False, 'written': False, 'error': str(exc)}
             params = mod.setdefault("params", [])
             cur = None
             for q in params:
                 if q.get("id") == pid:
                     cur = q.get("value")
+                    try:
+                        contracts.number(cur, 'current value')
+                    except ValueError as exc:
+                        return {'ok': False, 'written': False, 'error': str(exc)}
                     break
             if cur is None:
                 cur = pinfo.get("default")
@@ -604,6 +624,10 @@ def apply_recipe(patch_path, name, dry_run=False, weight=1.0):
             else:
                 effective = float(cur) * (1.0 - weight) + target * weight
                 src = "current {} * {} -> target {}".format(cur, weight, target)
+            try:
+                contracts.number(effective, 'interpolated value')
+            except ValueError as exc:
+                return {'ok': False, 'written': False, 'error': str(exc)}
             clamped = None
             if lo is not None and hi is not None:
                 c = min(hi, max(lo, effective))
@@ -618,7 +642,7 @@ def apply_recipe(patch_path, name, dry_run=False, weight=1.0):
                     break
             if not found:
                 params.append({"id": pid, "value": effective})
-            row = {"module": model, "instance": inst, "module_id": mod["id"],
+            row = {"module": model, "plugin": plugin, "instance": inst, "module_id": mod["id"],
                    "param": s["param"], "param_id": pid,
                    "value": effective, "why": s.get("why", ""), "mix": src}
             if clamped:
@@ -628,7 +652,7 @@ def apply_recipe(patch_path, name, dry_run=False, weight=1.0):
     if not dry_run and applied:
         patchio.write_patch(patch_path, patch)
     return {"recipe": r["name"], "file": os.path.basename(patch_path),
-            "weight": weight, "applied": applied, "skipped": skipped,
+            "weight": weight, "applied": applied, "skipped": skipped, "partial": bool(skipped),
             "written": bool(applied and not dry_run)}
 
 

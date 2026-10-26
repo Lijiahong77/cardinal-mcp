@@ -43,16 +43,18 @@ index a326f5b..6f74ce2 100644
  // ==== CARDINAL-MCP-C3-LOG-GET-BEGIN ====
  // ------------------------------------------------------------ /log-get
  // C3 (2026-10-22): 增量读进程内日志环形缓冲。
-@@ -2491,6 +2525,8 @@ static int osc_js_list_handler(const char*, const char*, lo_arg**, int, const lo
+@@ -2491,8 +2525,10 @@ static int osc_js_list_handler(const char*, const char*, lo_arg**, int, const lo
  
  // ==== CARDINAL-MCP-C-GROUP-END ====
  
 +
 +
+ 
+ 
  static int osc_fallback_handler(const char* const path, const char* const types, lo_arg**, int, lo_message, void*)
  {
      d_stderr("Cardinal OSC unhandled message \"%s\" with types \"%s\"", path, types);
-@@ -2981,6 +3017,7 @@ void Initializer::loadSettings(const bool isRealInstance)
+@@ -2983,6 +3019,7 @@ void Initializer::loadSettings(const bool isRealInstance)
      REG("/module-move", "hii", osc_module_move_handler) \
      REG("/module-copy", "hi", osc_module_copy_handler) \
      REG("/log-get", "ii", osc_log_get_handler) \
@@ -60,11 +62,12 @@ index a326f5b..6f74ce2 100644
      REG("/midi-out", "iiii", osc_midi_out_handler) \
      REG("/osc-js-run", "i", osc_js_run_handler) \
      REG("/osc-js-list", "", osc_js_list_handler) \
-@@ -3291,6 +3328,7 @@ void loadTemplate(const bool factory)
+@@ -3293,7 +3330,8 @@ void loadTemplate(const bool factory)
              remoteUtils::sendFullPatchToRemote(remoteDetails);
  }
  
 +
+ 
  void loadTemplateDialog(const bool factory)
  {
  #ifndef HEADLESS_BEHAVIOUR
@@ -109,10 +112,9 @@ index fee31df..286fcf0 100644
  			delete cable;
  			// Don't log exceptions because missing modules create unnecessary complaining when cables try to connect to them.
  			continue;
-@@ -1343,4 +1352,25 @@ void Engine_setRemoteDetails(Engine* const engine, remoteUtils::RemoteDetails* c
+@@ -1343,3 +1352,24 @@ void Engine_setRemoteDetails(Engine* const engine, remoteUtils::RemoteDetails* c
  
  } // namespace engine
- 
 +// ==== CARDINAL-MCP-C2-LOADSKIP-BEGIN ====
 +// C2: /load skipped 收集器（定义）
 +std::vector<LoadSkip> g_loadSkips;
@@ -139,27 +141,29 @@ diff --git a/src/Rack/include/engine/Engine.hpp b/src/Rack/include/engine/Engine
 index 5e17a35..b8f87e4 100644
 --- a/src/Rack/include/engine/Engine.hpp
 +++ b/src/Rack/include/engine/Engine.hpp
-@@ -6,11 +6,13 @@
+@@ -6,13 +6,15 @@
  #include <engine/Cable.hpp>
  #include <engine/ParamHandle.hpp>
  
 +
+ 
  namespace rack {
  /** High-performance classes handling modules and voltage signals between them
  */
  namespace engine {
  
 +
+ 
  /** Manages Modules and Cables and steps them in time.
  
  Engine contains a shared mutex that locks when the Engine state is being read or written (manipulated).
-@@ -231,6 +233,24 @@ struct Engine {
+@@ -233,6 +235,24 @@ struct Engine {
  	PRIVATE void startFallbackThread();
  };
  
 +
- } // namespace engine
  
+ } // namespace engine
 +// ==== CARDINAL-MCP-C2-LOADSKIP-BEGIN ====
 +// C2 (2026-10-22): /load skipped 收集器。Engine::fromJson 加载时被跳过的
 +// 模块/线在此留痕（此前 cable skip 故意静默、模块 skip 只进 warningLog 且

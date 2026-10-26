@@ -2,19 +2,7 @@ diff --git a/plugins/Makefile b/plugins/Makefile
 index f14a2e4..4d69043 100644
 --- a/plugins/Makefile
 +++ b/plugins/Makefile
-@@ -581,6 +581,11 @@ BIDOO_CUSTOM_PER_FILE = channel channel filterType
- PLUGIN_FILES += $(filter-out Biset/src/plugin.cpp,$(wildcard Biset/src/*.cpp))
- PLUGIN_FILES += $(wildcard Biset/src/*/*.cpp)
- 
-+# --------------------------------------------------------------
-+# Starsea (personal plugin package)
-+
-+PLUGIN_FILES += $(filter-out Starsea/src/plugin.cpp,$(wildcard Starsea/src/*.cpp))
-+
- # modules/types which are present in other plugins
- BISET_CUSTOM = Blank ButtonTrigger Clock Tree TreeDisplay
- 
-@@ -1016,6 +1021,7 @@ PLUGIN_FILES += $(filter-out rackwindows/src/plugin.cpp,$(wildcard rackwindows/s
+@@ -1021,6 +1021,7 @@ PLUGIN_FILES += $(filter-out rackwindows/src/plugin.cpp,$(wildcard rackwindows/s
  PLUGIN_FILES += $(filter-out rcm-modules/src/plugin.cpp,$(wildcard rcm-modules/src/*.cpp))
  PLUGIN_FILES += $(wildcard rcm-modules/src/*.c)
  PLUGIN_FILES += $(wildcard rcm-modules/src/PianoRoll/*.cpp)
@@ -22,65 +10,11 @@ index f14a2e4..4d69043 100644
  
  # modules/types which are present in other plugins
  RCM_CUSTOM = Transport
-@@ -2284,6 +2290,12 @@ $(BUILD_DIR)/Biset/src/%.cpp.o: Biset/src/%.cpp
- 		$(foreach m,$(BISET_CUSTOM),$(call custom_module_names,$(m),Biset)) \
- 		-DpluginInstance=pluginInstance__Biset
- 
-+$(BUILD_DIR)/Starsea/src/%.cpp.o: Starsea/src/%.cpp
-+	-@mkdir -p "$(shell dirname $(BUILD_DIR)/$<)"
-+	@echo "Compiling $<"
-+	$(SILENT)$(CXX) $< $(BUILD_CXX_FLAGS) -c -o $@ \
-+		-DpluginInstance=pluginInstance__Starsea
-+
- $(BUILD_DIR)/BogaudioModules%.cpp.o: BogaudioModules%.cpp
- 	-@mkdir -p "$(shell dirname $(BUILD_DIR)/$<)"
- 	@echo "Compiling $<"
 diff --git a/plugins/plugins.cpp b/plugins/plugins.cpp
 index ac13d31..a3c32d0 100644
 --- a/plugins/plugins.cpp
 +++ b/plugins/plugins.cpp
-@@ -199,6 +199,11 @@ extern Model* modelBlank;
- #undef modelBlank
- #undef modelTree
- 
-+// Starsea (personal plugin package)
-+extern Model* modelStarseaSketch;
-+extern Model* modelStarseaMiniArranger;
-+extern Model* modelStarseaMiniArrangerExpander;
-+
- // BogaudioModules - integrate theme/skin support
- #include <mutex>
- #include <string>
-@@ -975,6 +980,7 @@ Plugin* pluginInstance__Bacon;
- Plugin* pluginInstance__Befaco;
- Plugin* pluginInstance__Bidoo;
- Plugin* pluginInstance__Biset;
-+Plugin* pluginInstance__Starsea;
- Plugin* pluginInstance__BogaudioModules;
- Plugin* pluginInstance__CatroModulo;
- Plugin* pluginInstance__cf;
-@@ -1772,6 +1778,20 @@ static void initStatic__Bidoo()
-     }
- }
- 
-+static void initStatic__Starsea()
-+{
-+    Plugin* const p = new Plugin;
-+    pluginInstance__Starsea = p;
-+
-+    const StaticPluginLoader spl(p, "Starsea");
-+    if (spl.ok())
-+    {
-+        p->addModel(modelStarseaSketch);
-+        p->addModel(modelStarseaMiniArranger);
-+        p->addModel(modelStarseaMiniArrangerExpander);
-+    }
-+}
-+
- static void initStatic__Biset()
- {
-     Plugin* const p = new Plugin;
-@@ -3189,6 +3209,7 @@ static void initStatic__RCM()
+@@ -3209,6 +3209,7 @@ static void initStatic__RCM()
          p->addModel(modelCVMmtModule);
          p->addModel(modelCVTglModule);
          p->addModel(modelPianoRollModule);
@@ -88,11 +22,3 @@ index ac13d31..a3c32d0 100644
          p->addModel(modelDuckModule);
          p->addModel(modelSEQAdapterModule);
          p->addModel(modelSyncModule);
-@@ -3735,6 +3756,7 @@ void initStaticPlugins()
-     initStatic__Befaco();
-     initStatic__Bidoo();
-     initStatic__Biset();
-+    initStatic__Starsea();
-     initStatic__BogaudioModules();
-     initStatic__CatroModulo();
-     initStatic__cf();

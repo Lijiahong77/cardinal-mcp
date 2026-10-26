@@ -1,5 +1,187 @@
 # 待办总表 · 统一开工用
 
+## 2026-10-26 当前交付状态：待提交/推送
+
+当前入口：[DELIVERY-2026-10-26.md](DELIVERY-2026-10-26.md)。本日 Python 四批、01–17 恢复链/持久 fixtures/harness 与文档整理交付；新显式 runner 最后实际运行 295 唯一方法，0 failure/error/skip/loader/socket，普通 Python 非 -O。native17 已完整隔离构建、经许可部署，用户短测推进/编辑停首段/undo-redo读回通过。下方各阶段“未部署”等表述为当时历史，不覆盖此状态。
+
+尚待父最终独审后提交/推送；本次仅准备暂存，不宣称已完成 Git 交付。native17 本版声音、长时压力/全库、下游同步停止/静音、硬实时、MiniArranger 快照风险及跨资源/多 writer 契约仍待，不继承旧版验收。用户机架/探针和运行二进制不纳入本次源码提交。
+
+## 工具链整体体检：按根因分组收敛（四批 Python 离线通过，尚未现场启用）
+
+### SongRoll短实机行为验收（native17；推进/编辑停止首段/撤销重做读回通过）
+
+- 用户许可临时测试架后加载 `patches/songroll-stopfirst-live-test-20261026-222306.vcv`，9模块14线、SongRoll与CLOCKED初始停止；原7模块位置/键盘参数/原5线保留，新模块右侧同排贴紧。用户主动点击CLOCKED RUN后，父只读采样确认SongRoll running=true且currentSection在1/0切换，未代用户自动开播。
+- 用户自行多处编辑后，父以不可变加载时readback作基准（不能用已保存变化的磁盘test文件），查出第一段通道1/2/3的pattern及第一段通道1/8和第二段通道8的repeats净变化；CLOCKED仍running=true，SongRoll连续读回running=false/currentSection=0，支持真实改后停止首段。不能据净差还原每次点击顺序。
+- 用户一次Ctrl+Z后，第一段第3通道pattern 2→1；一次Ctrl+Shift+Z后1→2。父均再次实际读回并持久记录，其他编排字段不变，undo/redo后running=false/currentSection=0，不恢复播放。本轮通过范围为此实际编辑及该history往返，不冒称所有控件/全threadsafe/长时稳定/音频延迟均验。
+- 证据：工作区 `audit/songroll-live-ready.md/.json/.png`、`songroll-live-click-check-initial-baseline.json`、`songroll-live-undo-readback.json`、`songroll-live-redo-readback.json`。原模板副本返回路径 `backups/native-disk-template-copy-20261026-222306.vcv`（磁盘模板copy，非GUI实时另存）；尚未自动恢复原架。SongRoll测试模块未接音频，native17本版用户声音试听仍待，不能继承旧版试听结论。
+
+### native17部署基线验收（2026-10-26；部署/启动通过，后续SongRoll短测见上段，本版试听待验）
+
+- 用户明确授权后部署含15–17的exe和配套资源，完整旧exe/resources/userdata已实际复制并核hash，备份工作区 `backups/controlled-native17-deploy-20261026-215144/`。6547 payload逐项读回匹配，父另全量独核零差异；37 target-only保持。现役exe SHA256 `ec0df8d9220a2a35dce46686c3e26a6c55d82ce74fce473f8b76f3a0ac4f9a63`。
+- 正常启动唯一native/gui实例（本轮PID57672），父通过MCP再次核build `Oct 26 2026 21:21:35`、playing=false；完整只读分页7modules/5cables、moduleJSON/ports、loadskipped0、selftestrc0、136日志无warn/error。原布局保持，父看截图无黑屏/错误弹窗。
+- 原模板没有SongRoll，未加模块/加载测试架/发MIDI/OSC写或RUN。因此这次不能称stopfirst GUI、edit/undo-redo或本版声音已验。6/7 data原样，TextEditor旧Notes经既有reader转native schema并加末尾换行，已披露不伪称全部dict相同；磁盘原template及userdatahash未变。
+- 源码tools/patchjs/HEADstatusindex及共享prefix保护保持；未MCPrestart/commitpush。rollback.py自包含默认dryrun两次rc0，真实回退需用户保存正常关闭且另许可，不自动杀进程或还原userdata。
+- 报告 `audit/controlled-native17-deploy.md`、`controlled-native17-runtime.json`，证据索引 `controlled-native17-evidence-manifest.json`。下一步需另获临时测试架许可与手动播放，实际验SongRoll改后停首段；不能把旧14版键盘试听继承为本版通过。
+
+### 含15–17隔离Native构建（2026-10-26；构建与资源候选通过，未部署）
+
+- 全新ext4目录 `/home/lijia/hermes-native17-build-20261026-210230`，159独立固定HEAD仓库/41351固定blob核OID与mode，67已审17覆盖路径匹配；不复制旧Cardinal/Carla/DGL对象、归档或exe，只读共享既有第三方PawPaw prefix。jansson/deps/Surge/Carla/DGL/aubio/plugins/rack/Native/resources十阶段真实make全部rc0。
+- exe 103092736 bytes，MZ/PE AMD64；SHA256 `ec0df8d9220a2a35dce46686c3e26a6c55d82ce74fce473f8b76f3a0ac4f9a63`，编译时间串 `Oct 26 2026 21:21:35`；Surge `1.3.isolated-fixed.3313430`。固定HEAD metadata而非历史fixture commit，源码17patch overlay是dirty，不称上游release。
+- 未部署候选：工作区 `backups/native17-candidate-20261026-210230/`，6547 payload/367854810 bytes，86 manifests及SongRoll.svg，按Makefile展开并解symlink。父代理再次独立逐项读取全部6547 size/hash零差异，并核PE AMD64。当前win64exe SHA仍 `b3f99eb022cdad788a10b5bb9979aa76d8c046378666ecd58620f5cb177c5dc3`，尚未包含15–17。
+- 生产160repo/48968文件、共享prefix14220项与四旧lab前后保持。源前后仅既有Makefile的speexdsp configure.ac可见性recipe变更，无新增兼容产品补丁。首轮构造器误拒Git固定macOS libportaudio.a，make未执行；修审计器后同lab继续，首错保留，不继承旧产物造成功。
+- 报告：工作区 `audit/native17-isolated-build.md`、native17各stage/objects/version/source/protection证据。未重跑295全矩阵；未部署/启动/GUI/OSC/MIDI/播放/commitpush。当前仅证明完整Native可编及资源候选完整，Windows运行、stopfirst界面和音频/延迟仍待单独受控验收。
+
+### SongRoll改后停首段批（2026-10-26；源码恢复/离线集成最终独审PASS，未部署）
+
+- 第17组 `tools/osc_patch/patches/17-songroll-stopfirst.patch` 正式注册，根plugins/rcm-modules；SHA256 `3a76957569a39344f8e322a2f72e4dded607587ad42aedcbb210630d2c8ec3a4`。按李明确取舍：编辑/替表/非null完整或partial数据载入/undo-redo后停止推进、回第一段段头计数，手动RUN；不恢复历史running/段位置。null/无data边界、常规RESET/FREE/LIMIT与pattern量纲保留，旧高RUN/EOP先低后新上升沿。
+- 每实例同一recursive_mutex保护配置/runtime读写；DSP try_lock失败不碰受保护数据，UI不写outputs、不持模块锁反调Engine。不是仅设running=false，也不是全Cardinal线程安全认证。MiniArranger快照风险另待，不在本批。
+- 独审发现并修正B1：只读争锁原来会将同一事件变10→0→10，现保持DSP事件电平；真正编辑原子发布取消，成功持锁DSP才确认消费。代价：争锁可延长脉宽/冻结旧pattern、漏短输入边沿；在途样本可完成旧高。不保证硬实时或下游PianoRoll停止/静音。
+- 真实8个MinGW/C++11 TU对象重新编译通过，52真实C++场景包含在58候选方法内。全量295唯一方法（236+58+1）通过，最终独审另完整重跑295通过，0失败/错误/skip/loader错误/Python socket尝试；TSan17另层真实运行通过，不重复计方法。
+- 独立ext4 lab `/home/lijia/hermes-replay-lab-20261026-202600-stopfirst17-retry` 固定四repo对象物化，01–17首次全actual applied/main rc0，51条Git命令rc0，67覆盖路径和七源post bytes/mode匹配候选。只物化必要四repo，未声称全部builddeps齐全。
+- 新patch作为外层文本raw diffcheck rc3保留，23处是合法空context标记，EOF在最后hunk内。最终独审另在ext4 after16 fixture严格正向whitespace=error-all check/实际apply/反向check均rc0，真新增源码尾空格负控被拒绝；不是把rc3改写成0。旧first-error和retry false汇总保原，最终综合裁定另存。
+- 报告：工作区 `audit/songroll-stopfirst-integration-final-review.md` 及同前缀verdict/checks/strict-forward/whitespace；B1备份 `backups/songroll-stopfirst-b1-20261026-194122/`，集成备份 `backups/songroll-stopfirst-integration-20261026-201342/`。前后保护源码工具/用户资产/现役exe与WSL记录集合保持，未构建完整Native、部署、操作软件、commit/push。15/16/17均未进入当前运行exe；下一质量门是合并隔离Native构建及另获许可的GUI/音频验收。
+
+### SongRoll history/UI批（2026-10-26；源码/恢复/离线验收通过，未部署）
+
+- 第16组 `tools/osc_patch/patches/16-songroll-history-ui.patch` 正式追加，应用根plugins/rcm-modules；SHA256 `9a005a3a850c0b9cbb3c55e44f650d4f1269d06fe7b63817cfade44355488b73`。四UI文件修完整Module快照、同段单向显示刷新、Repeats/Clock点击按权威data计算（count/mode互不陈旧覆盖）。原边界noop仍push history的行为保留，不另改音乐规则。
+- 真实C++11/Jansson/ASan/UBSan的22场景通过，包含在新增29方法内；四真实MinGW TU编对象rc0。完整undo会恢复历史running/currentSection并经enterSection重置段内进度/刷新输出，未擅改此既有恢复语义；不称线程安全修复。
+- 独立固定四仓库新lab `/home/lijia/hermes-replay-lab-20261026-181040-history16` 首次01–16全applied/main rc0，48条真实命令rc0；67覆盖路径相对15lab仅四授权UI变化，post bytes/mode吻合候选。原01–15、replay函数、VERIFY36/端点33保持。
+- 全量显式236唯一方法（234+2）通过；最终独审再跑91相关唯一方法通过，含22真实C++场景，不额外重复加总。无失败/错误/skip/loader错误，Python socket创建尝试0（不是子进程syscall审计）。最终passed=true，无阻断。
+- 报告：工作区 `audit/songroll-history-implementation.md`、`songroll-history-review.md`、`songroll-history-integration.md`、`songroll-history-integration-final-review.md`；备份与恢复证据见对应filemanifest。原exe/resources/用户资产保护保持，无部署/软件操作/commitpush。参数15和history16尚未进入正在运行的exe，完整Native链接/GUI/音频延迟未验。
+- 仍待：缩表缺currentSection的恢复语义、SongRoll/MiniArranger共享状态设计。下方为实施前调查历史，不以其中“尚未修复”覆盖本批已通过部分。
+
+### SongRoll后续调查（2026-10-26；history/UI后已修，其他项仍待）
+
+- 三控件dataToJson快照不符合ModuleChange完整JSON契约，离线undo实际抛缺plugin异常。只补包装仍有同段UI显示陈旧；再每帧刷新仍不能解决undo后未step立即点击Repeats的缓存回写，点击需从当前数据取值，不能只加刷新。此为history/UI串行正确性，不是线程安全证书。
+- 段表缩短且缺currentSection可保留越界旧索引，离线已断言；空sections本身会归一一段，并非空vector必崩。缺索引时是否重置段内进度/输出需要明确恢复语义再改。
+- 纠正旧条目：受检SongRoll无label字段/对应字符串读取，整数/null label实验忽略，未复现所谓坏label崩溃；不新增label支持。旧C组“坏label类型”风险不能当现存已证缺陷。
+- 只读调查26源文件哈希保持，5实验变体各6场景真实编译运行；包装/刷新/权威输入逐层效果见工作区 `audit/songroll-risk-investigation.md` 与 `songroll-repro-results.json`。实验候选仅scratch，不是生产补丁，也未全TU编译/部署。
+- 静态共享状态证据：SongRoll配置/游标/进度UI与DSP普通读写无统一同步；moduleToJson用Engine共享锁，不能排除DSP共享锁下推进。MiniArranger atomic count不保护noteSnap/overview读者持有期，导出还直接读取unit metadata。未做竞态运行复现/TSan/延迟测试。
+- 设计待取舍：模块短锁（简单但需实测音频等待预算）或单写者命令+快照持有/退休协议（复杂但可控制音频不等待）。仅双buffer/index、seqlock普通数据或shared_ptr不能直接宣称实时安全。history/UI可独立先修，不动端口/布局/播放规格；线程方案需先决定边界。
+
+### C++参数入口安全批（2026-10-26；源码/恢复/离线验收通过，未部署）
+
+- 第15组 `tools/osc_patch/patches/15-param-write-safety.patch` 已落盘并注册，应用根为主仓库，SHA256 `51639209029a95a0fcd112dcd1195532a060bb086354b38ceedb74262ea3fe30`。内部按ID控制入口持Engine锁完成查找/数量检查/转换/写入；指针式参数读写及平滑方法补空指针/索引检查，不在DSP每次访问新增锁。
+- raw无回复、raw量纲、display虚换算/错误回执及既有history包装保持；NaN/Inf原政策未改。保护正常Engine移除时上述外部入口的Module/pq生命周期，不代表任意悬空指针、全部UI/DSP/history并发已修；持锁display/远端通知的音频等待时间仍需运行验收。
+- 离线ASan/UBSan真实函数体56场景全通过，独审另10场景（真实pthread/Qty虚方法/undo-redo/AddrSeq锁）通过；两个真实MinGW C++11 TU对象编译rc0。不是完整Native链接或新exe，原harness的NaN通知断言已按真实既有noop纠正并重跑红绿。
+- 新独立lab `/home/lijia/hermes-replay-lab-20261026-170711-param15` 固定四仓库对象构造，01–15首次全applied，45条Git命令rc0；67覆盖路径，较14lab仅两授权CPP变化和新增header。01–14 payload、replay函数、VERIFY_MARKS及33端点不变。
+- 显式205唯一unittest（199+6）通过，0失败/错误/跳过/socket；最终集成独审另复跑60相关方法全通过，passed=true，无阻断。C++56+10不重复计入205。生产exe/resources/用户资产、HEAD/index保护保持，无部署、播放、OSC/MIDI或commit/push。
+- 原件备份：工作区 `backups/cpp-param-integration-20261026-170205/` 及 `backups/cpp-param-source-before/`；报告 `audit/cpp-param-own-review.md`、`cpp-param-integration.md`、`cpp-param-integration-final-review.md`。当前运行exe仍为此前基础键盘验收版本，未含第15修复。后续先处理SongRoll关键风险，再合并隔离构建/运行验收，避免每小修一轮换exe。
+
+### 最新运行验收（2026-10-26；部署/启动/只读协议及基础键盘试听通过）
+
+- 李本轮明确确认：新版单音、三键和弦都有声，松手尾音正常结束、不卡音。基础键盘声音验收通过；仅限当前7模块模板，不扩称SongRoll伴奏、全模块库、长时间稳定性或全16声部均通过。下方“待试听”为本次确认前的阶段记录，以本条为准。
+
+- 李明确授权并确认未开Cardinal后，备份原exe/全部resources/完整userdata，受控部署6547候选payload，37个target-only资源/DLL保留。父代理部署后独立读取全部6547文件，size/hash零差异；exe SHA256 `b3f99eb022cdad788a10b5bb9979aa76d8c046378666ecd58620f5cb177c5dc3`。
+- 已正常启动 `D:/Cardinal/win64/CardinalNative.exe`（本轮PID26152），Native26.02/Rack2.4.1；父再次通过MCP只读ping/build_info/transport核验，native/gui build `Oct 26 2026 14:57:51`，playing=false。未重启MCP；新CLI用于全量只读验收，不据此宣称常驻MCP已加载Python新代码。
+- 原模板自然加载7模块/5线，live IDs/params/cables与模板一致；窗口截图可见全部7面板，无错误弹窗。Gate/包络/VCA/HostAudio前4通道瞬时零符合未输入音符状态，不等于全16通道录音证明或用户试听通过。未发MIDI/写OSC/load/改布局/参数/播放。
+- 原模板/native.json及其余userdata当前hash保持；软件未来退出时保存prefs不在此保证内。tools/patches/js与Git状态/index未变（本段随后由父另行同步）；无commit/push。正常模板非空不等于自动播放，已查HostMIDI初始gate=false、ADSRenv=0和VCA门控。
+- 完整备份/回退：工作区 `backups/controlled-native-deploy-20261026-160658/`，original实物6549文件已校验；rollback.py默认dry-run通过，--apply须先正常关Cardinal且需用户授权，依赖audit/controlled_deploy_v2.py，勿删helper。报告 `audit/controlled-native-deploy-final.md`。
+- 保留缺口：真实注册85集合/1407模块，磁盘86manifest/1426条目、freshCLI缓存1411，不能混称全部可实例化；只验原7模块。log分页包装器边界问题仅验收脚本绕过，产品未修。待李键盘单音/和弦实际试听，之后才判断音频层。
+
+### 恢复脚本安全批（2026-10-26；离线验收与最终独审通过）
+
+#### 最新收口：14组恢复链集成通过（2026-10-26；未部署）
+
+- near/far补丁已正式追加为 `tools/osc_patch/patches/14-rackwindows-nearfar.patch`，应用根 `plugins/rackwindows`，固定基线 `60dfe5dff94b82fc42a43d971e41e64e296b0220`。原01–13 bytes/顺序及全部replay函数AST未变；端点预期仍33，失败保守停止逻辑未弱化。
+- 新独立lab `/home/lijia/hermes-replay-lab-20261026-153951-compat14` 四仓库固定对象tree核验通过，生产main首次01–14全部actual applied、42条命令均rc0；rwlib固定pre/posthash和100644模式吻合。66覆盖路径与成功构建旧lab全等；与现役63字节相同、3仅空行差，不声称全树一致。
+- 集成显式离线回归199唯一方法（原192+新7），0失败/错误/跳过；最终独审另外重跑54相关唯一方法全通过，Python socket创建尝试0。独审passed=true，无security/logic/regression阻断；未重复计算两轮总数。
+- 生产HEAD/index、原13补丁、其他既有dirty及用户patch/js、现役exe/resources与未部署候选保持；本轮未重编、启动、部署、OSC/load/播放或commit/push。补丁及文档落盘不等于提交，当前14组集成尚未提交。
+- 原件：工作区 `backups/recovery-compat-integration-20261026-153146/`；证据：`audit/recovery-compat-integration.md`、`recovery-compat-integration-summary.json`、`recovery-compat-integration-final-review.md`。下列13组/构建段落为历史阶段结果，当前状态以本段及已通过隔离构建为准。
+- 非阻断后续：文档少量“已在git/当前HEAD”历史措辞可进一步澄清；新7测试固定对象来源依赖本机WSL，移植CI时需显式配置且缺对象失败。全dirty diffcheck仍有未动09/10旧patch空白诊断，本轮授权tracked差异检查通过，不擅修旧payload。
+
+#### 隔离Native构建（2026-10-26；最小兼容补丁后构建通过，未部署）
+
+- 最新验收：李授权后，仅在隔离lab添加rackwindows条件undef near/far。小TU红rc1→绿rc0；独立重放、反向检查和字节核验通过。补丁 `audit/native-compat-rackwindows.patch`，原件 `backups/native-nearfar-20261026-144656/`；未纳入生产13组清单。
+- 刷新Surge旧fixture版本为 `1.3.isolated-fixed.3313430`；plugins.a/rack.a真实rc0。Native首次rc2缺先决归档，按原Makefile补编Carla/DGL/aubio后Native真实rc0，无新增其他源码补丁。
+- 实物exe 103098880 bytes、PE x86-64，SHA256 `b3f99eb022cdad788a10b5bb9979aa76d8c046378666ecd58620f5cb177c5dc3`。未部署候选 `backups/native-compat-candidate-20261026-150338/` 含exe/86 manifests/资源；父代理独立读回6547 payload、367860954 bytes逐项hash全符，零差异。
+- 保护核验仍为160repo/48856生产文件/14220共享prefix零变；lab补丁后41367源码项零变。main/Rack/rcm保留恢复fixture metadata，不声称其HEAD等于原固定commit。未启动/部署/OSC/播放/试听，未重跑原192测试，警告未修；见工作区 `audit/native-compat-build.md`。下一步可独审候选兼容补丁是否纳入恢复链；部署/启动需另获许可。
+- 下列为首轮失败历史，已由上述续编结果取代，不代表仍受阻：
+
+- 已在成功恢复lab `/home/lijia/hermes-replay-lab-20261026-131623-songbuild` 补齐158递归gitlink固定源码；40224唯一依赖blob的OID/mode校验通过。仅从固定对象取源码，不搬现役dirty或Cardinal构建缓存。
+- 实际make：plugins首次缺jansson.h rc2 → 隔离jansson与deps真实rc0 → plugins第二次rc2。记录器rc0不是make成功。rack.a/Native jack未尝试，父代理读回确认隔离exe/plugins.a/rack.a均不存在，不能标能编/产物。
+- 当前阻断：`plugins/rackwindows/src/rwlib.h` 的near/far变量被MinGW空宏吞掉，预处理已证实。现役该子模块有条件#undef near/far的dirty兼容修补，但不在13补丁中，未搬入lab。待李授权：仅审阅该最小兼容补丁、留可重放diff、只应用隔离lab后续编译；不全量捕获dirty。
+- 构造器曾遇git archive export-ignore/export-subst造成metadata缺失/blob变化，已按固定blob补齐；依赖另补独立固定仓库metadata，防止版本生成继承主fixture SHA。此前部分Surge归档带旧生成版本，继续前需刷新deps，不能当部署候选。
+- 保护核验：160repo身份/index、48856生产文件及14220只读第三方prefix项前后不变；现役Windows/WSL exe SHA保持94979772e585333efee91dd850e992bde099f593de20f377ce77230d1e7fa89c。未部署/启动/OSC/播放/MCP重启/提交推送。构建任务均已结束。
+- 证据：工作区 `audit/native-isolated-build.md`、`native-isolated-baseline.json`、`native-isolated-events.jsonl`、`native-isolated-first-real-source-error.txt`、`native-isolated-protection-check.json`。后续可能仍有surgext等既存兼容缺口，不承诺修near/far即全链成功。
+
+#### 全链真实隔离恢复进度（13组严格重放通过；65路径有3个仅空行差异，未构建）
+
+- 李授权后11仅去除与03逐byte重复的6hunks/32条Starsea新增，SongRoll两条增量逐byte保留；备份 `backups/patch11-incremental-20261026-131614/`。新lab `/home/lijia/hermes-replay-lab-20261026-131623-songbuild` 原生产main实际01–13全部applied、rc=0，无跳过/绕冲突；追加verify 33端点/36标记通过。
+- 67文件块的65去重old/new路径全部实比：62 equal / 3 different / 0非对称missing；3文件仅空行不同，非空行bytes相同：`src/CardinalCommon.cpp`、`src/Rack/include/engine/Engine.hpp`、`src/override/Engine.cpp`。父代理再次读取lab与现役全部65路径核对内容hash/缺失与空行差异通过；不是全65逐byte一致，不擅自清理空白payload。
+- 当前恢复验收：固定对象baseline和13组严格重放通过，覆盖路径比较已完成但字节完全等同未通过；coverage之外/其他未materialize依赖不在保证内。未Native构建/部署/试听/MCP重启，现役WSL三repo HEAD/status/index及65源路径不变。报告 `audit/replay-full-songbuild-recovery.md`；父核 `audit/replay-full-songbuild-parent-check.json`。
+
+- 固定主树 `8aa0fc7552c80c464b8f1f87c3199ab3dfe4e40b`、Rack `8c6f41b778b4bf8860b89b36d5503fd37924077f`、rcm `c4a243ec7089254aa19225c0666bb4bda2163a6a`，仅从Git对象构造独立lab；不复制现役dirty源码，不共享worktree元数据。
+- 首轮01因工作补丁CRLF冲突。李授权后仅将01精确恢复为已提交LF blob；SHA256 `4f37d32b7c86812805145df673a7679ed8ebc0fd99449f8d569d983e33a968f0`，2570 LF/0 CRLF。原件 `backups/patch01-lf-20261026-125605/`。脚本、其他12补丁、现役源树不变。
+- 新lab `/home/lijia/hermes-replay-lab-20261026-125606`：01–08真实applied，09正反检查冲突且apply未调用，10–13未尝试。09旧上下文空行与固定基线+01–08产物不一致；不能放宽脚本或跳过。证据 `audit/replay-full-lf-recovery.md`、`replay-full-lf-groups.jsonl`、`replay-full-lf-09-context-diagnosis.json`。
+- 李授权后09仅调整context/hunk header：4文件12hunks、89条新增payload含空白逐byte不变（独立断言PASS）；备份 `backups/patch09-context-20261026-130218/`。新lab `/home/lijia/hermes-replay-lab-20261026-130228-c2` 实际01–09 applied，10正反冲突且未actual apply，11–13未尝试。
+- 李授权后10去掉重复09的33行C2 handler+1注册，其余110条payload逐byte不变；备份 `backups/patch10-incremental-20261026-130851/`。新lab `/home/lijia/hermes-replay-lab-20261026-130923-m1` 实际01–10 applied、11冲突、12–13未尝试。整Common源码预期bytes一致；C2/M1定义和注册各一次，M1 type=sii，JS修复保留。
+- 历史11阻断为累积快照：8hunks中6个共32新增行重复03的Starsea改动，另2行才是SongRoll增量；后已按授权修复，见本节顶部。原证据 `audit/replay-full-m1-recovery.md`、`replay-full-m1-payload-proof.json`、`replay-full-m1-11-cumulative-diagnosis.json`。
+- 所有失败lab保留不复用。各轮仅对应授权补丁变化，其余420文件保护集及WSL三仓库HEAD/status/index、65源路径核验无意外变化。Native构建/部署仍未进行。
+
+- ✅ `replay_osc.py` 删除弱标记与already-exists文本成功兜底；只有严格无跳过的反向检查能判已装。正向/反向/实际apply三阶段跳过或部分筛选都拒绝；后续叠加使反向无法证明时保守停，不要求重应用。
+- ✅ 固定命令级whitespace/context/autocrlf策略，隔离继承GIT_*；目标自身.git/gitfile加Git discovery验证，保留submodule/gitfile。不自动init/add、不碰现役索引；合法skip.txt等文件名不误杀。未知/矛盾CLI参数在工作前退出2，无参数仍为原真实apply入口。
+- ✅ 首错/未知即停，准确列applied/skipped/failed/notattempted；已应用组不谎称回滚。check只看当前树、不模拟整条依赖；verify仅端点+标记，不认证源码完整或可构建。
+- ✅ 父代理实跑192方法（此前149+replay43），零failures/errors/skips；diff --check通过。最终独审43方法+14额外真实Git/CLI场景通过，无新阻断，未重跑其他149，不重复累计。
+- ✅ 真WSL源码经UNC只读清单核验33/33端点、标记齐全、受检文件哈希未变（`audit/replay-real-source-checklist.json`）。Windows工具仓库先前verify的0/33是检查目标无C++源码，并非WSL源码坏。
+- 证据：工作区 `audit/replay-review-fixes-regression.json`、`replay-review-fixes.md`、`replay-hardening-review-final.md`。整批前回退 `backups/replay-hardening-20261026-121023/`；独审补修前 `backups/replay-review-fixes-20261026-123125/`。
+- 后续已在固定三仓库基线上真实隔离重放全13并比较65覆盖路径，见本节顶部；其他依赖未materialize、Native构建/部署仍未进行。只在隔离树apply；生产仅按逐次授权修01/09/10/11补丁，现役源树不改，无播放/MCP重启/提交推送。
+
+### 字典身份/值域批（2026-10-26；离线验收与最终独审通过）
+
+- ✅ paramlib 显式 plugin 不借另一插件字典；保留已定义别名/casefold，None-plugin 仅允许唯一有效型号，canonical冲突/坏身份/歧义拒绝。module_params/find_param/port_semantics 不再裸遍历取首选；唯一Plateau查询兼容已恢复。
+- ✅ qualified `plugin/model` 或 `plugin|model` 按组件精确匹配，单/批写与shared selector不再把A/Twin选成XA/Twin；裸短名兼容保留。recipe逐实例解析各自pid/范围/default，applied/skipped含身份，partial明确，不改变既有部分应用政策。
+- ✅ strict int排bool/float/string、strict bool、有限binary64数值守门；负索引与实际数组上限、SongRoll各字段、sample实际槽数、按名instance/value和recipe index/weight/target/current/meta等在业务备份/写/load前拒绝。MiniArranger固定16格，显式伪stepsPerMeasure拒绝，measures1..64；RCM既有有限int32越界pitch警告与有限值clamp/warning政策保留。
+- ✅ sampler公共MCP槽上限16、业务按8/16；Host Parameters仍0..23。父代理实跑149方法（原116+value33），0 failures/errors/skips，diff --check通过。最终独审相关33方法通过，另98次入口拒绝与128次合法小节映射读回通过；不与149重复相加，不冒称独审重跑全部149。
+- 证据：工作区 `audit/value-hardening-regression.json`、`value-review-fixes.md`、`value-review-final.md`。整批前备份 `backups/value-hardening-20261026-111659/`；独审补修前 `backups/value-review-fixes-20261026-114656/`。
+- ⚠️ 文件值finite仍为binary64检查，不是全文件float32可表示性证明；未解决GUI陈旧更新/多writer/跨输出资源/目录断电持久性，C++边界/撤销/线程竞争、replay完整恢复、autosave关联与现场启用仍未完成。port_semantics公开schema仍不接受module_id，不因direct可用宣称MCP支持。
+
+### 编辑器身份/路径/阶段批（2026-10-26；离线实现与两路独立复核通过）
+
+- ✅ SongRoll read/write/edit、seq edit_note/set_running、sample load/clear 共七入口新增尾部可选 module_id，并贯穿 MCP schema/DISPATCH。多匹配/全局重复ID/name与ID冲突拒绝；返回候选而不默认改第一台。保留旧位置参数；seq MCP 的 module 仍必填。
+- ✅ 采样先 canonicalize 再验证存在，保存同一绝对路径，root 只作对话框目录，不再拼旧目录+basename；其他槽不变。仅存在性，不保证可解码或现场已加载。
+- ✅ 八条可 reload 写入口统一共享阶段回执：完整实际写入路径、False不load、写成后至多一次load；failure/warning/throw/unknown不顶层成功，保留 written 事实，verified=False。业务备份/写异常结构化，不load；原 written 路径/bool类型保留，新增 written_path。未知load副作用不谎称未加载，不自动重试。
+- ✅ 父代理实跑116方法（此前98+新15+父独立3），0 failures/errors/skips；diff --check通过。两路独立复核均passed、无blocker：目标路19方法+82补充场景，阶段路18方法+192场景；均包含新15，不与116相加，也未独立重跑全116。源码与用户patch/js哈希未变。
+- 证据：工作区 `audit/editor-hardening-regression.json`、`editor-hardening-implementation.md`、`editor-review-targets.md`、`editor-review-stages.md`。回退：`backups/editor-hardening-20261026-102345/` 四个原文件；新公共helper `tools/editor_contracts.py`。
+- 后续F6/F7与sampler16p MCP槽上限进展见上方字典身份/值域批；GUI陈旧更新/多writer/跨输出源资源、C++与现场启用仍待。不得把任一批验收扩称B组全部完成。
+
+### 公共文件安全批（2026-10-26；离线验收与最终独立复核通过）
+
+- ✅ `patchio.write_patch` 先完成编码/压缩/结构校验，同目录独占临时文件写入、flush/fsync、字节回读，再 os.replace；故障注入验证提交前原件不变，不降级截断覆盖。
+- ✅ 默认 `as_archive=None`：原目标保留格式，已有归档只换 patch.json，保留附属资源的 payload/顺序/普通元数据。新目标仍默认 JSON；显式 False 会丢附属成员时拒绝。每次覆盖强制独占版本备份 `<原文件名>.bak-patchio-<uuid>`，即使业务 backup=False 也会备份；无自动清理，磁盘占用会增长。
+- ✅ 实际 stream 解压/raw/JSON 50 MB 上限、物理 tar header 数量限制；危险路径/链接/歧义/损坏拒绝，JSON 写入拒绝非有限值。独立审查发现根目录 `.` / `./patch.json` 被误拒后，已补兼容测试修复；仍拒绝路径穿越及规范化碰撞，保留原成员名字。
+- ✅ 父代理实跑 **98 项**：原有 67 + 文件安全 30 + 横向编辑器 1（含 SongRoll/seq/清采样/recipe/按名参数五个 subTest），零失败/错误/跳过；diff --check 通过。最终独立复核 passed=true、无新增阻断；独立重跑文件安全 30 项及最小 probe，重新只读核对 64/64 `.vcv`（其中 41/41 归档）与原版解码一致，原件哈希未变。报告 `audit/file-hardening-review-final.md`；独立复核未重跑整套 98 项，不混淆执行者。
+- 证据：工作区 `audit/file-hardening-regression.json`、`file-hardening-compat-fix.md`、`file-compat-corpus.jsonl`。整批前回退 `backups/file-hardening-20261026-094741/patchio.py`；兼容修复前 `backups/file-compat-20261026-101131/`。
+- ⚠️ 这不是完整文件事务：未解决读取后陈旧 dict、GUI/多 writer 并发覆盖、跨输出另存的源资源继承、断电目录持久性。只保护目标已有归档资源；没有真机加载/试听或 MCP 重载，不改运行态/布局，不覆盖用户原 patch。精确模块目标、采样路径与阶段回执后续进展见上方编辑器批。
+
+### 2026-10-26 Python 首批进度（优先于下方历史状态）
+
+- ✅ **代码与离线回归**：接线 output-first、MIDI 四整数与不支持延迟帧明确拒绝；远端错误/三段 load 回复、回复来源与 tag 过滤；MCP/CLI schema 与失败传播、有限 float32/整数边界、raw param 槽预检。槽预检只是 best-effort，不能代替 C++ 边界检查。
+- ✅ **复核补洞**：合法高端口不再误限 23；SongRoll write/edit repeats 对齐工具 1..4096（面板 64）；load 成功后的验证异常保留 loaded/backup/load_result；坏参数记录不能静默跳过；审计器崩溃与正常审计 FAIL 查询分开传播。
+- ✅ **父代理与第二轮独立复核均通过**：旧 MCP 32 + safety 31 + replay 4，共 67 项，零 failures/errors/skips；64 TOOLS 与 DISPATCH 名称集合一致，git diff --check 通过。独立复核 passed=true、无本轮阻断，核对源码增量与测试前后哈希一致；报告 `audit/hardening-review-final.md`。仅离线/mock，不等于现场验收。
+- ⚠️ **部署验证主动收紧**：load_after=False 不加载、不 diff；实际 load 确认成功后即使快照相同，本批仍 ok=False、loaded=True、verified=False、load_association_proven=False。没有本次 load 与 autosave 的关联证据，不能认证部署；不要看到 ok=False 就重试 load。snapshot_comparison_complete 只是快照比较诊断，不是本次加载/稳定原子快照/当前内存证明。
+- ⬜ **尚未现场启用**：没有重启运行 MCP、没有向机架测试写入、没有 C++ 修复/编译/部署，也没有用户试听。源码落盘不等于运行 MCP 已加载新代码。
+- 证据：工作区 `audit/hardening-regression.json`、`hardening-review-fixes.md`；回退：`backups/python-hardening-20261026-090108/`（首批前）与 `backups/review-fixes-20261026-093244/`（复核补洞前）。保留原 `patches/songroll_2sec_test.vcv` 的外部修改和未跟踪 `js/05_songroll_probe.js`，未提交/推送。
+
+> 初始体检证据报告：`D:/hermes/profiles/cardinal-master/workspace/audit/Cardinal-工具链整体体检.md`；下列为审计发现与剩余范围，不是全量已完工声明。审计时未改生产，后续 Python 实施以上方进度为准；WSL、exe、现场机架未在本轮改动。
+
+- ◐ **A · 先止血：Python 已实现，C++ 仍待修。** Python schema入口、deploy False/错误状态、cable/MIDI/JS回复/load/MCP契约已补回归，见上方。raw `/param` 的 C++调用链仍未检查当前模块param索引，实际 `src/override/Engine.cpp:1089` 直接下标写；预检不能消除竞态或其他客户端绕过。C++修复、编译、部署分别按权限进行；不在真机试坏索引。
+- ◐ **B · 公共文件安全、编辑器身份/阶段、字典与主要输入边界离线通过。** 进展及精确边界见上方；陈旧写入/并发/跨输出源资源、目录持久性及全文件float32政策仍未解决，不承诺任意畸形JSON全结构健壮性。autosave未知不能判fresh，不能当当前内存备份。不得把四批验收扩称全部B组已完成。
+- ⬜ **C · 自建C++正确性。** SongRoll三类控件给history::ModuleChange传dataToJson而非完整Module JSON；复核修复撤销/重做、坏label类型、恢复段索引不变量。SongRoll与MiniArranger存在可定位UI/DSP共享状态竞争，需明确单写者/快照生命周期；未做生产崩溃或线程压力测试。LIMIT/ClockDiv与扩展器停止门语义另与李确认，不替他补规格。
+- ◐ **D · 恢复脚本安全与13组隔离重放通过，构建仍待。** 已修累积补丁链并固定三仓库基线，65覆盖路径比较62相同、3仅空行不同；不称全树字节相同。下一步另获准后补齐固定依赖并隔离Native构建，不碰现役exe。33/33清单与13组apply都不等于可构建/可启动。长期回归以接口/持久化不变量为主。
+
+## 接线现场新发现（Python 修复已落盘，运行 MCP 尚未重载）
+
+- ✅ `tools/cardinal_mcp.py:cable_add` 的 input→output 序列化错误已改为 C++ 协议的 output→input；保留公开 Python 参数签名。已离线解码实际 OSC 构包断言端点顺序与 int64 ID；高端口不被错误挡住。历史现场 `err:E_BAD_PORT` 是发现证据，新 Python 尚未现场验收，不能只凭回包 ok 结案。
+- 现场已按实际 C++ 协议直接发送输出在前的 `/cable-add`，修正原测试机架 Gate 错接 ADSR Attack CV(IN0) 的问题；读回确认接到 GATE(IN4)，ADSR/VCA/HostAudio 都采到非零信号。修线时仅改内存接线并紧凑布局、未改播放状态；随后李确认循环有声、布局紧凑。整体审查期间该 `.vcv` 新增modified状态，未覆盖或回退用户文件。
+
+## 2026-10-25 接手校验收尾
+
+- ✅ 修复 `tools/osc_patch/replay_osc.py` 的 SongRoll Model 标记检查路径：定义在 `plugins/rcm-modules/src/SongRollModule.cpp` 胶文件，不在 `src/SongRoll/SongRollModule.cpp` 引擎实现中。未删检查、未改端点期望数。
+- 回归：新增 `tools/osc_patch/test_replay_osc.py`，先复现原误报再修复；4 项覆盖正确布局、缺胶文件、标记错放引擎文件、端点数量错误。4/4 通过，原 MCP 离线回归 32/32 通过。
+- 现役 WSL `/home/lijia/Cardinal` 实跑只读 `--verify`：退出 0、33/33 端点、所有标记齐全。此次没有应用补丁、修改 WSL 源码、编译或操作当前机架；不等同于已在干净树验证完整重放。
+- 原有 `replay_osc.py` 文档字符串 `\|` 的 SyntaxWarning、MCP 测试文件句柄 ResourceWarning 未在本次扩修。
+
 > 建立：2026-10-19 · **最后更新：2026-10-21 10:50**
 >
 > **当前状态（别再看旧结论）：**

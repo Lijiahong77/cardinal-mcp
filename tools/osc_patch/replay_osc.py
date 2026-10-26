@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""replay_osc.py —— 把全部 OSC 改动一次性重放到 Cardinal 源码树
+r"""replay_osc.py —— 把全部 OSC 改动一次性重放到 Cardinal 源码树
 
 ★ 为什么有这个脚本（2026-10-21）
   在此之前，33 个 OSC 端点的 C++ 改动**只存在于 WSL 工作区**（不在 git 里）。
@@ -18,7 +18,7 @@
      跑完 6 个注入器也凑不出现在的树 —— 实测已由 patch 逐字节一致验证。
   3. patch 可 `git apply --check` 预检、可回滚（反向 apply）、可 diff。
 
-★ 覆盖范围（4 组 patch，按依赖顺序）
+★ 覆盖范围（17 组 patch，按依赖顺序）
   | # | patch | 内容 | 基线 |
   |---|-------|------|------|
   | 1 | 01-osc-core.patch | `src/CardinalCommon.cpp`（28 端点全部实现 + 注册）<br>`src/CardinalCommon.hpp`（+1 声明）<br>`src/override/Engine.cpp`（恢复 2 处 `patch->log`）<br>`src/override/MenuBar.cpp`（**延后 120 帧自动开 OSC**）<br>`src/override/Window.cpp`（截图落盘 + 保存分支） | Cardinal `8aa0fc7` |
@@ -35,34 +35,54 @@
 | 12 | 12-songroll-module.patch | SongRoll 复活+阶段2/3（**rcm-modules 子模块**，应用根 `plugins/rcm-modules`）：`.cppx` 复活为 `.cpp`（Data/Module/Transport）+ Rack 2 API 修（`rack::dsp::` 全限定）+ 阶段2引擎（10/11 端口+EOP 推进+JSON）+ 阶段3 UI 移植（Rack 1→2：VirtualWidget→Widget、onMouseDown→onButton、SequentialLayout Vec spacing、事件直改 data+push undo）+ 胶文件重写 | 子模块 HEAD `c4a243e` |
 | 13 | 13-songroll-panel.patch | SongRoll **新面板**（**rcm-modules 子模块**，应用根 `plugins/rcm-modules`）：`res/SongRoll.svg` 重画为 600×380（旧 Inkscape 面板整file替换）——端口圆圈图案与真 PortWidget 坐标一一对应，消除「图案与端口不符 + 底部截断」 | 子模块 HEAD `c4a243e` + 12 应用后 |
 
-★ 幂等
-  每一组都先 `git apply --check`：能干净应用 ⇒ 跳过（已应用过）；
-  报 "already applied" ⇒ 也跳过；**报冲突 ⇒ 立刻停下报错**，绝不 `--reject` 硬塞。
+| 14 | 14-rackwindows-nearfar.patch | rackwindows：条件 undef near/far，修复 MinGW 头宏冲突，不改 DSP 算法；应用根 plugins/rackwindows | rackwindows `60dfe5dff94b82fc42a43d971e41e64e296b0220` |
+| 15 | 15-param-write-safety.patch | 参数边界与 OSC/JS 控制入口生命周期锁；两个源码和新增内部头；应用根为空（main） | 四仓库固定对象完整应用01–14后；未部署 |
+| 16 | 16-songroll-history-ui.patch | SongRoll 四UI：完整 Module history 快照、同段单向显示刷新、点击读取权威数据；应用根 plugins/rcm-modules | 四仓库固定对象完整应用01–15后；未部署 |
 
-用法（在 WSL 里跑；patch 文件在 Windows 侧仓库，需要先拷过去）:
-    # 0) 把 patch 拷进 WSL
-    cp /mnt/d/Cardinal/tools/osc_patch/patches/*.patch /tmp/cardinal-patches/
+| 17 | 17-songroll-stopfirst.patch | SongRoll 编辑/替表/非null完整或partial load/undo-redo 停推进并回第一段计数；同步及event取消 | 四固定对象完整应用01–16后；根 plugins/rcm-modules；未部署 |
 
-    # 1) 预检：看能不能干净应用（不改任何东西）
-    python3 replay_osc.py --check
+第16组单独应用的历史行为：完整 undo/redo 恢复历史 running/currentSection，
+并经 enterSection 重置 repeatsLeft 与该段进度；缺currentSection分支当时未改。
+第17组明确覆盖该运行恢复规则：保留完整Module history快照，但编辑/替表/
+非null完整或partial load/undo-redo 均停止推进，回第一段从段头计数，需手动RUN。
+旧高RUN/EOP必须先low再new rise；null data不改，根本没有data不触发restore。
+UI/JSON recursive_mutex与DSP try_lock协调；只读竞争冻结event电平与pulse计时，
+编辑发布取消，不由UI写outputs。可延长脉宽、漏短输入边沿；在途旧sample可完成，
+原子可见性不保证第N个失败sample的硬时限；两event端口不是原子事务。
+不承诺硬实时、普遍线程安全或下游静音。第15、16、17组仅恢复链集成；
+现役源码/EXE/resources未更新，未部署或运行验收。
 
-    # 2) 真正重放
-    python3 replay_osc.py
+★ 保守幂等与失败停止
+  正向检查成功才应用；正向失败仅当严格反向检查成功且无跳过/路径筛选时
+  判为 skipped。不凭错误文本、文件存在或标记认定完整安装。
+  后续叠加可能令反向检查失败，此时停止待人工核对，不是要求重新应用。
+  第一个 conflict/unknown/意外状态即停止；已完成组不自动回滚。
+  不自动 git init/add，应用根须为真实 Git 工作树顶层（支持子模块/gitfile）。
 
-    # 3) 只重放到某个目录（干净副本验证用）
-    CARDINAL_SRC=/tmp/clean python3 replay_osc.py
+用法（运行前显式确认目标；唯一源码根覆盖名是 CARDINAL_ROOT）:
+    CARDINAL_ROOT=/path/to/isolated/source python3 replay_osc.py --check
+    CARDINAL_ROOT=/path/to/isolated/source python3 replay_osc.py
+    CARDINAL_ROOT=D:/Cardinal python replay_osc.py --verify
 
-    # 4) 校验现状（不重放，只报告端点是否齐全）
-    python3 replay_osc.py --verify
-
-★ 为什么脚本在 Windows 侧仓库、却要在 WSL 里跑
-  patch 的目标路径是 Linux 路径（`src/CardinalCommon.cpp` 相对 Cardinal 源码树根），
-  且 `git apply` 必须在真实 git 仓库里跑。Windows 侧仓库 `D:/Cardinal` 只是
-  **patch 的存放处**，不是应用目标。
+--check 仅逐组针对当前树检查，不修改目标/索引，不是依赖序列模拟；
+不能据全绿推断干净树完整重放。--verify 仅端点计数与标记清单，
+不认证完整 patch、源码一致性、重放、构建、运行或试听。
+补丁搜索使用 CARDINAL_PATCH_DIR（可选）及脚本旁 patches/。
+未显式覆盖时目标仍为 /home/lijia/Cardinal；不要把默认目标当授权。
+Windows/WSL 均需目标自身的有效 Git 仓库；此脚本不自动创建仓库或改索引。
+Git 子进程移除全部继承 GIT_*，仅经目标自身 .git/gitfile 发现仓库并核对顶层；
+合法 separate-git-dir/submodule gitfile 可用，不接受环境绑定的外置仓库。
+所有 Git 命令以 -c 固定 apply.whitespace=nowarn、apply.ignorewhitespace=no、
+core.autocrlf=false、core.eol=lf、core.safecrlf=false，不改用户配置；
+不自动修空白/忽略上下文空白，不经 autocrlf 隐式改换行。这仍是 Git apply
+判据而非全树字节认证（例如仓库自身 attributes/filter 语义不在此作全面认证）。
+CLI 仅接受无参数（原实际 apply 入口），或单个 --check / --verify / --help / -h；
+未知、带值、重复或矛盾参数在任何目标操作前以退出码 2 拒绝。
 """
 
 import os
-import shutil
+import re
+import json
 import subprocess
 import sys
 import tempfile
@@ -106,31 +126,13 @@ PATCHES = [
     ("11-songroll-build.patch", "SongRoll 复活·注册链：Makefile wildcard + plugins.cpp addModel", ""),
     ("12-songroll-module.patch", "SongRoll 复活+阶段2/3·模块本体（rcm-modules 子模块）：引擎（10/11 端口+EOP 推进+JSON）+ UI Rack 2 移植 + 胶文件", "plugins/rcm-modules"),
     ("13-songroll-panel.patch", "SongRoll 新面板（rcm-modules 子模块）：res/SongRoll.svg 重画 600×380，端口图案与真 PortWidget 坐标一一对应", "plugins/rcm-modules"),
+    ("14-rackwindows-nearfar.patch", "rackwindows：条件 undef near/far，修复 MinGW 头宏冲突（无 DSP 算法改动）", "plugins/rackwindows"),
+    ("15-param-write-safety.patch", "参数边界检查与 OSC/JS 控制入口生命周期锁（固定01–14之后，未部署）", ""),
+    ("16-songroll-history-ui.patch", "SongRoll history/UI：完整快照、单向显示刷新、点击权威数据（固定01–15之后，未部署）", "plugins/rcm-modules"),
+    ("17-songroll-stopfirst.patch", "SongRoll 编辑/载入/撤销重做停止首段、同步及event取消（固定01–16之后，未部署）", "plugins/rcm-modules"),
 ]
 
-# 幂等兜底标记：多层 patch 叠同一文件时（01/05/06/07/09/10 全改
-# CardinalCommon.cpp），早期 patch 的**反 apply 会被后期 patch 的叠加
-# 推挤破坏**（2026-10-24 实测：01 失败在 :180、06 在 :1592、08/09 在 :1664，
-# 全是后续组追加区）⇒ 反 apply 判据对这些组误报冲突。
-# 兜底 = 该组的**独有标记**全部在树里 ⇒ 改动确实在，判 skipped。
-# 路径相对 CARDINAL_ROOT（同 VERIFY_MARKS）。只给实测有叠加的组配。
-PATCH_MARKS = {
-    "01-osc-core.patch": [
-        ("src/CardinalCommon.cpp", "CARDINAL-MCP-READ-PROBES-BEGIN"),
-        ("src/override/MenuBar.cpp", "oscAutostartEnabled"),
-    ],
-    "06-b3-module-copy.patch": [
-        ("src/CardinalCommon.cpp", 'REG("/module-copy"'),
-    ],
-    "08-c3-log-get.patch": [
-        ("src/CardinalCommon.cpp", 'REG("/log-get"'),
-    ],
-    "09-c2-load-skipped.patch": [
-        ("src/override/Engine.cpp", "addLoadSkip"),
-    ],
-}
-
-# 校验点：应用完后这些标记必须存在（防止 patch 被裁剪/漏 apply）
+# 标记只供清单诊断，不参与 applied/skipped 的判定。
 VERIFY_MARKS = [
     ("src/CardinalCommon.cpp", "// ==== CARDINAL-MCP-READ-PROBES-BEGIN ====", "A 组只读探针"),
     ("src/CardinalCommon.cpp", "static void cardinalOscReply(", "E1 三段式回包 helper"),
@@ -167,7 +169,7 @@ VERIFY_MARKS = [
     ("plugins/Makefile", "rcm-modules/src/SongRoll/*.cpp", "SongRoll 编译规则"),
     ("plugins/plugins.cpp", "addModel(modelSongRollModule)", "SongRoll addModel"),
     ("plugins/rcm-modules/plugin.json", '"rcm-songroll"', "SongRoll manifest 条目"),
-    ("plugins/rcm-modules/src/SongRoll/SongRollModule.cpp", "modelSongRollModule", "SongRoll 引擎实现"),
+    ("plugins/rcm-modules/src/SongRollModule.cpp", "modelSongRollModule", "SongRoll Model 定义（胶文件）"),
 ]
 
 # OSC 端点总数（M1 后 = 33）
@@ -191,16 +193,34 @@ def find_patch_dir():
         if os.path.isdir(cand) and any(
                 os.path.exists(os.path.join(cand, n)) for n, _, _ in PATCHES):
             return cand
-    die("找不到 patch 目录。已查：\n  " + "\n  ".join(
-        c for c in PATCH_SEARCH if c) +
-        "\n请先 `cp /mnt/d/Cardinal/tools/osc_patch/patches/*.patch /tmp/cardinal-patches/`")
-    return None
+    raise FileNotFoundError("找不到 patch 目录。已查：\n  " + "\n  ".join(
+        c for c in PATCH_SEARCH if c) + "\n用 CARDINAL_PATCH_DIR 指定补丁目录。")
 
 
 def run_git(args, cwd):
-    """跑 git，返回 (rc, stdout+stderr)。"""
-    p = subprocess.run(["git"] + args, cwd=cwd, capture_output=True, text=True)
-    return p.returncode, (p.stdout or "") + (p.stderr or "")
+    """Run read/check/apply commands, retaining complete diagnostics per stream."""
+    # Command-scoped policy, identical for check/reverse/actual; never rewrite
+    # whitespace, relax context, or normalize LF through user autocrlf settings.
+    policy = ["-c", "apply.whitespace=nowarn", "-c", "apply.ignorewhitespace=no",
+              "-c", "core.autocrlf=false", "-c", "core.eol=lf", "-c", "core.safecrlf=false"]
+    result = {"command": ["git"] + policy + args, "cwd": str(cwd), "returncode": None,
+              "stdout": "", "stderr": "", "exception": None}
+    try:
+        # Discover only from cwd's own .git/gitfile, not an inherited repository,
+        # index, config injection, ceiling, or alternate object store binding.
+        env = {key: value for key, value in os.environ.items()
+               if not key.upper().startswith("GIT_")}
+        env.update(LC_ALL="C", LANG="C")
+        p = subprocess.run(result["command"], cwd=cwd, capture_output=True,
+                           text=True, encoding="utf-8", errors="replace", env=env)
+        result.update(returncode=p.returncode, stdout=p.stdout or "", stderr=p.stderr or "")
+    except Exception as exc:
+        result["exception"] = repr(exc)
+        for field in ("stdout", "stderr"):
+            value = getattr(exc, field, None)
+            if value is not None:
+                result[field] = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)
+    return result
 
 
 def read_text(path):
@@ -238,64 +258,65 @@ def apply_one(root, patch_dir, name, desc, apply_root_rel, dry_run=False):
     apply_root_rel = "" 表示在 root 应用；否则在 root/apply_root_rel 应用
     （Rack 子模块的情况）。
     """
-    ppath = os.path.join(patch_dir, name)
-    if not os.path.exists(ppath):
-        return "conflict", "patch 文件不存在：%s" % ppath
+    detail = {"message": desc, "commands": [], "apply_attempted": False}
 
-    apply_root = os.path.join(root, apply_root_rel) if apply_root_rel else root
+    def failure(message):
+        detail["message"] = message
+        return "conflict", detail
+
+    def command(args):
+        result = run_git(args, apply_root)
+        detail["commands"].append(result)
+        return result
+
+    def unsafe(result):
+        # Output is a veto, never positive evidence of success. Check both streams
+        # at every phase, including rc=0 partial/path-filtered operations.
+        output = result["stdout"] + "\n" + result["stderr"]
+        # Match diagnostic records, never words inside "Checking patch <path>"
+        # or hunk contents. Preserve vetoes for both real Git and explicit
+        # partial/filter diagnostics from wrappers, at the start of a line.
+        diagnostic = r"^(?:error: |warning: )?(?:Skipped patch |Skipping (?:patch |path )|" \
+                     r"excluded path |including only |path[- ]filtered(?: |$)|partially applied(?:[ .]|$))"
+        return result.get("exception") or re.search(diagnostic, output, re.I | re.M)
+
+    ppath = os.path.abspath(os.path.join(patch_dir, name))
+    if not os.path.isfile(ppath):
+        return failure("patch 文件不存在：%s" % ppath)
+    apply_root = os.path.abspath(os.path.join(root, apply_root_rel))
     if not os.path.isdir(apply_root):
-        return "conflict", "应用根不存在：%s" % apply_root
+        return failure("应用根不存在：%s" % apply_root)
 
-    # 🔴 git apply 需要在 **git 仓库** 里跑。Rack 是子模块；在"干净副本"里它可能
-    #    只是一个普通目录（没有 .git）⇒ 此时 git apply 会把它当 gitlink，
-    #    输出 "Skipped patch 'include/settings.hpp'" 并**静默跳过**（rc=0，假装成功！）
-    #    ⇒ 必须先给它建个仓库，否则 patch 悄悄没生效。
     if not os.path.exists(os.path.join(apply_root, ".git")):
-        if not dry_run:
-            rc0, out0 = run_git(["init", "-q", "."], apply_root)
-            if rc0 != 0:
-                return "conflict", "无法在 %s 建 git 仓库：\n%s" % (apply_root, out0)
-            run_git(["add", "-A"], apply_root)
-            print("           （已为 %s 建 git 仓库，Rack 子模块必需）"
-                  % apply_root_rel)
+        return failure("应用根须有自身 .git 目录或 gitfile；不接受继承环境绑定的仓库。")
+    repo = command(["rev-parse", "--show-toplevel"])
+    if (repo["returncode"] != 0 or repo.get("exception") or repo["stderr"] or
+            os.path.normcase(os.path.realpath(repo["stdout"].strip())) !=
+            os.path.normcase(os.path.realpath(apply_root))):
+        return failure("应用根必须是实际 Git 工作树顶层；不自动 init/add，用户索引不作初始化。")
 
-    rc, out = run_git(["apply", "--check", "-v", ppath], apply_root)
-    # 🔴 假成功检测：git apply 在某些情况下会输出 "Skipped patch 'xxx'" 并返回 0，
-    #    实际什么都没改。必须当成失败，否则 patch 悄悄丢失。
-    if "skipped patch" in out.lower():
-        return "conflict", ("git apply 跳过了部分文件（假成功）：\n%s\n"
-                           "通常是该目录被当成 gitlink；给它建个 git 仓库即可。" % out)
-
-    if rc == 0:
+    forward = command(["apply", "--check", "-v", ppath])
+    if unsafe(forward):
+        return failure("正向检查异常或跳过/筛选部分路径；不能证明完整应用。")
+    if forward["returncode"] == 0:
         if dry_run:
-            return "would_apply", desc
-        rc2, out2 = run_git(["apply", "-v", ppath], apply_root)
-        if rc2 != 0:
-            return "conflict", "apply 失败：\n%s" % out2
-        return "applied", desc
+            return "would_apply", detail
+        detail["apply_attempted"] = True
+        actual = command(["apply", "-v", ppath])
+        if unsafe(actual) or actual["returncode"] != 0:
+            return failure("实际 apply 失败或部分跳过；此组可能已部分改动，未自动回滚。")
+        return "applied", detail
+    if forward["returncode"] != 1:
+        return failure("git 正向检查执行失败；停止，不尝试后续操作。")
 
-    # ---- 幂等：正向 apply 失败，可能是"已经应用过了" ----
-    # 🔴 判据不能用报错文本（git 对"已应用"和"真冲突"报同样的
-    #    "patch does not apply"）。可靠办法 = **反向检查**：
-    #    patch 能否被 reverse-apply ⇒ 说明改动已在文件里。
-    rc_rev, _ = run_git(["apply", "--check", "-R", ppath], apply_root)
-    if rc_rev == 0:
-        return "skipped", "已应用过（反向检查确认，幂等跳过）"
-
-    # ---- 幂等兜底：反 apply 被后续 patch 叠加推挤时（PATCH_MARKS 注释），
-    #      用该组独有标记判定「改动是否确实在树里」
-    marks = PATCH_MARKS.get(name, [])
-    if marks:
-        missing = [(rel, mk) for rel, mk in marks
-                   if mk not in read_text(os.path.join(root, rel))]
-        if not missing:
-            return "skipped", "已应用过（标记兜底：反 apply 被后续叠加推挤，但独有标记俱在）"
-
-    # 真的冲突
-    low = out.lower()
-    if "already exists" in low or "already applied" in low:
-        return "skipped", "已应用过（幂等跳过）"
-    return "conflict", "冲突，未应用：\n%s" % out
+    reverse = command(["apply", "--check", "-R", "-v", ppath])
+    if unsafe(reverse):
+        return failure("反向检查异常或部分跳过；不能证明已完整应用。")
+    if reverse["returncode"] == 0:
+        detail["message"] = "已应用过（严格反向检查确认，幂等跳过）"
+        return "skipped", detail
+    return failure("正反向检查均不能证明此组状态。后续叠加可能破坏反向检查；"
+                   "这不是要求重新应用，请人工核对完整差异。")
 
 
 def verify(root):
@@ -318,6 +339,11 @@ def verify(root):
 
 def main():
     argv = sys.argv[1:]
+    # Only the documented zero-value modes are accepted. No abbreviations,
+    # ignored positionals, conflicting modes, or duplicate flags may reach apply.
+    if len(argv) > 1 or (argv and argv[0] not in ("--check", "--verify", "--help", "-h")):
+        sys.stderr.write("ERROR: expected no arguments, --check, --verify, or --help (one mode only)\n")
+        return 2
     dry_run = "--check" in argv
     do_verify_only = "--verify" in argv
 
@@ -326,66 +352,72 @@ def main():
         return 0
 
     root = CARDINAL_ROOT
-    if not os.path.isdir(os.path.join(root, ".git")):
-        # git worktree / 裸 .git 文件都算
-        if not os.path.exists(os.path.join(root, ".git")):
-            die("目标不是 git 仓库：%s\n用 CARDINAL_ROOT=... 指定。" % root)
-
-    patch_dir = find_patch_dir()
     print("目标源码树 : %s" % root)
-    print("patch 目录 : %s" % patch_dir)
-    print("")
+    print("清单验收范围：仅端点计数与标记清单；不认证完整 patch、重放、构建或运行。")
+    if dry_run:
+        print("注意：--check 逐组检查当前树，不是依赖序列模拟；不能据全绿推断干净树完整重放。")
 
     if do_verify_only:
-        ok, problems, n_ep = verify(root)
+        try:
+            ok, problems, n_ep = verify(root)
+        except Exception as exc:
+            print("清单检查执行异常：%r；未验收。" % exc)
+            return 1
         print("端点数     : %d / %d" % (n_ep, EXPECTED_ENDPOINTS))
-        if ok:
-            print("\n✅ 校验通过：33 端点 + 所有标记齐全")
-            return 0
-        print("\n❌ 校验不通过：")
-        for p in problems:
-            print("  - %s" % p)
+        print("标记清单检查：%s" % ("通过" if ok else "失败"))
+        for problem in problems:
+            print("  - %s" % problem)
+        return 0 if ok else 1
+
+    resolution_error = None
+    try:
+        patch_dir = find_patch_dir()
+    except Exception as exc:
+        patch_dir, resolution_error = None, repr(exc)
+    print("patch 目录 : %s" % patch_dir)
+    groups = {key: [] for key in ("applied", "skipped", "failed", "notattempted", "would_apply")}
+    for index, (name, desc, apply_root_rel) in enumerate(PATCHES):
+        try:
+            if resolution_error is not None:
+                status, detail = "conflict", {"message": "补丁目录查找失败", "exception": resolution_error}
+            else:
+                status, detail = apply_one(root, patch_dir, name, desc, apply_root_rel,
+                                           dry_run=dry_run)
+        except Exception as exc:
+            status, detail = "unknown", {"message": "组执行异常；副作用未知", "exception": repr(exc)}
+        allowed = ("would_apply", "skipped") if dry_run else ("applied", "skipped")
+        print("%s %s [%s]" % (name, status, apply_root_rel or "."))
+        if status not in allowed:
+            groups["failed"].append(name)
+            groups["notattempted"] = [p[0] for p in PATCHES[index + 1:]]
+            print(json.dumps(detail, ensure_ascii=False, indent=2))
+            break
+        groups[status].append(name)
+
+    for key, names in groups.items():
+        print("%s (%d): %s" % (key, len(names), ", ".join(names) or "-"))
+    if groups["failed"]:
+        if dry_run:
+            print("--check 已停止：未真正改动目标文件或索引；不能证明完整重放。")
+        else:
+            print("停止：先前组可能已生效，失败组副作用须核对；未自动回滚，未验收。")
         return 1
-
-    # ---- 重放 ----
-    results = []
-    for name, desc, apply_root_rel in PATCHES:
-        status, detail = apply_one(root, patch_dir, name, desc, apply_root_rel,
-                                   dry_run=dry_run)
-        results.append((name, desc, status, detail))
-        icon = {"applied": "✔ 已应用", "would_apply": "○ 可应用",
-                "skipped": "= 已存在", "conflict": "✘ 冲突"}.get(status, status)
-        scope = ("[%s] " % apply_root_rel) if apply_root_rel else ""
-        print("%-10s %-28s %s%s" % (icon, name, scope, desc))
-        if status == "conflict":
-            print("           %s" % detail)
-
-    print("")
-    conflicts = [r for r in results if r[2] == "conflict"]
-    if conflicts:
-        print("❌ %d 组冲突，**未强行应用**（避免把源码搞坏）。"
-              "请人工检查上面的详情。" % len(conflicts))
-        return 1
-
-    applied = [r for r in results if r[2] in ("applied", "would_apply")]
-    skipped = [r for r in results if r[2] == "skipped"]
-    print("合计：%d 组应用 / %d 组已存在" % (len(applied), len(skipped)))
-
     if dry_run:
-        print("\n（--check 模式：未真正改动任何文件）")
+        print("--check 模式：未真正改动目标文件或索引。")
         return 0
 
-    # ---- 应用后自动校验 ----
-    ok, problems, n_ep = verify(root)
-    print("")
+    try:
+        ok, problems, n_ep = verify(root)
+    except Exception as exc:
+        print("校验执行异常：%r；先前组可能已生效，未验收；未自动回滚。" % exc)
+        return 1
     print("端点数     : %d / %d" % (n_ep, EXPECTED_ENDPOINTS))
     if ok:
-        print("✅ 校验通过：33 端点 + 所有标记齐全")
-        print("\n下一步：编译（见 HANDOFF.md §2.4）")
+        print("端点与标记清单检查通过。")
         return 0
-    print("❌ 校验不通过：")
-    for p in problems:
-        print("  - %s" % p)
+    print("清单校验失败：先前组可能已生效但未验收；未自动回滚。")
+    for problem in problems:
+        print("  - %s" % problem)
     return 1
 
 

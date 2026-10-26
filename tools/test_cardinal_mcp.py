@@ -71,11 +71,11 @@ class TestHistVsStatus(unittest.TestCase):
         out = m._hist("anything")
         self.assertTrue(out["ok"])
 
-    def test_hist_none_is_unsupported(self):
+    def test_hist_none_is_no_response(self):
+        # 无应答不能证明构建不支持，且绝不伪装成 ok。
         out = m._hist(None)
-        # 探针不可用时报 error=probe_not_supported，绝不伪装成 ok。
-        self.assertEqual(out.get("error"), "probe_not_supported")
-        self.assertNotIn("ok", out)  # 不出现 ok=True 的假成功
+        self.assertEqual(out.get("error"), "probe_no_response")
+        self.assertFalse(out.get("ok"))
 
 
 class TestScreenshotTarget(unittest.TestCase):

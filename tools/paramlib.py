@@ -837,18 +837,41 @@ TERMS = {
 
 
 def lookup(plugin, model):
-    """Find a module's dictionary entry, trying plugin/model aliases and a
-    model-only fallback."""
-    lib = load()
-    for p in (plugin, ALIAS.get(plugin, plugin)):
-        for m in (model, MODEL_ALIAS.get(model, model)):
-            hit = lib.get("{}/{}".format(p, m))
-            if hit:
-                return hit
-    for v in lib.values():
-        if v.get("model") == model:
-            return v
-    return None
+    """Resolve a unique plugin/model identity; never borrow another plugin.
+
+    Case folding and the existing explicit aliases are supported. A missing
+    plugin (None) permits only one valid model identity across the whole library;
+    an explicit plugin never falls back. Collisions or invalid entries fail closed.
+    """
+    if (plugin is not None and not isinstance(plugin, str)) or not isinstance(model, str):
+        return None
+    def canonical(p, m):
+        p, m = p.casefold(), m.casefold()
+        p = {k.casefold(): v.casefold() for k, v in ALIAS.items()}.get(p, p)
+        m = {k.casefold(): v.casefold() for k, v in MODEL_ALIAS.items()}.get(m, m)
+        return p, m
+    wanted = canonical(plugin or '', model)
+    matches = []
+    for key, value in load().items():
+        if not isinstance(key, str) or '/' not in key:
+            continue
+        identity = canonical(*key.split('/', 1))
+        if (identity != wanted if plugin is not None else identity[1] != wanted[1]):
+            continue
+        if (not isinstance(value, dict) or
+                not isinstance(value.get('plugin'), str) or
+                not isinstance(value.get('model'), str) or
+                canonical(value['plugin'], value['model']) != identity):
+            return None
+        params = value.get('params')
+        if not isinstance(params, dict):
+            return None
+        for pid, info in params.items():
+            if (not isinstance(pid, str) or not re.fullmatch(r'0|[1-9][0-9]*', pid)
+                    or len(pid) > 10 or int(pid) >= 2**31 or not isinstance(info, dict)):
+                return None
+        matches.append(value)
+    return matches[0] if len(matches) == 1 else None
 
 
 def name_of(plugin, model, param_id):

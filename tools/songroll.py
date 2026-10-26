@@ -39,6 +39,7 @@ import shutil
 from typing import Any
 
 import patchio
+import editor_contracts as contracts
 
 PATCH_DIR = os.environ.get("CARDINAL_PATCH_DIR") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "patches"
@@ -124,17 +125,17 @@ def _validate_sections(sections: Any) -> tuple[bool, str]:
             r = ch.get("repeats", 1)
             m = ch.get("repeat_mode", 1)
             cd = ch.get("clock_div", 1)
-            if not isinstance(p, int) or not (PATTERN_MIN <= p <= PATTERN_MAX):
+            if type(p) is not int or not (PATTERN_MIN <= p <= PATTERN_MAX):
                 return False, (f"第 {i+1} 段通道 {c+1} pattern={p!r} 越界"
                                f"（应为 {PATTERN_MIN}..{PATTERN_MAX}，1-based）")
-            if not isinstance(r, int) or not (REPEATS_MIN <= r <= REPEATS_MAX):
+            if type(r) is not int or not (REPEATS_MIN <= r <= REPEATS_MAX):
                 return False, (f"第 {i+1} 段通道 {c+1} repeats={r!r} 越界"
                                f"（应为 {REPEATS_MIN}..{REPEATS_MAX}；"
                                f"注意面板控件只支持到 64）")
-            if not isinstance(m, int) or not (0 <= m <= 2):
+            if type(m) is not int or not (0 <= m <= 2):
                 return False, (f"第 {i+1} 段通道 {c+1} repeat_mode={m!r} 越界"
                                f"（0=不限 1=至少 2=至多）")
-            if not isinstance(cd, int) or not (CLOCK_DIV_MIN <= cd <= CLOCK_DIV_MAX):
+            if type(cd) is not int or not (CLOCK_DIV_MIN <= cd <= CLOCK_DIV_MAX):
                 return False, (f"第 {i+1} 段通道 {c+1} clock_div={cd!r} 越界"
                                f"（应为 {CLOCK_DIV_MIN}..{CLOCK_DIV_MAX}，0=关）")
     return True, ""
@@ -179,23 +180,17 @@ def _write_patch_preserving_format(path: str, d: dict[str, Any]) -> str:
     return path
 
 
-def _select_module(patch: dict[str, Any], module: str | None) -> tuple[dict | None, str]:
+def _select_module(patch, module, module_id=None):
     mods = _find_songroll(patch)
+    target, error = contracts.select_target(patch.get("modules") or [], mods, module, module_id)
     if not mods:
-        return None, "这份机架里没有 SongRoll 模块（model=rcm-songroll）"
-    if module:
-        for m in mods:
-            if module.lower() in m.get("model", "").lower() or \
-               module.lower() in f"{m.get('plugin')}|{m.get('model')}".lower():
-                return m, ""
-        return None, (f"机架里有 {len(mods)} 个 SongRoll，但没有名为 {module!r} 的"
-                      f"（本工具按 model 名匹配，用 'songroll' 即可）")
-    return mods[0], ""
+        error["error"] = "这份机架里没有 SongRoll 模块（model=rcm-songroll）"
+    return target, error
 
 
 # ================================================================ 读取
 
-def read_sections(patch_name: str, module: str | None = None) -> dict[str, Any]:
+def read_sections(patch_name: str, module: str | None = None, module_id: int | None = None) -> dict[str, Any]:
     """读出段落表（人话摘要 + 原始 JSON）"""
     path = _resolve(patch_name)
     out: dict[str, Any] = {"ok": False, "patch": patch_name, "module": module}
@@ -209,9 +204,9 @@ def read_sections(patch_name: str, module: str | None = None) -> dict[str, Any]:
         out["error"] = err
         return out
 
-    m, err = _select_module(d, module)
+    m, err = _select_module(d, module, module_id)
     if m is None:
-        out["error"] = err
+        out.update(err)
         return out
 
     sections = _get_sections(m)
@@ -237,33 +232,16 @@ def read_sections(patch_name: str, module: str | None = None) -> dict[str, Any]:
 def _commit(patch_name: str, d: dict[str, Any], path: str,
             backup: bool, load_after: bool) -> dict[str, Any]:
     """备份 → 写盘 → （可选）重载。返回写盘结果字典。"""
-    out: dict[str, Any] = {}
-    if backup:
-        bak = path + ".bak-songroll"
-        shutil.copy2(path, bak)
-        out["backup"] = bak
-        out["backup_note"] = "⚠️ Cardinal 若开着，之后在它里 Ctrl+S 会覆盖这次改动。"
-
-    try:
-        _write_patch_preserving_format(path, d)
-    except Exception as e:  # noqa: BLE001
-        out["ok"] = False
-        out["error"] = f"写盘失败（已备份，可回滚）：{e}"
-        return out
-
-    out["ok"] = True
-    out["written"] = path
-    out["note"] = ("文件已改。若 Cardinal 开着，要看到效果需重新加载"
-                   "（load_patch 会中断音频，先确认）。")
-    if load_after:
-        import cardinal_mcp as cm
-        out["loaded"] = cm.load_patch(os.path.basename(path))
-    return out
+    return contracts.save_edit({}, path, d, ".bak-songroll" if backup else None,
+                               load_after, writer=_write_patch_preserving_format)
 
 
 def write_sections(patch_name: str, module: str | None, sections: list[dict[str, Any]],
-                   backup: bool = True, load_after: bool = False) -> dict[str, Any]:
+                   backup: bool = True, load_after: bool = False, module_id: int | None = None) -> dict[str, Any]:
     """整表写入段落表（自检不过就不写）"""
+    error = contracts.input_error(bools=dict(backup=backup, load_after=load_after))
+    if error:
+        return error
     path = _resolve(patch_name)
     out: dict[str, Any] = {"ok": False, "patch": patch_name, "module": module}
     if not path:
@@ -282,9 +260,9 @@ def write_sections(patch_name: str, module: str | None, sections: list[dict[str,
         out["error"] = err
         return out
 
-    m, err = _select_module(d, module)
+    m, err = _select_module(d, module, module_id)
     if m is None:
-        out["error"] = err
+        out.update(err)
         return out
 
     m.setdefault("data", {})
@@ -305,7 +283,7 @@ def edit(patch_name: str, module: str | None, op: str,
          index: int | None = None, after: int | None = None,
          src: int | None = None, dst: int | None = None,
          running: bool | None = None,
-         backup: bool = True, load_after: bool = False) -> dict[str, Any]:
+         backup: bool = True, load_after: bool = False, module_id: int | None = None) -> dict[str, Any]:
     """高层操作——李用大白话说，我改段落表。
 
     op 取值：
@@ -316,6 +294,14 @@ def edit(patch_name: str, module: str | None, op: str,
       set_channel      改某段某通道（section + channel + pattern/repeats/mode/clock_div）
       set_running      设走带开关（running=True/False）
     """
+    error = contracts.input_error(
+        ints={k: v for k, v in dict(section=section, channel=channel, pattern=pattern,
+              repeats=repeats, mode=mode, clock_div=clock_div, index=index,
+              after=after, src=src, dst=dst).items() if v is not None},
+        bools={**dict(backup=backup, load_after=load_after),
+               **({'running': running} if running is not None or op == 'set_running' else {})})
+    if error:
+        return error
     path = _resolve(patch_name)
     out: dict[str, Any] = {"ok": False, "patch": patch_name, "module": module, "op": op}
     if not path:
@@ -327,9 +313,9 @@ def edit(patch_name: str, module: str | None, op: str,
         out["error"] = err
         return out
 
-    m, err = _select_module(d, module)
+    m, err = _select_module(d, module, module_id)
     if m is None:
-        out["error"] = err
+        out.update(err)
         return out
 
     sections = _get_sections(m)

@@ -1,0 +1,24 @@
+diff --git a/src/rwlib.h b/src/rwlib.h
+index 9bd0b8c..d9700f9 100644
+--- a/src/rwlib.h
++++ b/src/rwlib.h
+@@ -3,6 +3,19 @@
+ 
+ #include "math.h"
+ 
++/* Cardinal patch 2026-09-20 (near/far undef)
++ * 交叉编译到 Windows 时，mingw 的 <minwindef.h> 会无条件把 near / far
++ * 定义为空宏（16 位内存模型遗留，且不受 _NO_W32_PSEUDO_MODIFIERS 控制）。
++ * 本文件里的 `int near` / `int far` 会被吃成 `int  = ...`，报
++ *   error: expected unqualified-id before '=' token
++ * Linux 原生编译不含 <windows.h>，所以从没暴露过。此处取消这两个宏。 */
++#ifdef near
++#undef near
++#endif
++#ifdef far
++#undef far
++#endif
++
+ namespace rwlib {
+ 
+ /* #functions

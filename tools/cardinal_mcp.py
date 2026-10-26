@@ -45,6 +45,7 @@ Run modes
 
 import io
 import json
+import math
 import os
 import re
 import shutil
@@ -65,6 +66,7 @@ import modbrowser  # noqa: E402  (module library, reads Cardinal's PluginManifes
 import modresolve  # noqa: E402  (plain-language module name -> candidates/unique hit)
 import topology  # noqa: E402  (rack wiring / role recognition)
 import seq  # noqa: E402  (sequencer notes = piano-roll equivalent)
+import editor_contracts as contracts
 import songroll  # noqa: E402  (SongRoll sections = song arrangement table)
 import abc_export  # noqa: E402  (sequencer notes -> .abc text score)
 import samplelib  # noqa: E402  (sampler slots = right-click 'Load sample' equivalent)
@@ -127,6 +129,7 @@ class CardinalLink:
     def __init__(self):
         # Bind to an ephemeral local port ("" , 0); we only send to Cardinal
         # and receive its replies on this same socket.
+        self.target = (socket.gethostbyname(CARDINAL_IP), CARDINAL_PORT)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(("", 0))
         self.sock.settimeout(TIMEOUT)
@@ -135,46 +138,51 @@ class CardinalLink:
         # On Windows, sending to a port with nobody listening raises
         # ConnectionResetError (ICMP unreachable) instead of failing silently.
         try:
-            self.sock.sendto(build_msg(address, args), (CARDINAL_IP, CARDINAL_PORT))
+            self.sock.sendto(build_msg(address, args), self.target)
             return True
         except OSError as e:
             raise RuntimeError(
                 f"OSC send failed ({e}). Confirm Cardinal standalone has "
                 f"Engine -> Enable OSC remote control on, port {CARDINAL_PORT}.") from e
 
-    def ask(self, address, args=(), expect="/resp", timeout=None):
-        """Send one message and wait for a `/resp` reply.
+    def ask(self, address, args=(), expect="/resp", timeout=None, reply_tag=None):
+        """Wait for a reply from the configured peer and, optionally, a tag.
 
-        Returns the reply params list, or None on timeout / no listener.
-        We first drain any stale datagrams so a leftover reply from a previous
-        call cannot be mistaken for the answer to this one.
+        Drain without blocking and ignore diagnostics/foreign packets until
+        the monotonic deadline. The legacy protocol still has no request ID:
+        a delayed same-tag reply cannot be fully disambiguated here.
         """
-        self.sock.settimeout(timeout or TIMEOUT)
-        # Drain leftover datagrams (best effort).
+        budget = TIMEOUT if timeout is None else timeout
+        if not math.isfinite(budget) or budget <= 0:
+            raise ValueError("OSC timeout must be finite and positive")
+        self.sock.settimeout(0.0)
         try:
-            while True:
+            for _ in range(256):
                 self.sock.recv(65535)
-        except (socket.timeout, OSError):
+        except (BlockingIOError, socket.timeout, OSError):
             pass
 
+        self.sock.settimeout(budget)
+        deadline = time.monotonic() + budget
         self.send(address, args)
-        deadline = time.time() + (timeout or TIMEOUT)
-        while time.time() < deadline:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            self.sock.settimeout(remaining)
             try:
-                data, _addr = self.sock.recvfrom(65535)
-            except socket.timeout:
+                data, peer = self.sock.recvfrom(65535)
+            except (socket.timeout, OSError):
                 return None
-            except OSError:
-                # Port not listening: Windows returns an ICMP unreachable and
-                # raises ConnectionResetError here.
-                return None
+            if peer != self.target:
+                continue
             try:
                 msg = OscMessage(data)
             except Exception:
                 continue
-            if msg.address == expect:
+            if (msg.address == expect and
+                    (reply_tag is None or (msg.params and str(msg.params[0]) == reply_tag))):
                 return msg.params
-        return None
 
 
 # Module-level singleton: one socket for the process lifetime.
@@ -252,7 +260,7 @@ def load_patch(name):
         raw = f.read()
     blob = patchio.archive_bytes(raw)
     extra = {"blob_bytes": len(blob)}
-    res = link().ask("/load", [("b", blob)], timeout=6.0)
+    res = link().ask("/load", [("b", blob)], timeout=6.0, reply_tag="load")
     if res is None:
         # Reached Cardinal? The most common cause: OSC not enabled, or wrong port.
         return {"ok": False, "sent": os.path.basename(p), **extra,
@@ -261,15 +269,34 @@ def load_patch(name):
     # D2: Cardinal answers ["load", "ok"|"warn <text>"|"fail <text>"].
     # "warn" = loaded but with diagnostics (fromJson/unarchive warnings),
     # now surfaced here instead of only popping a GUI dialog (or vanishing).
-    last = reply[-1] if reply else ""
-    if last == "ok":
+    if len(reply) not in (2, 3) or reply[0] != "load":
+        return {"ok": False, "error": "invalid_load_reply", "reply": reply, **extra}
+    payload = reply[1]
+    status = reply[2] if len(reply) == 3 else "ok"
+    if payload == "ok":
         ok, warnings = True, []
-    elif last.startswith("warn "):
-        ok, warnings = True, [last[5:].strip()]
+    elif payload.startswith("warn "):
+        ok, warnings = True, [payload[5:].strip()]
     else:
-        ok, warnings = False, [last[5:] if last.startswith("fail ") else last]
-    return {"ok": ok, "warnings": warnings,
+        ok, warnings = False, [payload[5:] if payload.startswith("fail ") else payload]
+    return {"ok": ok and status == "ok", "warnings": warnings, "status": status,
             "sent": os.path.basename(p), "reply": reply, **extra}
+
+
+def _parameter_input_error(module_id, param_id, value):
+    """Reject unsafe OSC integer/float values before even a preflight read."""
+    if type(module_id) is not int or not 0 <= module_id < 2 ** 63:
+        return {"ok": False, "sent": False, "error": "module_id must be a nonnegative int64"}
+    if type(param_id) is not int or not 0 <= param_id < 2 ** 31:
+        return {"ok": False, "sent": False, "error": "param_id must be a nonnegative int32"}
+    try:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("value must be numeric")
+        if not math.isfinite(struct.unpack("f", struct.pack("f", value))[0]):
+            raise ValueError("value must be finite")
+    except (ValueError, OverflowError, struct.error):
+        return {"ok": False, "sent": False, "error": "value must fit a finite OSC float32"}
+    return None
 
 
 def set_param(module_id, param_id, value):
@@ -278,13 +305,21 @@ def set_param(module_id, param_id, value):
     Args:
       module_id  int64 module index (from patch_info)
       param_id   int   parameter slot, 0-based
-      value      float target (typically 0.0 – 1.0, but some params use other
-                ranges — e.g. VCF cutoff is in Hz-ish internal units).
+      value      finite raw storage value; units/ranges are module-specific.
+                A live read probe must validate the slot before raw sending.
     """
+    invalid = _parameter_input_error(module_id, param_id, value)
+    if invalid:
+        return invalid
+    validation = get_param(module_id, param_id)
+    if validation.get("ok") is not True or validation.get("status") != "ok":
+        return {"ok": False, "sent": False, "error": "parameter_validation_failed",
+                "validation": validation}
     link().send("/param", [("h", int(module_id)), ("i", int(param_id)),
                            ("f", float(value))])
-    return {"ok": True, "moduleId": int(module_id), "paramId": int(param_id),
-            "value": float(value)}
+    return {"ok": True, "sent": True, "verified": False,
+            "moduleId": int(module_id), "paramId": int(param_id), "value": float(value),
+            "note": "Raw /param has no acknowledgement; read back to verify. C++ still needs bounds checks."}
 
 
 # ★ 2026-10-19 批次 A1：按名字设参数。
@@ -295,13 +330,15 @@ def _find_module_instances(d, module):
     机架里常有 2 个同型号（2 个 VCA-1 是常态），所以返回列表而不是单个，
     由调用方用 instance 序号挑 —— 永远把「有几个、挑了哪个」报出来。
     """
-    if "/" in module:
-        plug_want, model_want = module.split("/", 1)
-        want = plug_want.lower() + "/" + model_want.lower()
+    qualified = module.replace('|', '/')
+    if '/' in qualified:
+        plug_want, model_want = qualified.casefold().split('/', 1)
+        hits = [m for m in d.get('modules', [])
+                if m['plugin'].casefold() == plug_want and m['model'].casefold() == model_want]
     else:
-        want = module.lower()
-    hits = [m for m in d.get("modules", [])
-            if want in (m["plugin"] + "/" + m["model"]).lower()]
+        want = module.casefold()
+        hits = [m for m in d.get('modules', [])
+                if want in (m['plugin'] + '/' + m['model']).casefold()]
     return hits, d.get("modules", [])
 
 
@@ -313,6 +350,8 @@ def _resolve_param_id(entry, param):
     - 匹配只认有名字的槽 —— reserved 槽 name=None，天然不会被名字命中
     """
     params = entry["params"]
+    if type(param) not in (str, int) or (type(param) is int and param < 0):
+        return None, None, "param must be a name or nonnegative integer (not bool)"
     if re.fullmatch(r"\d+", str(param).strip()):
         pid = int(param)
         info = params.get(str(pid))
@@ -352,21 +391,27 @@ def set_param_by_name(patch, module, param, value, instance=0, load_after=False)
     永远带「共几个 / 挑了哪个 / 它的位置」。
     """
     import paramlib as pl
+    error = contracts.input_error(bools=dict(load_after=load_after))
+    if error:
+        return error
     p = resolve(patch)
     if not os.path.exists(p):
         return {"error": f"patch not found: {p}"}
+    error = contracts.input_error(ints=dict(instance=instance), numbers=dict(value=value))
+    if error:
+        return error
     d = patchio.read_patch(p)
 
     hits, all_mods = _find_module_instances(d, module)
     if not hits:
         return {"error": f"机架里没有「{module}」",
                 "available": sorted({m["model"] for m in all_mods})}
-    if not 0 <= int(instance) < len(hits):
+    if not 0 <= instance < len(hits):
         return {"error": f"机架里有 {len(hits)} 个 {module}，instance={instance} 越界",
                 "instances": [{"instance": i, "module_id": m["id"],
                                "pos": (m.get("pos") or [None, None])[0]}
                               for i, m in enumerate(hits)]}
-    mod = hits[int(instance)]
+    mod = hits[instance]
 
     entry = pl.lookup(mod["plugin"], mod["model"])
     if not entry:
@@ -397,11 +442,7 @@ def set_param_by_name(patch, module, param, value, instance=0, load_after=False)
     else:
         params.append({"id": pid, "value": float(value)})
 
-    bak = p + ".bak-param"
-    shutil.copy2(p, bak)
-    patchio.write_patch(p, d)
-
-    out = {"ok": True, "patch": os.path.basename(p), "backup": bak,
+    out = {"ok": True, "patch": os.path.basename(p),
            "module": f"{mod['plugin']}/{mod['model']}",
            "module_id": mod["id"], "param_id": pid,
            "param_name": (info or {}).get("name"), "kind": (info or {}).get("kind"),
@@ -410,8 +451,7 @@ def set_param_by_name(patch, module, param, value, instance=0, load_after=False)
         out["note_instances"] = f"机架里有 {len(hits)} 个 {mod['model']}，本次改的是 instance={instance}"
     if warnings:
         out["warnings"] = warnings
-    if load_after:
-        out["loaded"] = load_patch(p)
+    out = contracts.save_edit(out, p, d, ".bak-param", load_after, load_patch)
     return out
 
 
@@ -443,6 +483,9 @@ def set_params_by_name_batch(patch, sets, load_after=False):
     记 failed，其余照改。全部失败时**不写盘**（防止把好文件写坏）。
     """
     import paramlib as pl
+    error = contracts.input_error(bools=dict(load_after=load_after))
+    if error:
+        return error
     p = resolve(patch)
     if not os.path.exists(p):
         return {"error": f"patch not found: {p}"}
@@ -462,10 +505,10 @@ def set_params_by_name_batch(patch, sets, load_after=False):
             module = item.get("module")
             param = item.get("param")
             value = item.get("value")
-            instance = int(item.get("instance", 0) or 0)
+            instance = contracts.integer(item.get("instance", 0), "instance")
             if module is None or param is None or value is None:
                 raise ValueError("缺 module / param / value")
-            value = float(value)
+            value = contracts.number(value, "value")
 
             hits, all_mods = _find_module_instances(d, module)
             if not hits:
@@ -527,17 +570,14 @@ def set_params_by_name_batch(patch, sets, load_after=False):
                 "results": results,
                 "note": "没有一条成功 ⇒ 未写盘（原文件未改动）"}
 
-    bak = p + ".bak-param"
-    shutil.copy2(p, bak)
-    patchio.write_patch(p, d)
-
-    out = {"ok": True, "patch": os.path.basename(p), "backup": bak,
+    out = {"ok": True, "patch": os.path.basename(p),
            "written": True, "applied": applied, "requested": len(sets),
            "failed": len(sets) - applied, "results": results}
     if applied != len(sets):
         out["note"] = f"{applied} 条成功、{len(sets) - applied} 条失败 —— 成功的已写入，失败的见对应条目"
-    if load_after:
-        out["loaded"] = load_patch(p)
+    out = contracts.save_edit(out, p, d, ".bak-param", load_after, load_patch)
+    if out.get("written"):
+        out["written"] = True
     return out
 
 
@@ -610,10 +650,10 @@ def cardinal_audit(name, checks=None):
     if "ports" in checks:
         try:
             bad = audit_ports.audit(p, verbose=False)
+            out["checks"]["ports"] = {"ok": not bad, "hard": len(bad),
+                                      "violations": sorted(set(bad))}
         except Exception as e:  # noqa: BLE001
-            bad = [f"audit_ports crashed: {e}"]
-        out["checks"]["ports"] = {"ok": not bad, "hard": len(bad),
-                                  "violations": sorted(set(bad))}
+            out["checks"]["ports"] = {"ok": False, "error": f"audit_ports crashed: {e}"}
 
     if "values" in checks:
         try:
@@ -623,8 +663,6 @@ def cardinal_audit(name, checks=None):
             hard, soft = int(hard or 0), int(soft or 0)
             out["checks"]["values"] = {"ok": hard == 0, "hard": hard,
                                        "warnings": soft}
-        except Exception as e:  # noqa: BLE001
-            out["checks"]["values"] = {"ok": False, "error": f"audit_values crashed: {e}"}
         except Exception as e:  # noqa: BLE001
             out["checks"]["values"] = {"ok": False, "error": f"audit_values crashed: {e}"}
 
@@ -645,8 +683,11 @@ def cardinal_audit(name, checks=None):
             out["checks"]["chain"] = {"ok": False, "error": f"audit_chain crashed: {e}"}
 
     if "validate" in checks:
-        problems = _audit_validate(p)
-        out["checks"]["validate"] = {"ok": not problems, "problems": problems}
+        try:
+            problems = _audit_validate(p)
+            out["checks"]["validate"] = {"ok": not problems, "problems": problems}
+        except Exception as e:  # noqa: BLE001
+            out["checks"]["validate"] = {"ok": False, "error": f"audit_validate crashed: {e}"}
 
     # FAIL = 任一检查 ok=False；WARN = 全 ok 但有软告警
     fail = any(not v.get("ok", True) for v in out["checks"].values())
@@ -662,8 +703,9 @@ def set_host_param(port, value):
     Host parameters drive things like audio device, sample rate, and the knobs
     exposed by the Host Parameters / Host Parameters Map modules.
     """
-    if not 0 <= int(port) <= 23:
-        return {"error": "port must be 0-23"}
+    invalid = _tool_input_error("cardinal_set_host_param", {"port": port, "value": value})
+    if invalid:
+        return invalid
     link().send("/host-param", [("i", int(port)), ("f", float(value))])
     return {"ok": True, "port": int(port), "value": float(value)}
 
@@ -713,6 +755,15 @@ def _classify_port(direction, enum, name):
     return "cv/other"
 
 
+def _lookup_module_entry(module):
+    """Dictionary queries share fail-closed identity resolution, never first-match."""
+    if not isinstance(module, str):
+        return None
+    qualified = module.replace('|', '/')
+    plugin, model = qualified.split('/', 1) if '/' in qualified else (None, module)
+    return pl.lookup(plugin, model)
+
+
 def cardinal_port_semantics(module=None, patch=None, module_id=None):
     """查一个模块的端口语义表：每个口是 pitch/gate/clock/audio/cv。
 
@@ -727,19 +778,14 @@ def cardinal_port_semantics(module=None, patch=None, module_id=None):
         if not os.path.exists(resolve(patch)):
             return {"error": f"patch not found: {resolve(patch)}"}
         d = patchio.read_patch(resolve(patch))
-        hits = [m for m in d.get("modules", [])
-                if not module or module.lower() in (m["plugin"] + "/" + m["model"]).lower()]
-        if not hits:
-            return {"error": f"patch has no module {module}"}
-        mod = hits[0]
+        mod, err = contracts.select_target(d.get('modules', []), d.get('modules', []),
+                                           module, module_id)
+        if err:
+            return err
         plugin, model = mod["plugin"], mod["model"]
         entry = pl.lookup(plugin, model)
     elif module:
-        if "/" in module:
-            plugin, model = module.split("/", 1)
-        else:
-            plugin, model = None, module
-        entry = pl.lookup(plugin, model)
+        entry = _lookup_module_entry(module)
     if not entry:
         return {"error": f"{module} not in param dictionary",
                 "known": sorted(pl.load().keys())}
@@ -774,16 +820,29 @@ def _params_map(module):
     所以可以直接逐项比。
     """
     out = {}
-    for q in (module.get("params") or []):
+    params = module.get("params", [])
+    if not isinstance(params, list):
+        raise ValueError("params must be a list")
+    for index, q in enumerate(params):
         if not isinstance(q, dict):
-            continue
+            raise ValueError("params[%d] must be an object" % index)
         pid = q.get("id")
-        if pid is None:
-            continue
+        if not isinstance(pid, int) or isinstance(pid, bool) or pid < 0:
+            raise ValueError("params[%d] requires a nonnegative integer id" % index)
+        if pid in out:
+            raise ValueError("duplicate param id: %d" % pid)
+        if "value" not in q:
+            raise ValueError("param %d is missing value" % pid)
+        value = q["value"]
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError("param %d value must be numeric" % pid)
         try:
-            out[int(pid)] = float(q.get("value", 0.0))
-        except (TypeError, ValueError):
-            continue
+            value = float(value)
+        except (ValueError, OverflowError) as exc:
+            raise ValueError("param %d value must be finite" % pid) from exc
+        if not math.isfinite(value):
+            raise ValueError("param %d value must be finite" % pid)
+        out[pid] = value
     return out
 
 
@@ -815,6 +874,11 @@ def _diff_params(d_file, d_live, tol=1e-4):
                 continue
             compared += 1
             vlive = pl[pid]
+            if not math.isfinite(vfile) or not math.isfinite(vlive):
+                mismatches.append({"module_id": mf["id"], "param_id": pid,
+                                   "file_value": str(vfile), "live_value": str(vlive),
+                                   "reason": "nonfinite_value", "delta": None})
+                continue
             if abs(vfile - vlive) > tol:
                 mismatches.append({
                     "module_id": mf["id"],
@@ -864,7 +928,7 @@ def cardinal_diff(name, check_params=True):
     extra_m = mods_l - mods_f
     extra_c = cab_l - cab_f
     started = cardinal_proc_start()
-    stale = bool(started and os.path.getmtime(live_path) + 1.0 < started)
+    stale = (os.path.getmtime(live_path) + 1.0 < started) if started is not None else None
 
     # --- 参数层（E8 解锁：/param-get 探针已编译，可读实时值） -------------
     param_mismatches, param_stats = ([], {"params_compared": 0,
@@ -904,47 +968,70 @@ def cardinal_diff(name, check_params=True):
         "missing_cables": ["%s#%s -> %s#%s" % c for c in sorted(miss_c)],
         "extra_cables": ["%s#%s -> %s#%s" % c for c in sorted(extra_c)],
         "stale": stale,
-        "note": note}
+        "freshness_known": started is not None,
+        "source": "autosave_snapshot", "note": note}
 
 
 def cardinal_deploy(name, load_after=True):
-    """一键部署：备份 → 五项审计（FAIL 拒发）→ /load → 读回比对（结构 + 参数）。
+    """Audit, optionally load, then compare the limited autosave snapshot.
 
-    顺序即防线：崩类问题被审计拦在加载前；diff 证明「文件里的东西
-    引擎真的都装上了」。
-
-    ✅ E8 已解锁（2026-10-21）：当年因 `/param-get` 探针没编译，只能验结构。
-    现在探针已进 exe，且引擎 autosave 与 .vcv 同量纲 ⇒ **参数层也能验**：
-    旋钮值没真正生效（被引擎钳位、被静默丢弃、被模块版本改写）现在会被抓出来。
-
-    ⚠️ 但参数层的可信度依赖 autosave 是新鲜的：`/load` 会触发一次
-    autosave 落盘，所以 deploy 路径上参数层是可靠的；若是别的场景
-    （比如只改了文件没 load），autosave 可能是旧的 ⇒ 看 `stale` 标志。
+    load_after=False must never load or diff. A source-file backup is NOT a
+    backup of unsaved GUI state. Successful snapshot checks do not verify
+    live memory, sequencer data, layout or sound; missing evidence fails closed.
     """
+    invalid = _tool_input_error("cardinal_deploy", {"name": name, "load_after": load_after})
+    if invalid:
+        return invalid
     p = resolve(name)
     if not os.path.exists(p):
         return {"error": "patch not found: %s" % p}
     bak = p + ".bak-deploy"
     shutil.copy2(p, bak)
     au = cardinal_audit(name)
-    if au.get("verdict") == "FAIL":
+    if not isinstance(au, dict) or au.get("error") or au.get("verdict") not in ("PASS", "WARN"):
         return {"ok": False, "deployed": False, "backup": bak,
-                "why": "audit FAIL —— 加载即崩类问题，先修再部署", "audit": au}
+                "why": "Audit failed or did not provide a valid verdict; refusing to load.", "audit": au}
+    if not load_after:
+        return {"ok": True, "deployed": False, "loaded": False,
+                "verified": False, "stage": "audited", "backup": bak,
+                "audit": au, "note": "Audit only; the running rack was not loaded or verified."}
     loaded = load_patch(p)
     if not isinstance(loaded, dict) or not loaded.get("ok"):
         return {"ok": False, "deployed": False, "backup": bak,
                 "why": "/load failed（Cardinal 开着吗？OSC 开了吗）",
                 "load_result": loaded}
-    time.sleep(1.0)          # 引擎装载 + autosave 落盘需要一点时间
-    diff = cardinal_diff(name)
-    out = {"ok": True, "deployed": os.path.basename(p), "backup": bak,
-           "audit_verdict": au.get("verdict"), "diff": diff}
-    # 参数层不通过 ⇒ 整体不算完全成功，但**不掩盖**：结构层与参数层分开报
-    if diff.get("params_checked") and diff.get("params_match") is False:
-        out["ok"] = False
-        out["why"] = ("结构层一致，但参数层有 %d 项与文件不符 —— "
-                      "引擎没真正吃下这些旋钮值"
-                      % len(diff.get("param_mismatches") or []))
+    out = {"ok": False, "deployed": os.path.basename(p), "loaded": True,
+           "verified": False, "stage": "loaded", "load_association_proven": False,
+           "verification_scope": "autosave_structure_and_params",
+           "live_verified": False, "backup": bak, "load_result": loaded,
+           "audit_verdict": au.get("verdict"),
+           "note": "Autosave comparison is not current-memory, module-data or audio verification."}
+    if loaded.get("warnings"):
+        out.update(stage="loaded_with_warnings",
+                   why="Load warnings require inspection before verification.")
+        return out
+    try:
+        time.sleep(1.0)  # A delay alone is not evidence of autosave completion.
+        diff = cardinal_diff(name)
+        param_stats = diff.get("params") if isinstance(diff, dict) else None
+        snapshot_complete = (isinstance(diff, dict) and not diff.get("error")
+                    and diff.get("match") is True
+                    and diff.get("params_checked") is True
+                    and diff.get("params_match") is True
+                    and diff.get("freshness_known") is True
+                    and diff.get("stale") is False
+                    and isinstance(param_stats, dict)
+                    and param_stats.get("params_unserialized") == 0)
+        # No request-linked autosave evidence exists in this protocol. Even a
+        # changed file cannot establish load causality, instance ownership or
+        # current memory. Deliberately fail closed for every deploy this batch.
+        out.update(stage="compared", diff=diff,
+                   snapshot_comparison_complete=snapshot_complete)
+        out["why"] = ("Loaded, but this load's snapshot association is unproven; "
+                      "autosave comparison alone cannot verify deployment.")
+    except Exception as exc:  # Never erase a confirmed /load side effect.
+        out.update(stage="verification_failed", error=str(exc),
+                   why="Load succeeded; snapshot verification failed. Do not blindly retry load.")
     return out
 
 
@@ -962,18 +1049,16 @@ def ping():
 #   /host-param /load，且都不回数据）。下面这组工具依赖**李本机编译的**
 #   打了补丁的 Cardinal（tools/osc_patch/），它新增了 5 个只读端点：
 #     /modules  /param-get  /ports  /signal  /light
-#   ⚠️ 若返回 {"error": "probe_not_supported"}，说明跑的是**未打补丁的 exe**。
-#   重编译：bash tools/cross_build_cardinal.sh（先关掉 Cardinal）
+#   无应答只说明未收到有效响应，不能据此认定构建缺端点或建议重编。
 
 PROBE_UNSUPPORTED = {
-    "error": "probe_not_supported",
-    "note": "This Cardinal build has no read probes. Rebuild with "
-            "tools/osc_patch/inject_osc_read.py applied, or run "
-            "tools/cross_build_cardinal.sh. Original Cardinal OSC can only write.",
+    "ok": False, "error": "probe_no_response",
+    "note": "No valid probe reply received. Check process, target, OSC and timeout; "
+            "this does not establish that the build lacks the endpoint. Do not retry writes blindly.",
 }
 
 
-def _ask_status(tag, address, args=()):
+def _ask_status(tag, address, args=(), timeout=None):
     """Send one probe and parse `/resp` ("tag", "payload"[, "status"]).
 
     E1 (2026-10-21) appended a third string: "ok" or "err:<CODE>". Builds that
@@ -982,13 +1067,17 @@ def _ask_status(tag, address, args=()):
 
     Returns (payload, status), or (None, None) when the peer did not answer.
     """
-    res = link().ask(address, args, timeout=1.5)
-    if res is None or len(res) < 2:
+    res = link().ask(address, args, timeout=timeout, reply_tag=tag)
+    if res is None:
         return None, None
+    if not isinstance(res, (list, tuple)) or len(res) not in (2, 3):
+        return "malformed probe reply", "err:E_INTERNAL"
     if str(res[0]) != tag:
         return None, None
     payload = str(res[1])
     status = str(res[2]) if len(res) > 2 else "ok"
+    if status != "ok" and status not in _STATUS_NOTES:
+        return "unknown probe status: %s" % status, "err:E_INTERNAL"
     return payload, status
 
 
@@ -1023,9 +1112,11 @@ def live_modules():
     class of bug where a .vcv file is fine on disk but the engine silently
     dropped a module (e.g. wrong plugin slug).
     """
-    payload = _ask("modules", "/modules")
+    payload, status = _ask_status("modules", "/modules")
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     mods = []
     for item in payload.split(","):
         if not item.strip():
@@ -1086,8 +1177,8 @@ def modules_page(offset=0, limit=32):
 def get_param(module_id, param_id):
     """Read back one knob's DISPLAY value (the physical number, not the stored one).
 
-    Cardinal stores most knobs normalized (ADSR.Attack stores 0.275 but shows
-    275 ms; Bogaudio-VCO.Frequency stores 6.0 octaves but shows 220 Hz). The
+    Display mappings are module-specific (ADSR.Attack stores 0.5 and shows
+    100 ms; Bogaudio VCO also depends on its Slow mode). The
     patched build returns getDisplayValue(), i.e. the number a human can judge.
     """
     payload, status = _ask_status(
@@ -1171,9 +1262,11 @@ def scan_signal(threshold=1e-4):
     The direct answer to "is anything actually sounding right now". A module whose
     every connected output sits at 0 V is producing no sound at this instant.
     """
-    payload = _ask("signal", "/signal")
+    payload, status = _ask_status("signal", "/signal")
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     hits = {}
     for item in payload.split(","):
         if not item.strip():
@@ -1227,9 +1320,11 @@ def build_info():
     timeout becomes diagnosable: process gone = crashed; process alive but no
     reply = OSC not started (they look identical from the client alone).
     """
-    payload = _ask("build-info", "/build-info")
+    payload, status = _ask_status("build-info", "/build-info")
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     info = _parse_kv(payload)
     caps = [c for c in info.pop("caps", "").split(",") if c]
     return {"ok": True, "variant": info.get("variant"), "mode": info.get("mode"),
@@ -1244,9 +1339,11 @@ def cables(module_id=None):
     ground truth — the same connections a human sees dragged on screen.
     """
     args = () if module_id is None else [("h", int(module_id))]
-    payload = _ask("cables", "/cables", args)
+    payload, status = _ask_status("cables", "/cables", args)
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     if payload == "none":
         return {"ok": True, "count": 0, "cables": []}
     out = []
@@ -1467,9 +1564,11 @@ def transport():
 
     Zero-hook — CardinalPluginContext already carries all of it.
     """
-    payload = _ask("transport", "/transport")
+    payload, status = _ask_status("transport", "/transport")
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     info = _parse_kv(payload)
     return {"ok": True,
             "playing": info.get("playing") == "1",
@@ -1489,9 +1588,11 @@ def engine_info():
     carries cpuRefreshMs=1000 so callers know the data can be up to 1 s old —
     the exact age is private engine state we refuse to fake.
     """
-    payload = _ask("engine-info", "/engine-info")
+    payload, status = _ask_status("engine-info", "/engine-info")
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     info = _parse_kv(payload)
     try:
         return {"ok": True,
@@ -1511,9 +1612,11 @@ def plugins(plugin=None):
       answers 'my spelling looks right but it won't load')
     - safeMode: when true, NO plugin loaded at all — first suspect for that case
     """
-    payload = _ask("plugins", "/plugins")
+    payload, status = _ask_status("plugins", "/plugins")
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     info = _parse_kv(payload)
     slugs = [s for s in info.get("plugins", "").split(",") if s and s != "none"]
     out = {"ok": True, "safe_mode": info.get("safeMode") == "1",
@@ -1570,7 +1673,7 @@ def _hist_status(payload, status):
     """
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
-    if status and status.startswith("err"):
+    if status != "ok":
         return {"ok": False, "status": status, "raw": payload,
                 "note": _status_note(status)}
     return {"ok": True, "result": payload, "status": status}
@@ -1588,10 +1691,15 @@ def set_param_by_display(module_id, param, value):
 
     Returns the old/new storage values (a human sees the display value move).
     """
-    payload = _ask("param-set", "/param-set-by-display",
+    invalid = _parameter_input_error(module_id, param, value)
+    if invalid:
+        return invalid
+    payload, status = _ask_status("param-set", "/param-set-by-display",
                    (("h", int(module_id)), ("i", int(param)), ("f", float(value))))
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     if not payload.startswith("ok"):
         return {"ok": False, "raw": payload}
     m = re.match(r"ok old=(\S+) new=(\S+)", payload)
@@ -1612,9 +1720,14 @@ def cable_add(module_id, input_port, target_module_id, output_port):
     ⚠️ One input accepts ONE cable — a second connection on the same input
     displaces the first. That is a hard engine rule, not a tool choice.
     """
+    invalid = _tool_input_error("cardinal_cable_add", {
+        "module_id": module_id, "input_port": input_port,
+        "target_module_id": target_module_id, "output_port": output_port})
+    if invalid:
+        return invalid
     payload, status = _ask_status("cable-add", "/cable-add",
-                   (("h", int(module_id)), ("i", int(input_port)),
-                    ("h", int(target_module_id)), ("i", int(output_port))))
+                   (("h", int(target_module_id)), ("i", int(output_port)),
+                    ("h", int(module_id)), ("i", int(input_port))))
     return _hist_status(payload, status)
 
 
@@ -1643,9 +1756,11 @@ def module_json(module_id):
     for editing a module properly: hand the JSON to module_from_json (JS API) or
     edit it and deploy the patch.
     """
-    payload = _ask("module-json", "/module-json", (("h", int(module_id)),))
+    payload, status = _ask_status("module-json", "/module-json", (("h", int(module_id)),))
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     try:
         data = json.loads(payload)
     except ValueError:
@@ -1711,24 +1826,35 @@ def module_copy(module_id, with_cables=True):
 def midi_out(port, status, data1, data2=0, frame=-1):
     """Inject a MIDI message into the running rack (what a hardware keyboard sends).
 
-    ⚠️ port must be 0..15 (DPF MIDI channel) and status 0x80..0xEF. frame=-1
-    means "send now"; a real frame number is honoured too. If the sequencer
+    ⚠️ port must be 0..15 (DPF MIDI channel) and status 0x80..0xEF. Only
+    frame=-1 (send now) is supported by the current four-argument endpoint.
+    Deferred frames are rejected without sending. If the sequencer
     transport is bypassed, the reply reports skipped:bypassed — the message was
     accepted but NOT delivered, and we say so rather than pretending it worked.
     """
-    payload = _ask("midi-out", "/midi-out",
+    invalid = _tool_input_error("cardinal_midi_out", {
+        "port": port, "status": status, "data1": data1, "data2": data2, "frame": frame})
+    if invalid:
+        return {**invalid, "delivered": False}
+    if frame != -1:
+        return {"ok": False, "delivered": False, "error": "deferred_midi_unsupported"}
+    payload, osc_status = _ask_status("midi-out", "/midi-out",
                    (("i", int(port)), ("i", int(status)),
-                    ("i", int(data1)), ("i", int(data2)), ("i", int(frame))))
+                    ("i", int(data1)), ("i", int(data2))))
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if osc_status != "ok":
+        return {**_hist_status(payload, osc_status), "delivered": False}
     out = {"ok": True, "port": int(port), "status": int(status),
            "data1": int(data1), "data2": int(data2), "frame": int(frame),
            "reply": payload}
     if payload.startswith("skipped"):
         out["delivered"] = False
         out["reason"] = payload
-    else:
+    elif payload == "sent":
         out["delivered"] = True
+    else:
+        out.update(ok=False, delivered=False, error="unexpected_midi_reply")
     return out
 
 
@@ -1754,9 +1880,11 @@ JS_DEFAULT_DIR = r"D:/Cardinal/js"
 
 def js_list():
     """List the JS scripts available to /osc-js-run (1-based indexes)."""
-    payload = _ask("js-list", "/osc-js-list")
+    payload, status = _ask_status("js-list", "/osc-js-list")
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     items = []
     for entry in payload.split(","):
         if ":" in entry:
@@ -1782,9 +1910,12 @@ def js_run(index):
     Over budget returns {"budget_exceeded_ms": N}; a JS error returns
     {"error": "..."}. Write-mode failures are reported, never swallowed.
     """
-    payload = _ask("js", "/osc-js-run", (("i", int(index)),))
+    payload, status = _ask_status("js", "/osc-js-run", (("i", int(index)),),
+                                  timeout=max(TIMEOUT, 3.0))
     if payload is None:
         return dict(PROBE_UNSUPPORTED)
+    if status != "ok":
+        return _hist_status(payload, status)
     out = {"ok": True, "script_index": int(index), "result": payload}
     if payload.startswith("disabled"):
         out["ok"] = False
@@ -2100,7 +2231,7 @@ def screenshot(save_to=None, timeout=8.0):
     on a real GPU it is fine. If you get an all-black PNG, check the renderer
     before assuming the patch is wrong.
     """
-    res = link().ask("/screenshot", [], timeout=timeout)
+    res = link().ask("/screenshot", [], timeout=timeout, reply_tag="screenshot")
     if res is None:
         return {"ok": False,
                 "note": "sent but no reply (Cardinal OSC off? wrong port? "
@@ -2186,10 +2317,12 @@ def module_params(patch=None, module=None, module_id=None, keyword=None):
         d = patchio.read_patch(p)
         targets = d.get("modules", [])
         if module_id is not None:
-            targets = [m for m in targets if m["id"] == int(module_id)]
+            selected, err = contracts.select_target(targets, targets, module, module_id)
+            if err:
+                return err
+            targets = [selected]
         elif module:
-            targets = [m for m in targets
-                       if module.lower() in (m["model"] + "/" + m["plugin"]).lower()]
+            targets, _ = _find_module_instances(d, module)
         if not targets:
             return {"error": "no matching module in patch",
                     "available": [{"id": m["id"], "model": m["model"]}
@@ -2214,16 +2347,7 @@ def module_params(patch=None, module=None, module_id=None, keyword=None):
 
     # Case 3: a single module's full dictionary entry.
     if module:
-        if "/" in module:
-            plugin, model = module.split("/", 1)
-        else:
-            plugin, model = None, module
-        e = pl.lookup(plugin, model) if plugin else None
-        if not e:
-            for v in pl.load().values():
-                if v["model"].lower() == module.lower():
-                    e = v
-                    break
+        e = _lookup_module_entry(module)
         if not e:
             return {"error": f"{module} not in param dictionary",
                     "known": sorted(pl.load().keys())}
@@ -2240,18 +2364,10 @@ def find_param(module, human):
     See paramlib.resolve_name for the Chinese->English keyword expansion.
     """
     import paramlib as pl
-    if "/" in module:
-        plugin, model = module.split("/", 1)
-    else:
-        plugin, model = None, module
-    e = pl.lookup(plugin, model) if plugin else None
+    e = _lookup_module_entry(module)
     if not e:
-        for v in pl.load().values():
-            if v["model"].lower() == module.lower():
-                e = v
-                break
-    if not e:
-        return {"error": f"{module} not in param dictionary"}
+        return {"error": f"{module} not in param dictionary (unknown, invalid or ambiguous)",
+                "known": sorted(pl.load().keys())}
     cands = pl.resolve_name(e["plugin"], e["model"], human)
     return {"module": e["model"], "query": human,
             "candidates": [{"param_id": pid, "name": nm, "score": sc}
@@ -2311,14 +2427,26 @@ def music(what="styles", arg=None, key=None):
 def apply_recipe(patch, recipe_name, load_after=False, weight=1.0):
     """Write a tone recipe into a patch; optionally load it into Cardinal after."""
     import musiclib as ml
+    error = contracts.input_error(bools=dict(load_after=load_after), numbers=dict(weight=weight))
+    if error:
+        return error
     p = resolve(patch)
     if not os.path.exists(p):
         return {"error": f"patch not found: {p}"}
-    res = ml.apply_recipe(p, recipe_name, weight=weight)
+    try:
+        res = ml.apply_recipe(p, recipe_name, weight=weight)
+    except Exception as exc:
+        # musiclib delegates its sole file mutation to atomic patchio.write_patch.
+        return {"ok": False, "written": False, "written_path": None,
+                "load_requested": bool(load_after), "loaded": False,
+                "load_succeeded": None, "verified": False, "stage": "write_failed",
+                "error": f"Recipe preparation/write failed: {exc}"}
     if res.get("error"):
         return res
-    if load_after and res.get("written"):
-        res["loaded"] = load_patch(p)
+    if res.get("written"):
+        return contracts.after_write(res, p, load_after, load_patch)
+    res.update(ok=False, written_path=None, load_requested=bool(load_after),
+               loaded=False, load_succeeded=None, verified=False, stage="not_written")
     return res
 
 
@@ -2600,8 +2728,8 @@ TOOLS = [
             "properties": {
                 "patch": {"type": "string", "description": "patch file name"},
                 "recipe": {"type": "string", "description": "recipe name, e.g. warm_pad"},
-                "weight": {"type": "number", "minimum": 0, "maximum": 1,
-                           "description": "0..1 blend: 1 = fully recipe "
+                "weight": {"type": "number",
+                           "description": "Finite weight clamped to 0..1: 1 = fully recipe "
                            "(default), 0.5 = halfway between current and recipe"},
                 "load_after": {"type": "boolean",
                                "description": "load immediately after writing (replaces current rack)"},
@@ -2640,14 +2768,13 @@ TOOLS = [
     },
     {
         "name": "cardinal_deploy",
-        "description": "One-click deploy: backup the .vcv, run all five audits (refuse to "
-                       "load on FAIL — crash-class problems are stopped BEFORE /load), push "
-                       "into the running Cardinal, wait, then read back and diff. The diff "
-                       "checks STRUCTURE (modules + cables) AND KNOB VALUES (E8 unlocked: "
-                       "the /param-get probe is now in the build, so a knob that never took "
-                       "effect gets caught instead of passing silently). If the knob layer "
-                       "fails, ok=false with the reason in `why` — the structure verdict is "
-                       "still reported separately.",
+        "description": "Audit a .vcv and optionally replace the running rack. "
+                       "load_after=false performs audit only, with no OSC load or diff. "
+                       "Loading loses unsaved rack edits and needs user approval. "
+                       "Warnings, failed/missing structure or parameter evidence, skipped "
+                       "parameters and unknown/stale autosave freshness cannot pass. "
+                       "Verification is limited to autosave_structure_and_params, NOT "
+                       "current memory, sequencer data or user listening (live_verified=false).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2911,7 +3038,9 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "patch": {"type": "string"},
-                "module": {"type": "string", "description": "e.g. songroll (default: first one found)"},
+                "module_id": {"type": "integer", "minimum": 0, "maximum": 2**63 - 1,
+                              "description": "Exact module ID; if module name is given both must match"},
+                "module": {"type": "string", "description": "e.g. songroll; must match exactly one module"},
             },
             "required": ["patch"],
             "additionalProperties": False,
@@ -2923,12 +3052,14 @@ TOOLS = [
         "name": "cardinal_songroll_write",
         "description": "Write a whole SongRoll section table (full replacement, validated "
                        "before touching disk). Each section needs exactly 8 channels, each "
-                       "channel: pattern 1..64 (1-based), repeats 1..64, repeat_mode "
+                       "channel: pattern 1..64 (1-based), repeats 1..4096 (panel limit 64), repeat_mode "
                        "0=no limit / 1=at least / 2=at most, clock_div 0=off / 1..64.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "patch": {"type": "string"},
+                "module_id": {"type": "integer", "minimum": 0, "maximum": 2**63 - 1,
+                              "description": "Exact module ID; if module name is given both must match"},
                 "module": {"type": "string"},
                 "sections": {
                     "type": "array",
@@ -2941,7 +3072,7 @@ TOOLS = [
                                     "type": "object",
                                     "properties": {
                                         "pattern": {"type": "integer", "minimum": 1, "maximum": 64},
-                                        "repeats": {"type": "integer", "minimum": 1, "maximum": 64},
+                                        "repeats": {"type": "integer", "minimum": songroll.REPEATS_MIN, "maximum": songroll.REPEATS_MAX},
                                         "repeat_mode": {"type": "integer", "minimum": 0, "maximum": 2},
                                         "clock_div": {"type": "integer", "minimum": 0, "maximum": 64},
                                     },
@@ -2970,6 +3101,8 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "patch": {"type": "string"},
+                "module_id": {"type": "integer", "minimum": 0, "maximum": 2**63 - 1,
+                              "description": "Exact module ID; if module name is given both must match"},
                 "module": {"type": "string"},
                 "op": {"type": "string",
                        "enum": ["add_section", "remove_section", "duplicate_section",
@@ -2977,7 +3110,7 @@ TOOLS = [
                 "section": {"type": "integer", "minimum": 0, "description": "0-based section index"},
                 "channel": {"type": "integer", "minimum": 1, "maximum": 8},
                 "pattern": {"type": "integer", "minimum": 1, "maximum": 64},
-                "repeats": {"type": "integer", "minimum": 1, "maximum": 64},
+                "repeats": {"type": "integer", "minimum": songroll.REPEATS_MIN, "maximum": songroll.REPEATS_MAX},
                 "mode": {"type": "integer", "minimum": 0, "maximum": 2,
                          "description": "0=no limit 1=at least 2=at most"},
                 "clock_div": {"type": "integer", "minimum": 0, "maximum": 64},
@@ -3049,15 +3182,17 @@ TOOLS = [
         "name": "cardinal_sample_load",
         "description": "Load a wav into a sampler slot — the AI equivalent of right-click → "
                        "'Load sample'. Refuses missing files and out-of-range slots, backs up "
-                       "first, and writes the path style already used by that module so other "
-                       "slots keep resolving. Pass load_after=true to hot-reload.",
+                       "first, and stores the existing canonical absolute file path without changing other "
+                       "slots. Existence is not audio decoding verification. Pass load_after=true to reload.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "patch": {"type": "string"},
+                "module_id": {"type": "integer", "minimum": 0, "maximum": 2**63 - 1,
+                              "description": "Exact module ID; if module name is given both must match"},
                 "file": {"type": "string", "description": "e.g. melody2/m_D4.wav (relative to samples/)"},
-                "slot": {"type": "integer", "minimum": 1, "maximum": 8,
-                         "description": "1-based, NOT 0-based"},
+                "slot": {"type": "integer", "minimum": 1, "maximum": 16,
+                         "description": "1-based; business validates actual samplerx8 (8) or sampler16p (16) slots"},
                 "module": {"type": "string", "description": "disambiguates when several samplers"},
                 "load_after": {"type": "boolean", "default": False},
             },
@@ -3075,7 +3210,9 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "patch": {"type": "string"},
-                "slot": {"type": "integer", "minimum": 1, "maximum": 8,
+                "module_id": {"type": "integer", "minimum": 0, "maximum": 2**63 - 1,
+                              "description": "Exact module ID; if module name is given both must match"},
+                "slot": {"type": "integer", "minimum": 1, "maximum": 16,
                          "description": "1-based"},
                 "module": {"type": "string"},
             },
@@ -3097,12 +3234,14 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "patch": {"type": "string"},
+                "module_id": {"type": "integer", "minimum": 0, "maximum": 2**63 - 1,
+                              "description": "Exact module ID; if module name is given both must match"},
                 "module": {"type": "string"},
                 "measure": {"type": "integer", "minimum": 0},
                 "step": {"type": "integer", "minimum": 0},
-                "pitch": {"type": "integer", "minimum": 0, "maximum": 127,
-                          "description": "MIDI note number, omit to rest a cell. "
-                          "Starsea tracks accept 12..108 only (engine clamps); rcm stores 0..127"},
+                "pitch": {"type": "integer", "minimum": -2**31, "maximum": 2**31 - 1,
+                          "description": "MIDI pitch as int32. Starsea accepts 12..108 only; "
+                          "rcm preserves finite out-of-MIDI pitches with an explicit warning"},
                 "length": {"type": "integer", "minimum": 1, "maximum": 16,
                            "description": "Starsea only, cells"},
                 "velocity": {"type": "number", "minimum": 0, "maximum": 1},
@@ -3128,6 +3267,8 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "patch": {"type": "string"},
+                "module_id": {"type": "integer", "minimum": 0, "maximum": 2**63 - 1,
+                              "description": "Exact module ID; if module name is given both must match"},
                 "module": {"type": "string"},
                 "running": {"type": "boolean"},
                 "pattern": {"type": "integer", "minimum": 0, "default": 0},
@@ -3268,10 +3409,10 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "module_id": {"type": "integer", "description": "module owning the INPUT port"},
-                "input_port": {"type": "integer", "minimum": 0, "maximum": 23,
+                "input_port": {"type": "integer", "minimum": 0, "maximum": 2147483647,
                                "description": "port index on the INPUT module"},
                 "target_module_id": {"type": "integer", "description": "module owning the OUTPUT port"},
-                "output_port": {"type": "integer", "minimum": 0, "maximum": 23,
+                "output_port": {"type": "integer", "minimum": 0, "maximum": 2147483647,
                                 "description": "port index on the OUTPUT module"},
             },
             "required": ["module_id", "input_port", "target_module_id", "output_port"],
@@ -3512,8 +3653,8 @@ TOOLS = [
                          "description": "first data byte, e.g. note number"},
                 "data2": {"type": "integer", "minimum": 0, "maximum": 127,
                           "description": "second data byte, e.g. velocity"},
-                "frame": {"type": "integer", "minimum": -1,
-                          "description": "-1 = send now; a real frame number defers it"},
+                "frame": {"type": "integer", "enum": [-1], "default": -1,
+                          "description": "Only -1 (send now) is supported; deferred frames are rejected"},
             },
             "required": ["port", "status", "data1"],
             "additionalProperties": False,
@@ -3538,11 +3679,9 @@ TOOLS = [
     {
         "name": "cardinal_js_run",
         "description": "★ Run JS INSIDE the running Cardinal (the host-code-execution "
-                       "capability blender/godot/UE MCPs have). This is the only path "
-                       "for operations needing free text or JSON, because this build's "
-                       "liblo cannot RECEIVE string OSC arguments (verified 2026-10-20: "
-                       "all string-input endpoints are dead; sending strings still "
-                       "works). API: read — cardinal.modules()/getParam(id,n)/ports(id)/"
+                       "capability blender/godot/UE MCPs have). Scripts support compound "
+                       "operations and module JSON; use ordinary OSC tools for single actions. "
+                       "API: read — cardinal.modules()/getParam(id,n)/ports(id)/"
                        "cables()/transport()/moduleJson(id); write (CARDINAL_JS_MODE=write "
                        "only) — cardinal.setDisplayValue(id,n,v)/moduleFromJson(id,json)/"
                        "addModule(slug,x,y)/cableAdd(...)/undo()/redo(). CONTRACT: the "
@@ -3645,16 +3784,16 @@ DISPATCH = {
         a["patch"], a["module"], a["measure"], a["step"],
         a.get("pitch"), a.get("length"), a.get("velocity"), a.get("retrigger"),
         a.get("active"), a.get("pattern", 0), a.get("track", 0),
-        a.get("clear", False), True, a.get("load_after", False)),
+        a.get("clear", False), True, a.get("load_after", False), module_id=a.get("module_id")),
     "cardinal_seq_set_running": lambda a: seq.set_running(
         a["patch"], a["module"], a["running"],
-        a.get("pattern", 0), a.get("track", 0), a.get("load_after", False)),
+        a.get("pattern", 0), a.get("track", 0), a.get("load_after", False), module_id=a.get("module_id")),
     # --- song arrangement table (SongRoll sections) ---
     "cardinal_songroll_read": lambda a: songroll.read_sections(
-        a["patch"], a.get("module")),
+        a["patch"], a.get("module"), module_id=a.get("module_id")),
     "cardinal_songroll_write": lambda a: songroll.write_sections(
         a["patch"], a.get("module"), a["sections"],
-        True, a.get("load_after", False)),
+        True, a.get("load_after", False), module_id=a.get("module_id")),
     "cardinal_songroll_edit": lambda a: songroll.edit(
         a["patch"], a.get("module"), a["op"],
         section=a.get("section"), channel=a.get("channel"),
@@ -3662,16 +3801,16 @@ DISPATCH = {
         mode=a.get("mode"), clock_div=a.get("clock_div"),
         index=a.get("index"), after=a.get("after"),
         src=a.get("src"), dst=a.get("dst"), running=a.get("running"),
-        backup=True, load_after=a.get("load_after", False)),
+        backup=True, load_after=a.get("load_after", False), module_id=a.get("module_id")),
     # --- sampler slots (equivalent of right-click -> Load sample) ---
     "cardinal_samples_list": lambda a: samplelib.list_samples(
         a.get("subdir", ""), a.get("limit", 300)),
     "cardinal_sample_inspect": lambda a: samplelib.inspect(a["patch"]),
     "cardinal_sample_load": lambda a: samplelib.load_sample(
         a["patch"], a["file"], a["slot"], a.get("module"),
-        True, a.get("load_after", False)),
+        True, a.get("load_after", False), module_id=a.get("module_id")),
     "cardinal_sample_clear": lambda a: samplelib.clear_slot(
-        a["patch"], a["slot"], a.get("module")),
+        a["patch"], a["slot"], a.get("module"), module_id=a.get("module_id")),
     # ---------------- B 组读数（第二批注入的只读端点，2026-10-20）----------
     "cardinal_build_info": lambda a: build_info(),
     "cardinal_cables": lambda a: cables(a.get("module_id")),
@@ -3715,6 +3854,73 @@ DISPATCH = {
 }
 
 
+def _validate_arguments(value, schema, path="arguments"):
+    """Validate the JSON-Schema subset used by TOOLS, without coercion/defaults."""
+    typ = schema.get("type")
+    valid = {"object": isinstance(value, dict), "array": isinstance(value, list),
+             "string": isinstance(value, str), "boolean": isinstance(value, bool),
+             "integer": isinstance(value, int) and not isinstance(value, bool),
+             "number": isinstance(value, (int, float)) and not isinstance(value, bool)}
+    if typ is not None and not valid.get(typ, False):
+        raise ValueError("%s must be %s" % (path, typ))
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("%s must be finite" % path)
+    if "enum" in schema and value not in schema["enum"]:
+        raise ValueError("%s is not an allowed value" % path)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            raise ValueError("%s is below minimum" % path)
+        if "maximum" in schema and value > schema["maximum"]:
+            raise ValueError("%s is above maximum" % path)
+    if isinstance(value, dict):
+        for key in schema.get("required", []):
+            if key not in value:
+                raise ValueError("%s.%s is required" % (path, key))
+        properties = schema.get("properties", {})
+        for key, item in value.items():
+            if key not in properties and schema.get("additionalProperties") is False:
+                raise ValueError("%s.%s is not allowed" % (path, key))
+            _validate_arguments(item, properties.get(key, {}), "%s.%s" % (path, key))
+    elif isinstance(value, list):
+        if len(value) < schema.get("minItems", 0):
+            raise ValueError("%s has too few items" % path)
+        for index, item in enumerate(value):
+            _validate_arguments(item, schema.get("items", {}), "%s[%d]" % (path, index))
+
+
+def _tool_input_error(name, arguments):
+    """Use the published schema for direct Python helpers as well as MCP."""
+    spec = next((tool for tool in TOOLS if tool["name"] == name), None)
+    if spec is None:
+        return {"ok": False, "error": "unknown tool: %s" % name}
+    try:
+        _validate_arguments(arguments, spec["inputSchema"])
+    except ValueError as exc:
+        return {"ok": False, "error": "invalid_arguments", "note": str(exc)}
+    return None
+
+
+def _call_tool(name, arguments):
+    """Shared validated entry for MCP and CLI; direct Python writes also guard inputs."""
+    spec = next((tool for tool in TOOLS if tool["name"] == name), None)
+    if spec is None or name not in DISPATCH:
+        raise ValueError("unknown tool: %s" % name)
+    _validate_arguments(arguments, spec["inputSchema"])
+    return DISPATCH[name](arguments)
+
+
+def _tool_failed(data):
+    """Preserve failures from the business result and requested load stage."""
+    if not isinstance(data, dict):
+        return False
+    checks = data.get("checks")
+    audit_crashed = (isinstance(checks, dict) and any(
+        isinstance(checks.get(name), dict) and bool(checks[name].get("error"))
+        for name in ("ports", "values", "flow", "chain", "validate")))
+    return (data.get("ok") is False or bool(data.get("error")) or audit_crashed
+            or (isinstance(data.get("loaded"), dict) and _tool_failed(data["loaded"])))
+
+
 def handle(req):
     """Handle one JSON-RPC request and return a response dict (or None for a
     notification that needs no reply).
@@ -3723,8 +3929,14 @@ def handle(req):
     over stdio. Every tool call is wrapped in try/except so a single tool error
     becomes an `isError` result instead of killing the server.
     """
+    if not isinstance(req, dict):
+        return {"jsonrpc": "2.0", "id": None,
+                "error": {"code": -32600, "message": "request must be an object"}}
     method, rid = req.get("method"), req.get("id")
-    params = req.get("params") or {}
+    params = req.get("params", {})
+    if not isinstance(params, dict):
+        return {"jsonrpc": "2.0", "id": rid,
+                "error": {"code": -32602, "message": "params must be an object"}}
 
     def result(payload):
         return {"jsonrpc": "2.0", "id": rid, "result": payload}
@@ -3749,16 +3961,16 @@ def handle(req):
         return result({"tools": TOOLS})
     if method == "tools/call":
         name = params.get("name")
-        args = params.get("arguments") or {}
-        fn = DISPATCH.get(name)
+        args = params.get("arguments", {})
+        fn = DISPATCH.get(name) if isinstance(name, str) else None
         if fn is None:
             return {"jsonrpc": "2.0", "id": rid, "result": {
                 "content": [{"type": "text", "text": f"unknown tool: {name}"}],
                 "isError": True}}
         try:
-            data = fn(args)
+            data = _call_tool(name, args)
             text = json.dumps(data, ensure_ascii=False, indent=2)
-            payload = {"content": [{"type": "text", "text": text}], "isError": False}
+            payload = {"content": [{"type": "text", "text": text}], "isError": _tool_failed(data)}
             # structured tool output (MCP 2025-06-18): a machine-readable twin
             # of the text content, conforming to the tool's outputSchema.
             # Guarded by isinstance so the declared schema stays honest even if
@@ -3884,16 +4096,17 @@ if __name__ == "__main__":
             sys.exit(1)
         tool = sys.argv[i + 1]
         raw = sys.argv[i + 2] if len(sys.argv) > i + 2 else "{}"
-        fn = DISPATCH.get(tool) or DISPATCH.get("cardinal_" + tool.lstrip("_"))
-        if fn is None:
+        name = tool if tool in DISPATCH else "cardinal_" + tool.lstrip("_")
+        if name not in DISPATCH:
             print("unknown tool:", tool)
             print("available:", ", ".join(sorted(DISPATCH)))
             sys.exit(1)
         try:
-            out = fn(json.loads(raw))
+            out = _call_tool(name, json.loads(raw))
         except Exception as e:
             out = {"error": str(e)}
         print(json.dumps(out, ensure_ascii=False, indent=2))
+        sys.exit(1 if _tool_failed(out) else 0)
     elif "--tools" in sys.argv:
         for t in TOOLS:
             print("  {:<28} {}".format(t["name"], t["description"].split(".")[0]))

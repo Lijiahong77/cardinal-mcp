@@ -1,0 +1,79 @@
+diff --git a/src/SongRoll/ClockDivControlWidget.cpp b/src/SongRoll/ClockDivControlWidget.cpp
+index 4ec741a3fee5a311a3a0719b63a0bb3d72555b7f..5f6ee8ffa58612ec005db3d413ab38b999d4423c 100644
+--- a/src/SongRoll/ClockDivControlWidget.cpp
++++ b/src/SongRoll/ClockDivControlWidget.cpp
+@@ -104,13 +104,15 @@ namespace SongRoll {
+       return;
+     int sec = clamp(module->currentSection, 0, int(data.sections.size()) - 1);
+ 
+-    json_t* oldModuleJ = module->dataToJson();
++    // undo/redo may happen before another UI step; data is authoritative.
++    clock_div = data.sections[sec].channels[channel].clock_div;
++    json_t* oldModuleJ = module->toJson();
+     if (minus.contains(e.pos))
+       clock_div = clamp(clock_div - 1, 0, 64);
+     else if (plus.contains(e.pos))
+       clock_div = clamp(clock_div + 1, 0, 64);
+     data.sections[sec].channels[channel].clock_div = clock_div;
+-    json_t* newModuleJ = module->dataToJson();
++    json_t* newModuleJ = module->toJson();
+ 
+     history::ModuleChange* h = new history::ModuleChange;
+     h->name = "change clock div";
+diff --git a/src/SongRoll/PatternControlWidget.cpp b/src/SongRoll/PatternControlWidget.cpp
+index c57b7abf42073ba9db047216b835fb4c7500187a..c8142f78595c15641e5b51062ffe198e9e2cf34e 100644
+--- a/src/SongRoll/PatternControlWidget.cpp
++++ b/src/SongRoll/PatternControlWidget.cpp
+@@ -73,10 +73,10 @@ namespace SongRoll {
+     else
+       newPattern = clamp(oldPattern + 1, 1, 64);
+ 
+-    json_t* oldModuleJ = module->dataToJson();
++    json_t* oldModuleJ = module->toJson();
+     data.sections[sec].channels[channel].pattern = newPattern;
+     pattern = newPattern - 1;   // widget display field 0-based
+-    json_t* newModuleJ = module->dataToJson();
++    json_t* newModuleJ = module->toJson();
+ 
+     history::ModuleChange* h = new history::ModuleChange;
+     h->name = "change pattern";
+diff --git a/src/SongRoll/PatternControllerSlice.cpp b/src/SongRoll/PatternControllerSlice.cpp
+index fc34b605ca80fa6a0060024b7b6781ccdcf0b2d7..c405ae1e01af8d16033aa012c0292328ff1e8e0c 100644
+--- a/src/SongRoll/PatternControllerSlice.cpp
++++ b/src/SongRoll/PatternControllerSlice.cpp
+@@ -47,8 +47,8 @@ namespace SongRoll {
+     }
+     int sec = clamp(module->currentSection, 0, int(data.sections.size()) - 1);
+ 
+-    // 段切换：从 data 刷新控件显示值
+-    if (sec != displayedSection) {
++    // 每帧单向从 data 刷新显示；同段 undo/redo 或 JSON 替换也会改值。
++    {
+       displayedSection = sec;
+       const ChannelConfig& ch = data.sections[sec].channels[channel];
+       pattern->pattern = ch.pattern - 1;   // engine 1-based -> widget 0-based
+diff --git a/src/SongRoll/RepeatControlWidget.cpp b/src/SongRoll/RepeatControlWidget.cpp
+index a137df74d5385645bef96e7e1ed2e4f5768a16eb..2870634d9599d43b5efaaeda0f1c93f08aaea6fe 100644
+--- a/src/SongRoll/RepeatControlWidget.cpp
++++ b/src/SongRoll/RepeatControlWidget.cpp
+@@ -88,7 +88,10 @@ namespace SongRoll {
+       return;
+     int sec = clamp(module->currentSection, 0, int(data.sections.size()) - 1);
+ 
+-    json_t* oldModuleJ = module->dataToJson();
++    // undo/redo may happen before another UI step; data is authoritative.
++    repeats = data.sections[sec].channels[channel].repeats;
++    repeat_mode = int(data.sections[sec].channels[channel].repeat_mode);
++    json_t* oldModuleJ = module->toJson();
+     if (minus.contains(e.pos))
+       repeats = clamp(repeats - 1, 1, 64);
+     else if (plus.contains(e.pos))
+@@ -97,7 +100,7 @@ namespace SongRoll {
+       repeat_mode = (repeat_mode + 1) % 3;
+     data.sections[sec].channels[channel].repeats = repeats;
+     data.sections[sec].channels[channel].repeat_mode = ChannelConfig::eRepeatMode(repeat_mode);
+-    json_t* newModuleJ = module->dataToJson();
++    json_t* newModuleJ = module->toJson();
+ 
+     history::ModuleChange* h = new history::ModuleChange;
+     h->name = "change repeats";

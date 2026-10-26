@@ -53,6 +53,7 @@ import os
 from typing import Any
 
 import patchio
+import editor_contracts as contracts
 
 PATCH_DIR = os.environ.get("CARDINAL_PATCH_DIR") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "patches"
@@ -275,13 +276,16 @@ def load_sample(
     slot: int = 1,
     module: str | None = None,
     backup: bool = True,
-    load_after: bool = False,
-) -> dict[str, Any]:
+    load_after: bool = False, module_id: int | None = None) -> dict[str, Any]:
     """把一个采样装进指定槽位 —— 等价于人右键 → Load sample。
 
     file    相对 samples_dir 的路径（如 "melody2/m_D4.wav"）或绝对路径
     slot    1..8（samplerx8）/ 1..16（sampler16p）。**1 起**。
     """
+    error = contracts.input_error(ints=dict(slot=slot),
+                                  bools=dict(backup=backup, load_after=load_after))
+    if error:
+        return error
     path = _resolve_patch(patch_name)
     out: dict[str, Any] = {
         "patch": patch_name, "file": file, "slot": slot, "module": module,
@@ -301,26 +305,11 @@ def load_sample(
         out["supported"] = sorted(SAMPLERS)
         return out
 
-    targets = [
-        f for f in found
-        if not module or module.lower() in f"{f[0].get('plugin')}|{f[0].get('model')}".lower()
-    ]
-    if not targets:
-        out["error"] = f"机架里没有名为 {module} 的采样模块"
-        out["found"] = [f"{m.get('plugin')}|{m.get('model')}" for m, _s, _t, _r in found]
+    m, error = contracts.select_target(d.get("modules") or [], [f[0] for f in found], module, module_id)
+    if error:
+        out.update(error)
         return out
-    if len(targets) > 1:
-        out["error"] = (
-            f"机架里有 {len(targets)} 个采样模块，请用 module 参数指定是哪一个"
-        )
-        out["found"] = [
-            {"module_id": m.get("id"),
-             "module": f"{m.get('plugin')}|{m.get('model')}"}
-            for m, _s, _t, _r in targets
-        ]
-        return out
-
-    m, slots, tmpl, rootf = targets[0]
+    _, slots, tmpl, rootf = next(f for f in found if f[0] is m)
     data = m.setdefault("data", {})
 
     # --- 自检 1：槽位范围 ---
@@ -330,57 +319,26 @@ def load_sample(
                          f"（源码里槽位是 1..{slots}，不是 0..{slots-1}）"}
 
     # --- 自检 2：文件真的存在吗 ---
-    full = _abs_of(file)
+    full = os.path.realpath(os.path.abspath(_abs_of(file))).replace("\\", "/")
     if not os.path.isfile(full):
         return {"ok": False, "refuse": "file_not_found",
                 "error": f"找不到采样文件：{full}",
                 "hint": "先用 cardinal_samples_list 看看有哪些。",
                 "samples_dir": SAMPLES_DIR}
-    rel = _rel_of(full)
-
     before = data.get(tmpl.format(slot), "") or ""
-
-    # --- ⛔ 风格必须与该模块已有条目一致 ---
-    # 实测机架里已有条目是 `samples/melody2/m_D4.wav`（含 samples/ 前缀）。
-    # 若新写 `melody2/xxx.wav`，同一模块里两种风格混存 + root 被改，
-    # 原来能解析的槽可能解析不到 ⇒ 静默哑掉。
-    # ⇒ 以「已有条目」为准；空模块才用 SAMPLES_DIR 基准。
-    existing = [
-        v for k, v in data.items()
-        if k.startswith("loaded_sample_path_") and v
-    ]
-    if existing:
-        sample = existing[0].replace("\\", "/")
-        prefix = sample.rsplit("/", 1)[0] if "/" in sample else ""
-        rel_new = f"{prefix}/{os.path.basename(rel)}" if prefix else os.path.basename(rel)
-        root_new = prefix
-    else:
-        rel_new = rel
-        root_new = os.path.dirname(rel_new) or ""
-    del rel          # 只用 rel_new，避免混用
+    # Persist exactly the canonical file whose existence was checked above.
+    # Root is a file-dialog directory only, never a sample path resolver.
+    rel_new = full
+    root_new = os.path.dirname(full).replace("\\", "/")
 
     # --- 写 path ---
     data[tmpl.format(slot)] = rel_new
-    # --- ⛔ 必须同步写 root（相对路径靠它解析，见文件头）
+    # Root remembers only the file-dialog directory.
     if rootf:
         before_root = data.get(rootf, "")
         data[rootf] = root_new
     else:
         before_root, root_new = None, None
-
-    if backup:
-        import shutil
-
-        bak = path + ".bak-sample"
-        shutil.copy2(path, bak)
-        out["backup"] = bak
-        out["backup_note"] = "⚠️ Cardinal 若开着，之后在里面 Ctrl+S 会覆盖这次改动。"
-
-    try:
-        patchio.write_patch(path, d)
-    except Exception as e:  # noqa: BLE001
-        out["error"] = f"写盘失败（已备份，可回滚）：{e}"
-        return out
 
     out.update({
         "ok": True,
@@ -395,19 +353,18 @@ def load_sample(
         "root_after": root_new,
         "written": path,
     })
-    if before:
-        out["note"] = f"槽 {slot} 原先装的是 {before}，已被覆盖。"
-
-    if load_after:
-        import cardinal_mcp as cm
-
-        out["loaded"] = cm.load_patch(os.path.basename(path))
+    out = contracts.save_edit(out, path, d, ".bak-sample" if backup else None, load_after)
+    if before and out.get("written"):
+        out["note"] = f"槽 {slot} 原先装的是 {before}，文件记录已被覆盖（未验证现场采样加载）。"
     return out
 
 
 def clear_slot(patch_name: str, slot: int, module: str | None = None,
-               backup: bool = True) -> dict[str, Any]:
+               backup: bool = True, module_id: int | None = None) -> dict[str, Any]:
     """清空一个采样槽（相当于人在界面上把槽清掉）。"""
+    error = contracts.input_error(ints=dict(slot=slot), bools=dict(backup=backup))
+    if error:
+        return error
     path = _resolve_patch(patch_name)
     out: dict[str, Any] = {"patch": patch_name, "slot": slot}
     if not path:
@@ -420,14 +377,11 @@ def clear_slot(patch_name: str, slot: int, module: str | None = None,
         return out
 
     found = _find_samplers(d)
-    targets = [f for f in found
-               if not module or module.lower() in f"{f[0].get('plugin')}|{f[0].get('model')}".lower()]
-    if not targets:
-        out["error"] = f"机架里没有 {module or '采样模块'}"
-        out["found"] = [f"{m.get('plugin')}|{m.get('model')}" for m, *_ in found]
+    m, error = contracts.select_target(d.get("modules") or [], [f[0] for f in found], module, module_id)
+    if error:
+        out.update(error)
         return out
-
-    m, slots, tmpl, _rf = targets[0]
+    _, slots, tmpl, _rf = next(f for f in found if f[0] is m)
     if not (1 <= slot <= slots):
         return {"ok": False, "refuse": "slot_out_of_range",
                 "error": f"槽位 {slot} 越界，该模块有 {slots} 个槽"}
@@ -435,18 +389,8 @@ def clear_slot(patch_name: str, slot: int, module: str | None = None,
     before = data.get(tmpl.format(slot), "") or ""
     data[tmpl.format(slot)] = ""
 
-    if backup:
-        import shutil
-
-        bak = path + ".bak-sample"
-        shutil.copy2(path, bak)
-    try:
-        patchio.write_patch(path, d)
-    except Exception as e:  # noqa: BLE001
-        out["error"] = f"写盘失败（已备份）：{e}"
-        return out
-    out.update({"ok": True, "cleared": before or None, "backup": path + ".bak-sample"})
-    return out
+    out["cleared"] = before or None
+    return contracts.save_edit(out, path, d, ".bak-sample" if backup else None)
 
 
 def set_mute(patch_name: str, slot: int, muted: bool,
