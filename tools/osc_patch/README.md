@@ -2,7 +2,9 @@
 
 > **2026-10-26 最终交付更新**：native17 已经许可构建/部署，当前事实、SHA、有限实机范围和待验项见 [DELIVERY-2026-10-26.md](../../docs/DELIVERY-2026-10-26.md)。下方“未部署”为集成当时记录。统一离线复跑使用 `python -B tools/run_safety_regression.py --out <仓库外新目录> --tmpdir <仓库外scratch> --wsl-source <WSL固定对象源码根> --jansson-include-dir <Linux开发头目录>`（从仓库根）；当前前提是 Windows + Ubuntu-26.04 WSL、python-osc/zstandard、g++ C++11/Jansson，不缺省 skip。头目录必须含 `jansson.h` 和 `jansson_config.h`，来自合法开发包/已配置依赖树；也可用进程级 `JANSSON_INCLUDE_DIR`，无配置/缺头必须失败，无旧 lab 默认回退。Windows 到 WSL 以独立 `env` argv 显式传值，不改全局环境。入口显式 15 suite，最后 295 唯一方法；不执行盲 discover，socket veto 在产品/测试导入前（不冒充 native 子进程网络/认证审计）。输出参数、可替换的本机头目录示例、standalone 命令、固定对象和 fixtures 来源详见交付页。
 
-> 建立：2026-10-21 · 当前恢复契约：17 组 patch、33 个 OSC 端点；包含 SongRoll、rackwindows near/far 构建兼容、参数健壮性、SongRoll history/UI及停止首段规则。第15、16、17组未部署。新增/修改文件是否已提交须另看 git status，文件存在不等于已进 git。
+> 建立：2026-10-21 · 当前恢复契约：17 组 patch、33 个 OSC 端点；包含 SongRoll、rackwindows near/far 构建兼容、参数健壮性、SongRoll history/UI及停止首段规则。01–17 代码交付为 338a955，native17 已许可部署；以下阶段“未部署”保留原历史，当前验收边界见交付页。新增/修改文件是否已提交仍须另看 git status。
+
+**测试入口：[TESTING.md](TESTING.md)**。区分生产恢复 patch、持久 fixtures、param/history/stopfirst 提取壳与第三方 reference；它们不是可直接运行的生产插件。文档总导航见 [docs/README.md](../../docs/README.md)。
 
 ---
 
@@ -62,9 +64,9 @@ tools/osc_patch/
 
 ## 三、怎么用
 
-### 3.1 日常：源码树已经是改好的状态，什么都不用做
+### 3.1 日常：不要为验证而重放现役 dirty 树
 
-不要为验证而重放现役 dirty 树；第15、16、17组仅恢复链集成，现役源码与 EXE/resources 未更新，**未部署**。文件存在不等于已提交。
+本链的代码交付与 native17 本地部署已完成，详见页首交付记录；不据此推断任何 dirty 上游工作树都等同已恢复基线。日常无需为“验证一下”改写现役源码或加载机架。下方 §3.4–3.6 的“未部署”等是集成当时记录，不覆盖当前结果。
 
 ### 3.2 恢复入口：先备份并显式确认目标，勿清理现役 dirty 树
 
@@ -235,6 +237,7 @@ E3 把端点注册改成 X-macro `REG("/path", "types", handler)`，
 
 ## 八、相关文档
 
-- 编译步骤：`HANDOFF.md` §2.4
-- 端点清单与分组：`docs/TODO-BACKLOG.md` 第三章
-- MCP 侧工具：`tools/cardinal_mcp.py`（55 个工具）
+- 当前交付/构建前提：[DELIVERY-2026-10-26.md](../../docs/DELIVERY-2026-10-26.md)
+- 测试目录导航：[TESTING.md](TESTING.md)
+- 接手历史：[HANDOFF.md](../../HANDOFF.md)；唯一待办：[TODO-BACKLOG.md](../../docs/TODO-BACKLOG.md)
+- MCP 侧真实工具表：[cardinal_mcp.py](../cardinal_mcp.py)（64 个工具，TOOLS/DISPATCH）

@@ -1,6 +1,9 @@
-# Candidate17 source-extraction harness
+# SongRoll stop-first source-extraction harness
 
-Not registered in production PATCHES. Root for `candidate.patch`: `plugins/rcm-modules`.
+The local `candidate.patch` is a test artifact, not a separately registered replay item.
+Its bytes are integrated as production patch 17; apply root: `plugins/rcm-modules`.
+See the [test index](../TESTING.md) for the explicit runner, source provenance and
+current prerequisites. This harness/reference is not a loadable production plugin.
 `after16.json` contains exact compressed preimages of the seven changed files;
 `reference/` contains actual candidate and Rack serialization/history source, not
 invented expected implementation. `sources.json` pins their bytes.
@@ -8,12 +11,15 @@ invented expected implementation. `sources.json` pins their bytes.
 Run in WSL (fresh output directory, real C++11/Jansson):
 
 ```
-python3 -B /mnt/d/Cardinal/tools/osc_patch/songroll_stopfirst_harness/run.py --out /home/lijia/NEW-OUTPUT
-python3 -B /mnt/d/Cardinal/tools/osc_patch/songroll_stopfirst_harness/replay.py --root /home/lijia/NEW-FIXTURE
+python3 -B tools/osc_patch/songroll_stopfirst_harness/run.py --out /path/to/new/output --jansson-include-dir /path/to/jansson-development/include
+python3 -B tools/osc_patch/songroll_stopfirst_harness/replay.py --root /path/to/new/fixture
 ```
 
-Default Jansson include is the read-only full14 build lab; runtime is real system
-libjansson.so.4. No install/network/device is needed. Missing dependencies fail,
+Run from the Linux-accessible repository root; output/fixture paths must be external
+and new. Explicitly supply the Linux Jansson include directory through the flag above
+or process-level `JANSSON_INCLUDE_DIR`; it must contain real `jansson.h` and generated
+`jansson_config.h`. There is no old-lab default. Runtime is real Linux
+libjansson.so.4. Once dependencies are prepared, no network/device is needed. Missing dependencies fail,
 not skip. Runtime cases have subprocess timeouts only in the outer unittest.
 `test_replay_songroll_stopfirst_candidate.py` exposes 52 source cases +6 artifact
 methods (58 unique methods); 12 B1 cases extend the old46. C++/TSan reruns are
